@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 
 export default function RegisterPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -14,7 +15,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ name, email, password }),
     });
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: "Failed" }));
@@ -31,6 +32,13 @@ export default function RegisterPage() {
         <h1 className="text-xl font-medium text-gray-900 mb-1">Create account</h1>
         <p className="text-sm text-gray-500 mb-6">Use email and a password (min 8 chars).</p>
         <form onSubmit={onSubmit} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Account name (optional)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+          />
           <input
             type="email"
             placeholder="Email"

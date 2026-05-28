@@ -17,11 +17,12 @@ await prompts.deleteMany({});
 
 const passwordHash = await bcrypt.hash("password123", 10);
 const accounts = [
-  { email: "alice@example.com", passwordHash, createdAt: new Date() },
-  { email: "bob@example.com", passwordHash, createdAt: new Date() },
+  { email: "alice@example.com", passwordHash, name: "Alice Nowak", image: "https://i.pravatar.cc/150?u=alice@example.com", createdAt: new Date() },
+  { email: "bob@example.com", passwordHash, name: "Bob Kowalski", image: null, createdAt: new Date() },
 ];
 await users.insertMany(accounts);
 
+const base = Date.now();
 const seed = [
   // alice — writer + coder
   { ownerEmail: "alice@example.com", category: "Writing",      name: "Summarize",          description: "Summarize any text in 3 bullets.",         body: "Summarize the following text in 3 bullets: <TEXT>" },
@@ -39,7 +40,7 @@ const seed = [
   { ownerEmail: "bob@example.com",   category: "Learning",     name: "Flashcards",         description: "Generate flashcards from notes.",          body: "Make 10 Q/A flashcards from these notes: <NOTES>" },
   { ownerEmail: "bob@example.com",   category: "Fun",          name: "Dad joke",           description: "Tell a clean dad joke about a topic.",     body: "Tell me 3 clean dad jokes about <TOPIC>." },
 ];
-await prompts.insertMany(seed);
+await prompts.insertMany(seed.map((p, i) => ({ ...p, createdAt: new Date(base + i * 1000) })));
 
 console.log("seeded:", {
   users: await users.countDocuments(),
