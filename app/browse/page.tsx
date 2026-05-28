@@ -3,13 +3,15 @@ import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
-type Prompt = { id: string; name: string; description: string };
+type Prompt = { id: string; name: string; description: string; category: string };
 
 export default function BrowsePage() {
   const { status, data } = useSession();
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [category, setCategory] = useState<string | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -20,12 +22,17 @@ export default function BrowsePage() {
     if (status !== "authenticated") return;
     const t = setTimeout(async () => {
       setLoading(true);
-      const res = await fetch("/api/prompts" + (q ? `?q=${encodeURIComponent(q)}` : ""));
-      setPrompts(res.ok ? await res.json() : []);
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (category) params.set("category", category);
+      const res = await fetch("/api/prompts" + (params.toString() ? `?${params}` : ""));
+      const body = res.ok ? await res.json() : { prompts: [], categories: [] };
+      setPrompts(body.prompts);
+      setCategories(body.categories);
       setLoading(false);
     }, 200);
     return () => clearTimeout(t);
-  }, [q, status]);
+  }, [q, category, status]);
 
   if (status !== "authenticated") return null;
 
@@ -48,6 +55,25 @@ export default function BrowsePage() {
           onChange={(e) => setQ(e.target.value)}
           className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-gray-500"
         />
+        {categories.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => setCategory(null)}
+              className={`text-xs px-2.5 py-1 rounded-full border ${category === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"}`}
+            >
+              All
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(category === c ? null : c)}
+                className={`text-xs px-2.5 py-1 rounded-full border ${category === c ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"}`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
         <ul className="mt-4 divide-y divide-gray-200 border border-gray-200 rounded bg-white">
           {loading && <li className="px-4 py-3 text-sm text-gray-400">Loading…</li>}
           {!loading && prompts.length === 0 && (
@@ -57,10 +83,13 @@ export default function BrowsePage() {
             <li key={p.id}>
               <button
                 onClick={() => {/* mock download */}}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50"
+                className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start justify-between gap-3"
               >
-                <div className="text-sm font-medium text-gray-900">{p.name}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{p.description}</div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{p.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{p.description}</div>
+                </div>
+                <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 shrink-0 mt-0.5">{p.category}</span>
               </button>
             </li>
           ))}
