@@ -163,18 +163,18 @@ export async function toggleStar(db: Db, promptId: string, userEmail: string): P
   const prompt = await db.collection("prompts").findOne({ _id: new ObjectId(promptId) });
   if (!prompt) return false;
   
-  const starredBy = prompt.starredBy || [];
+  const starredBy = (prompt.starredBy || []) as string[];
   const isStarred = starredBy.includes(userEmail);
   
   if (isStarred) {
     await db.collection("prompts").updateOne(
       { _id: new ObjectId(promptId) },
-      { $pull: { starredBy: userEmail } }
+      { $pull: { starredBy: userEmail } as any }
     );
   } else {
     await db.collection("prompts").updateOne(
       { _id: new ObjectId(promptId) },
-      { $addToSet: { starredBy: userEmail } }
+      { $addToSet: { starredBy: userEmail } as any }
     );
   }
   
