@@ -106,6 +106,17 @@ export default function PromptDetailPage({ params }: { params: { id: string } })
       <Navbar />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Image Banner */}
+        {prompt.image && (
+          <div className="mb-6 rounded-xl overflow-hidden">
+            <img
+              src={prompt.image}
+              alt={prompt.name}
+              className="w-full h-64 object-cover"
+            />
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-6">
           <Link href="/browse" className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4">

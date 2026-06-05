@@ -167,15 +167,21 @@ export async function toggleStar(db: Db, promptId: string, userEmail: string): P
   const isStarred = starredBy.includes(userEmail);
   
   if (isStarred) {
+    // Remove star
     await db.collection("prompts").updateOne(
       { _id: new ObjectId(promptId) },
       { $pull: { starredBy: userEmail } as any }
     );
+    // Remove from user's favorites
+    await removeFromFavorites(db, userEmail, promptId);
   } else {
+    // Add star
     await db.collection("prompts").updateOne(
       { _id: new ObjectId(promptId) },
       { $addToSet: { starredBy: userEmail } as any }
     );
+    // Add to user's favorites
+    await addToFavorites(db, userEmail, promptId);
   }
   
   return !isStarred;
@@ -207,7 +213,7 @@ export async function sharePrompt(db: Db, promptId: string, ownerEmail: string, 
   
   await db.collection("prompts").updateOne(
     { _id: new ObjectId(promptId) },
-    { $addToSet: { sharedWith: shareWithEmail } }
+    { $addToSet: { sharedWith: shareWithEmail } } as any
   );
   return true;
 }

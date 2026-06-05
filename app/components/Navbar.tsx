@@ -15,25 +15,12 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">P</span>
-            </div>
+            <img src="/static/image.png" alt="PromptingHub Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-semibold text-gray-900 dark:text-white">PromptingHub</span>
           </Link>
 
-          {/* Search - hidden on mobile, shown on larger screens */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8">
-            <div className="relative w-full">
-              <input
-                type="search"
-                placeholder="Search prompts..."
-                className="w-full px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              />
-              <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
+          {/* Spacer */}
+          <div className="flex-1"></div>
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
@@ -83,8 +70,22 @@ export function Navbar() {
                   </Link>
 
                   <Link href={`/user/${data?.user?.email}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <Avatar name={data?.user?.name || ""} image={data?.user?.image} size={32} />
+                    {data?.user?.image ? (
+                      <img src={data.user.image} alt={data.user.name || "User"} className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <Avatar name={data?.user?.name || ""} image={data?.user?.image} size={32} />
+                    )}
                   </Link>
+
+                  <button
+                    onClick={() => signOut()}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    title="Sign out"
+                  >
+                    <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </button>
                 </div>
               </>
             ) : (
