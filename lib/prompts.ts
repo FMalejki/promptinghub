@@ -184,14 +184,14 @@ export async function toggleStar(db: Db, promptId: string, userEmail: string): P
 export async function addToFavorites(db: Db, userEmail: string, promptId: string): Promise<void> {
   await db.collection("users").updateOne(
     { email: userEmail },
-    { $addToSet: { favorites: promptId } }
+    { $addToSet: { favorites: promptId } } as any
   );
 }
 
 export async function removeFromFavorites(db: Db, userEmail: string, promptId: string): Promise<void> {
   await db.collection("users").updateOne(
     { email: userEmail },
-    { $pull: { favorites: promptId } }
+    { $pull: { favorites: promptId } } as any
   );
 }
 
