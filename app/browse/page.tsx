@@ -1,32 +1,41 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { signOut, useSession } from "next-auth/react";
-import Link from "next/link";
-import { Avatar } from "../Avatar";
+import { useSession } from "next-auth/react";
+import { Navbar } from "../components/Navbar";
+import { PromptCard } from "../components/PromptCard";
+import { PROMPT_CATEGORIES } from "@/lib/constants";
 
 type Author = { email: string; name: string; image: string | null };
-type Prompt = { id: string; name: string; description: string; category: string; author: Author };
+type Prompt = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  author: Author;
+  image: string | null;
+  stars: number;
+  isPrivate: boolean;
+};
 
 export default function BrowsePage() {
   const { status, data } = useSession();
-  const authed = status === "authenticated";
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const [sort, setSort] = useState<"recent" | "popular">("recent");
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (category) params.set("category", category);
+    params.set("sort", sort);
+    
     const res = await fetch("/api/prompts" + (params.toString() ? `?${params}` : ""));
-    const body = res.ok ? await res.json() : { prompts: [], categories: [] };
-    setPrompts(body.prompts);
-    setCategories(body.categories);
+    const body = res.ok ? await res.json() : { prompts: [] };
+    setPrompts(body.prompts || []);
     setLoaded(true);
-  }, [q, category]);
+  }, [q, category, sort]);
 
   useEffect(() => {
     const t = setTimeout(load, 200);
@@ -34,118 +43,140 @@ export default function BrowsePage() {
   }, [load]);
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-sm font-medium text-gray-800">PromptingHub</h1>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            {authed ? (
-              <>
-                <Link href="/profile" className="flex items-center gap-2 hover:text-gray-800">
-                  <Avatar name={data!.user?.name || ""} image={data!.user?.image} size={24} />
-                  <span>{data!.user?.name || data!.user?.email}</span>
-                </Link>
-                <button onClick={() => signOut({ callbackUrl: "/browse" })} className="hover:text-gray-800">Sign out</button>
-              </>
-            ) : (
-              <Link href="/login" className="text-gray-800 hover:underline">Sign in</Link>
-            )}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Discover AI Prompts
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Browse, share, and discover the best prompts for your AI workflows
+          </p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-8">
+          <div className="relative max-w-3xl mx-auto">
+            <input
+              type="search"
+              placeholder="Search prompts..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-full px-6 py-4 pl-12 text-base border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 shadow-sm"
+            />
+            <svg
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
-      </header>
 
-      <section className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex gap-2">
-          <input
-            type="search"
-            placeholder="Search prompts…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-gray-500"
-          />
-          {authed && (
+        {/* Filters */}
+        <div className="mb-8 space-y-4">
+          {/* Sort */}
+          <div className="flex items-center gap-3 justify-center">
             <button
-              onClick={() => setShowAdd((s) => !s)}
-              className="bg-gray-800 hover:bg-gray-900 text-white text-sm rounded px-3 shrink-0"
+              onClick={() => setSort("recent")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sort === "recent"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
             >
-              {showAdd ? "Close" : "Add prompt"}
+              Recent
             </button>
-          )}
+            <button
+              onClick={() => setSort("popular")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sort === "popular"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              Popular
+            </button>
+          </div>
+
+          {/* Categories */}
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button
+              onClick={() => setCategory(null)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                category === null
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              All
+            </button>
+            {PROMPT_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(category === cat ? null : cat)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  category === cat
+                    ? "bg-blue-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {authed && showAdd && <AddPromptForm categories={categories} onAdded={() => { setShowAdd(false); load(); }} />}
+        {/* Results count */}
+        {loaded && (
+          <div className="mb-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {prompts.length} {prompts.length === 1 ? "prompt" : "prompts"} found
+            </p>
+          </div>
+        )}
 
-        {categories.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Chip active={category === null} onClick={() => setCategory(null)}>All</Chip>
-            {categories.map((c) => (
-              <Chip key={c} active={category === c} onClick={() => setCategory(category === c ? null : c)}>{c}</Chip>
+        {/* Prompts Grid */}
+        {loaded && prompts.length === 0 ? (
+          <div className="text-center py-16">
+            <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No prompts found</h3>
+            <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {prompts.map((prompt) => (
+              <PromptCard key={prompt.id} {...prompt} />
             ))}
           </div>
         )}
 
-        <ul className="mt-4 divide-y divide-gray-200 border border-gray-200 rounded bg-white">
-          {loaded && prompts.length === 0 && <li className="px-4 py-3 text-sm text-gray-400">No prompts found.</li>}
-          {prompts.map((p) => (
-            <li key={p.id}>
-              <button onClick={() => {/* mock download */}} className="w-full text-left px-4 py-3 hover:bg-gray-50">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-sm font-medium text-gray-900">{p.name}</div>
-                  <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 shrink-0 mt-0.5">{p.category}</span>
+        {/* Loading skeleton */}
+        {!loaded && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-200 dark:bg-gray-700" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">{p.description}</div>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                  <Avatar name={p.author.name} image={p.author.image} size={18} />
-                  <span>{p.author.name}</span>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-xs px-2.5 py-1 rounded-full border ${active ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function AddPromptForm({ categories, onAdded }: { categories: string[]; onAdded: () => void }) {
-  const [form, setForm] = useState({ name: "", description: "", category: "", body: "" });
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    const res = await fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    setSaving(false);
-    if (res.ok) onAdded();
-    else setError("Could not save — fill every field.");
-  }
-
-  const input = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500";
-  return (
-    <form onSubmit={submit} className="mt-3 border border-gray-200 rounded bg-white p-4 space-y-2">
-      <input className={input} placeholder="Name" value={form.name} onChange={set("name")} required />
-      <input className={input} placeholder="Short description" value={form.description} onChange={set("description")} required />
-      <input className={input} placeholder="Category" list="cats" value={form.category} onChange={set("category")} required />
-      <datalist id="cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-      <textarea className={input} placeholder="Prompt body" rows={4} value={form.body} onChange={set("body")} required />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <button disabled={saving} className="bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm rounded py-2 px-4">
-        {saving ? "Saving…" : "Save prompt"}
-      </button>
-    </form>
-  );
-}
+// Made with Bob
