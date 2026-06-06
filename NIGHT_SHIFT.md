@@ -37,8 +37,8 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ⬜ 7. Fork/customize: logged-in user forks a prompt with their values as a new prompt
 
 ### Phase 3 — Namespacing & install
-- ⬜ 8. User handles `@handle` + per-prompt slug → canonical `/p/owner/slug`
-- ⬜ 9. Install/use: copy command + manifest endpoint (downloadable bundle/JSON)
+- ✅ 8. User handles `@handle` + per-prompt slug → canonical `/p/owner/slug` — PR #5
+- 🔄 9. Install/use: copy command done (`npx promptinghub add owner/slug` box); manifest/download endpoint still TODO
 - ⬜ 10. Prompt metadata: model/tool tags (Gemini, GPT-Image-2, Claude…), README
 
 ### Phase 4 — Discovery & pool
@@ -69,4 +69,5 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - UI verified via Preview MCP: browse (16 prompts, chips, avatars) + detail page (file panel, copy-all) render correctly with live data.
 - Phase 1 COMPLETE.
 - PR #4 merged: template variables {{var}}/{{var:default}} → live customizable fields on detail page. 54 tests. Verified live click-through (Sarah/Acme). Demo cold-email template seeded.
-- Next: task 7 (fork/customize — save filled template as your own prompt), then Phase 3 (namespacing/install).
+- PR #5 merged: namespaced prompts — slugify, handles, unique-per-owner slugs, canonical /p/[handle]/[slug] route + API, shared PromptView, `npx promptinghub add owner/slug` install box. Backfilled existing data (3 handles, 17 slugs). 71 tests. Verified live.
+- Next: task 9 manifest/download endpoint (real install), then landing page (15), tags (12), seed real prompts (11).
