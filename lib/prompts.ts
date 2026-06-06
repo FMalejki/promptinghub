@@ -6,7 +6,8 @@ export type PromptFile = { path: string; content: string; language: string };
 export type PromptWithBody = { id: string; name: string; description: string; category: string; body: string; ownerEmail: string };
 export type PromptDetail = { id: string; name: string; description: string; category: string; body: string; files: PromptFile[]; author: Author };
 export type ListOpts = { q?: string; category?: string };
-export type NewPrompt = { name: string; description: string; category: string; body?: string; files?: PromptFile[] };
+export type NewPromptFile = { path: string; content: string; language?: string };
+export type NewPrompt = { name: string; description: string; category: string; body?: string; files?: NewPromptFile[] };
 
 const LANG_BY_EXT: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
