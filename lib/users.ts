@@ -1,8 +1,28 @@
 import { Db } from "mongodb";
 import bcrypt from "bcryptjs";
+import { slugify } from "./slug";
 
 export type User = { id: string; email: string; name: string; image: string | null };
 export type Profile = { email: string; name: string; image: string | null };
+
+// Returns the user's stable @handle, generating + persisting a unique one on first call.
+export async function ensureHandle(db: Db, email: string): Promise<string> {
+  const users = db.collection("users");
+  const row = await users.findOne({ email });
+  if (!row) throw new Error("User not found");
+  if (row.handle) return row.handle as string;
+
+  const base = slugify(email.split("@")[0]);
+  let handle = base;
+  for (let n = 2; await users.findOne({ handle }); n++) handle = `${base}-${n}`;
+  await users.updateOne({ email }, { $set: { handle } });
+  return handle;
+}
+
+export async function getUserByHandle(db: Db, handle: string): Promise<(Profile & { handle: string }) | null> {
+  const row = await db.collection("users").findOne({ handle });
+  return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle } : null;
+}
 
 export async function createUser(db: Db, email: string, password: string, name?: string): Promise<User> {
   const users = db.collection("users");

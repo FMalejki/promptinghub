@@ -1,10 +1,12 @@
 import { Db, ObjectId } from "mongodb";
+import { slugify } from "./slug";
 
 export type Author = { email: string; name: string; image: string | null };
 export type Prompt = { id: string; name: string; description: string; category: string; author: Author };
 export type PromptFile = { path: string; content: string; language: string };
 export type PromptWithBody = { id: string; name: string; description: string; category: string; body: string; ownerEmail: string };
 export type PromptDetail = { id: string; name: string; description: string; category: string; body: string; files: PromptFile[]; author: Author };
+export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: string };
 export type ListOpts = { q?: string; category?: string };
 export type NewPromptFile = { path: string; content: string; language?: string };
 export type NewPrompt = { name: string; description: string; category: string; body?: string; files?: NewPromptFile[] };
@@ -60,15 +62,23 @@ export async function listCategories(db: Db): Promise<string[]> {
   return ((await db.collection("prompts").distinct("category")) as string[]).sort();
 }
 
-export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt): Promise<Omit<Prompt, "author">> {
+export async function uniqueSlug(db: Db, ownerEmail: string, name: string): Promise<string> {
+  const base = slugify(name);
+  let slug = base;
+  for (let n = 2; await db.collection("prompts").findOne({ ownerEmail, slug }); n++) slug = `${base}-${n}`;
+  return slug;
+}
+
+export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt): Promise<Omit<Prompt, "author"> & { slug: string }> {
   const files = data.files?.length
     ? data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }))
     : undefined;
   const body = data.body ?? (files ? files.map((f) => f.content).join("\n\n") : "");
-  const doc: Record<string, unknown> = { ownerEmail, name: data.name, description: data.description, category: data.category, body, createdAt: new Date() };
+  const slug = await uniqueSlug(db, ownerEmail, data.name);
+  const doc: Record<string, unknown> = { ownerEmail, name: data.name, description: data.description, category: data.category, body, slug, createdAt: new Date() };
   if (files) doc.files = files;
   const { insertedId } = await db.collection("prompts").insertOne(doc);
-  return { id: insertedId.toString(), name: data.name, description: data.description, category: data.category };
+  return { id: insertedId.toString(), name: data.name, description: data.description, category: data.category, slug };
 }
 
 export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | null> {
@@ -93,5 +103,26 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     body: row.body ?? files.map((f) => f.content).join("\n\n"),
     files,
     author: { email: row.ownerEmail, name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null },
+    // canonical handle/slug included only when both are backfilled (kept off the strict type)
+    ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
+  };
+}
+
+export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string): Promise<NamespacedPromptDetail | null> {
+  const user = await db.collection("users").findOne({ handle });
+  if (!user) return null;
+  const row = await db.collection("prompts").findOne({ ownerEmail: user.email, slug });
+  if (!row) return null;
+  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  return {
+    id: row._id.toString(),
+    name: row.name,
+    description: row.description,
+    category: row.category,
+    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    files,
+    author: { email: row.ownerEmail, name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null },
+    handle,
+    slug,
   };
 }

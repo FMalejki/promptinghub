@@ -1,21 +1,21 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PromptView, PromptViewData } from "../../PromptView";
+import { PromptView, PromptViewData } from "../../../PromptView";
 
-export default function PromptDetailPage({ params }: { params: { id: string } }) {
+export default function NamespacedPromptPage({ params }: { params: { handle: string; slug: string } }) {
   const [prompt, setPrompt] = useState<PromptViewData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "notfound">("loading");
 
   useEffect(() => {
-    fetch(`/api/prompts/${params.id}`)
+    fetch(`/api/p/${params.handle}/${params.slug}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
         setPrompt(d);
         setStatus("ready");
       })
       .catch(() => setStatus("notfound"));
-  }, [params.id]);
+  }, [params.handle, params.slug]);
 
   return (
     <main className="min-h-screen">
