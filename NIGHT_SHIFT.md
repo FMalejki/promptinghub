@@ -48,7 +48,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ⬜ 14. Copy/usage counter
 
 ### Phase 5 — Polish
-- ⬜ 15. Landing page explaining the product (replace bare redirect)
+- ✅ 15. Landing page explaining the product (replace bare redirect) — PR #6
 - ⬜ 16. Profile shows a user's prompts
 - ⬜ 17. Edit/delete own prompts
 - ⬜ 18. Empty/loading/error states, responsive pass
@@ -70,4 +70,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - Phase 1 COMPLETE.
 - PR #4 merged: template variables {{var}}/{{var:default}} → live customizable fields on detail page. 54 tests. Verified live click-through (Sarah/Acme). Demo cold-email template seeded.
 - PR #5 merged: namespaced prompts — slugify, handles, unique-per-owner slugs, canonical /p/[handle]/[slug] route + API, shared PromptView, `npx promptinghub add owner/slug` install box. Backfilled existing data (3 handles, 17 slugs). 71 tests. Verified live.
-- Next: task 9 manifest/download endpoint (real install), then landing page (15), tags (12), seed real prompts (11).
+- PR #6 merged: real landing page (hero + value props + featured prompts) replacing the bare redirect. Verified live.
+- Session so far: 6 feature PRs (detail, multi-file, upload, templates, namespacing, landing) + infra. 71 tests.
+- Next: task 9 manifest/download endpoint (real install), tags/model filters (12), seed real prompts (11), fork (7), profile shows prompts (16), edit/delete (17).
+- Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
