@@ -3,6 +3,7 @@ import { Db, ObjectId } from "mongodb";
 export type Author = { email: string; name: string; image: string | null };
 export type Prompt = { id: string; name: string; description: string; category: string; author: Author };
 export type PromptWithBody = { id: string; name: string; description: string; category: string; body: string; ownerEmail: string };
+export type PromptDetail = { id: string; name: string; description: string; category: string; body: string; author: Author };
 export type ListOpts = { q?: string; category?: string };
 export type NewPrompt = { name: string; description: string; category: string; body: string };
 
@@ -47,4 +48,18 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
   return row
     ? { id: row._id.toString(), name: row.name, description: row.description, category: row.category, body: row.body, ownerEmail: row.ownerEmail }
     : null;
+}
+
+export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail | null> {
+  const p = await getPrompt(db, id);
+  if (!p) return null;
+  const u = await db.collection("users").findOne({ email: p.ownerEmail });
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    category: p.category,
+    body: p.body,
+    author: { email: p.ownerEmail, name: u?.name || p.ownerEmail.split("@")[0], image: u?.image ?? null },
+  };
 }
