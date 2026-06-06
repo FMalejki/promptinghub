@@ -27,9 +27,9 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 
 ### Phase 1 — Core prompt depth
 - ✅ 1. Prompt detail page `/prompt/[id]` + `GET /api/prompts/[id]` (full body, copy button) — PR #1
-- ⬜ 2. Multi-file prompt model: `files: [{path, content, language}]` (body → single-file fallback)
-- ⬜ 3. Detail page renders multiple files w/ language label + per-file & copy-all
-- ⬜ 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview
+- ✅ 2. Multi-file prompt model: `files: [{path, content, language}]` (body → single-file fallback) — PR #2
+- ✅ 3. Detail page renders multiple files w/ language label + per-file & copy-all — PR #2
+- 🔄 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview
 
 ### Phase 2 — Customization / templating
 - ⬜ 5. Variable extraction: parse `{{var}}` / `{{var:default}}` → `extractVariables()`
