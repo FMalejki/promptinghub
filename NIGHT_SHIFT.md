@@ -29,7 +29,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ✅ 1. Prompt detail page `/prompt/[id]` + `GET /api/prompts/[id]` (full body, copy button) — PR #1
 - ✅ 2. Multi-file prompt model: `files: [{path, content, language}]` (body → single-file fallback) — PR #2
 - ✅ 3. Detail page renders multiple files w/ language label + per-file & copy-all — PR #2
-- 🔄 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview
+- ✅ 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview — PR #3
 
 ### Phase 2 — Customization / templating
 - ⬜ 5. Variable extraction: parse `{{var}}` / `{{var:default}}` → `extractVariables()`
@@ -58,3 +58,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 ## Progress log
 - (setup) night-shift branched off main; Vercel CLI authed (project promptinghub); 24 baseline tests green.
 - PR #1 merged: prompt detail page + detail API. Deploy pipeline proven — public alias live, DB + routes verified (16 prompts). 28 tests green.
+- PR #2 merged: multi-file prompt model + multi-file detail rendering. 35 tests.
+- PR #3 merged: drag-and-drop multi-file upload form + shared newPromptSchema. 43 tests.
+- UI verified via Preview MCP: browse (16 prompts, chips, avatars) + detail page (file panel, copy-all) render correctly with live data.
+- Phase 1 COMPLETE. Next: Phase 2 (templating/customization — task 5 extractVariables).
