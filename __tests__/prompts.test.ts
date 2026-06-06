@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { listPrompts, getPrompt, getPromptDetail, listCategories, createPrompt } from "../lib/prompts";
+import { listPrompts, getPrompt, getPromptDetail, listCategories, createPrompt, languageFromPath, normalizeFiles } from "../lib/prompts";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -105,7 +105,7 @@ describe("getPrompt", () => {
 });
 
 describe("getPromptDetail", () => {
-  it("returns the prompt with body and resolved author profile", async () => {
+  it("returns the prompt with body, files and resolved author profile", async () => {
     const [summarize] = (await listPrompts(db, { q: "Summarize" }));
     const detail = await getPromptDetail(db, summarize.id);
     expect(detail).toEqual({
@@ -114,6 +114,7 @@ describe("getPromptDetail", () => {
       description: "Summarize any text",
       category: "Writing",
       body: "b1",
+      files: [{ path: "prompt.txt", content: "b1", language: "text" }],
       author: { email: "alice@x.com", name: "Alice", image: "http://img/a.png" },
     });
   });
@@ -130,5 +131,71 @@ describe("getPromptDetail", () => {
 
   it("returns null for malformed id", async () => {
     expect(await getPromptDetail(db, "nope")).toBeNull();
+  });
+});
+
+describe("languageFromPath", () => {
+  it("maps known extensions to a language label", () => {
+    expect(languageFromPath("agent.ts")).toBe("typescript");
+    expect(languageFromPath("config.yaml")).toBe("yaml");
+    expect(languageFromPath("main.py")).toBe("python");
+    expect(languageFromPath("data.json")).toBe("json");
+    expect(languageFromPath("README.md")).toBe("markdown");
+    expect(languageFromPath("notes.txt")).toBe("text");
+  });
+  it("is case-insensitive and falls back to text for unknown/no extension", () => {
+    expect(languageFromPath("Setup.PY")).toBe("python");
+    expect(languageFromPath("Dockerfile")).toBe("text");
+    expect(languageFromPath("weird.xyz")).toBe("text");
+  });
+});
+
+describe("normalizeFiles", () => {
+  it("returns stored files, inferring missing languages from the path", () => {
+    expect(normalizeFiles({ files: [{ path: "a.py", content: "x", language: "" }] })).toEqual([
+      { path: "a.py", content: "x", language: "python" },
+    ]);
+  });
+  it("synthesizes a single prompt.txt file from a legacy body", () => {
+    expect(normalizeFiles({ body: "hello" })).toEqual([{ path: "prompt.txt", content: "hello", language: "text" }]);
+  });
+});
+
+describe("multi-file prompts", () => {
+  it("stores files and returns them via getPromptDetail with inferred languages", async () => {
+    const { id } = await createPrompt(db, "alice@x.com", {
+      name: "Night-shift agent",
+      description: "An autonomous agent package",
+      category: "Agents",
+      files: [
+        { path: "prompt.md", content: "# System\nYou are an agent.", language: "" },
+        { path: "config.yaml", content: "model: claude", language: "" },
+      ],
+    });
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.files).toEqual([
+      { path: "prompt.md", content: "# System\nYou are an agent.", language: "markdown" },
+      { path: "config.yaml", content: "model: claude", language: "yaml" },
+    ]);
+  });
+
+  it("derives a concatenated body from the files for back-compat", async () => {
+    const { id } = await createPrompt(db, "bob@x.com", {
+      name: "Two parter",
+      description: "d",
+      category: "Misc",
+      files: [
+        { path: "a.txt", content: "first", language: "text" },
+        { path: "b.txt", content: "second", language: "text" },
+      ],
+    });
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.body).toBe("first\n\nsecond");
+  });
+
+  it("still accepts a legacy single body and exposes it as one file", async () => {
+    const { id } = await createPrompt(db, "alice@x.com", { name: "Legacy", description: "d", category: "Misc", body: "just text" });
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.files).toEqual([{ path: "prompt.txt", content: "just text", language: "text" }]);
   });
 });
