@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { listPrompts, getPrompt, listCategories, createPrompt } from "../lib/prompts";
+import { listPrompts, getPrompt, getPromptDetail, listCategories, createPrompt } from "../lib/prompts";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -101,5 +101,34 @@ describe("getPrompt", () => {
 
   it("returns null for malformed id", async () => {
     expect(await getPrompt(db, "not-a-valid-id")).toBeNull();
+  });
+});
+
+describe("getPromptDetail", () => {
+  it("returns the prompt with body and resolved author profile", async () => {
+    const [summarize] = (await listPrompts(db, { q: "Summarize" }));
+    const detail = await getPromptDetail(db, summarize.id);
+    expect(detail).toEqual({
+      id: summarize.id,
+      name: "Summarize",
+      description: "Summarize any text",
+      category: "Writing",
+      body: "b1",
+      author: { email: "alice@x.com", name: "Alice", image: "http://img/a.png" },
+    });
+  });
+
+  it("falls back to email-derived author when no user row exists", async () => {
+    const { id } = await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.author).toEqual({ email: "ghost@x.com", name: "ghost", image: null });
+  });
+
+  it("returns null for unknown id", async () => {
+    expect(await getPromptDetail(db, "507f1f77bcf86cd799439011")).toBeNull();
+  });
+
+  it("returns null for malformed id", async () => {
+    expect(await getPromptDetail(db, "nope")).toBeNull();
   });
 });

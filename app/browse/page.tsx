@@ -88,7 +88,7 @@ export default function BrowsePage() {
           {loaded && prompts.length === 0 && <li className="px-4 py-3 text-sm text-gray-400">No prompts found.</li>}
           {prompts.map((p) => (
             <li key={p.id}>
-              <button onClick={() => {/* mock download */}} className="w-full text-left px-4 py-3 hover:bg-gray-50">
+              <Link href={`/prompt/${p.id}`} className="block text-left px-4 py-3 hover:bg-gray-50">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-sm font-medium text-gray-900">{p.name}</div>
                   <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 shrink-0 mt-0.5">{p.category}</span>
@@ -98,7 +98,7 @@ export default function BrowsePage() {
                   <Avatar name={p.author.name} image={p.author.image} size={18} />
                   <span>{p.author.name}</span>
                 </div>
-              </button>
+              </Link>
             </li>
           ))}
         </ul>
