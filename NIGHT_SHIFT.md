@@ -21,8 +21,12 @@ clickable customizable fields, editable templates per-user.
 
 ## Roadmap (✅ done · 🔄 in progress · ⬜ todo)
 
+**Live preview (stable alias, public):** https://promptinghub-night-shift.vercel.app
+Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> promptinghub-night-shift.vercel.app`
+(Preview env vars + ssoProtection=null already configured on the Vercel project.)
+
 ### Phase 1 — Core prompt depth
-- ⬜ 1. Prompt detail page `/prompt/[id]` + `GET /api/prompts/[id]` (full body, copy button)
+- ✅ 1. Prompt detail page `/prompt/[id]` + `GET /api/prompts/[id]` (full body, copy button) — PR #1
 - ⬜ 2. Multi-file prompt model: `files: [{path, content, language}]` (body → single-file fallback)
 - ⬜ 3. Detail page renders multiple files w/ language label + per-file & copy-all
 - ⬜ 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview
@@ -53,3 +57,4 @@ clickable customizable fields, editable templates per-user.
 
 ## Progress log
 - (setup) night-shift branched off main; Vercel CLI authed (project promptinghub); 24 baseline tests green.
+- PR #1 merged: prompt detail page + detail API. Deploy pipeline proven — public alias live, DB + routes verified (16 prompts). 28 tests green.
