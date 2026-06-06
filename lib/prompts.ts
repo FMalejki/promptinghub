@@ -2,10 +2,33 @@ import { Db, ObjectId } from "mongodb";
 
 export type Author = { email: string; name: string; image: string | null };
 export type Prompt = { id: string; name: string; description: string; category: string; author: Author };
+export type PromptFile = { path: string; content: string; language: string };
 export type PromptWithBody = { id: string; name: string; description: string; category: string; body: string; ownerEmail: string };
-export type PromptDetail = { id: string; name: string; description: string; category: string; body: string; author: Author };
+export type PromptDetail = { id: string; name: string; description: string; category: string; body: string; files: PromptFile[]; author: Author };
 export type ListOpts = { q?: string; category?: string };
-export type NewPrompt = { name: string; description: string; category: string; body: string };
+export type NewPrompt = { name: string; description: string; category: string; body?: string; files?: PromptFile[] };
+
+const LANG_BY_EXT: Record<string, string> = {
+  ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
+  py: "python", rb: "ruby", go: "go", rs: "rust", java: "java", kt: "kotlin", swift: "swift",
+  c: "c", h: "c", cpp: "cpp", cs: "csharp", php: "php",
+  yaml: "yaml", yml: "yaml", json: "json", toml: "toml", xml: "xml", csv: "csv",
+  md: "markdown", mdx: "markdown", txt: "text", text: "text",
+  sh: "shell", bash: "shell", zsh: "shell",
+  html: "html", css: "css", scss: "scss", sql: "sql", env: "text",
+};
+
+export function languageFromPath(path: string): string {
+  const ext = path.toLowerCase().split(".").pop() || "";
+  return LANG_BY_EXT[ext] || "text";
+}
+
+export function normalizeFiles(row: { files?: PromptFile[]; body?: string }): PromptFile[] {
+  if (Array.isArray(row.files) && row.files.length) {
+    return row.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
+  }
+  return [{ path: "prompt.txt", content: row.body ?? "", language: "text" }];
+}
 
 export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]> {
   const match: Record<string, unknown> = {};
@@ -37,9 +60,14 @@ export async function listCategories(db: Db): Promise<string[]> {
 }
 
 export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt): Promise<Omit<Prompt, "author">> {
-  const doc = { ownerEmail, name: data.name, description: data.description, category: data.category, body: data.body, createdAt: new Date() };
+  const files = data.files?.length
+    ? data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }))
+    : undefined;
+  const body = data.body ?? (files ? files.map((f) => f.content).join("\n\n") : "");
+  const doc: Record<string, unknown> = { ownerEmail, name: data.name, description: data.description, category: data.category, body, createdAt: new Date() };
+  if (files) doc.files = files;
   const { insertedId } = await db.collection("prompts").insertOne(doc);
-  return { id: insertedId.toString(), name: doc.name, description: doc.description, category: doc.category };
+  return { id: insertedId.toString(), name: data.name, description: data.description, category: data.category };
 }
 
 export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | null> {
@@ -51,15 +79,18 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
 }
 
 export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail | null> {
-  const p = await getPrompt(db, id);
-  if (!p) return null;
-  const u = await db.collection("users").findOne({ email: p.ownerEmail });
+  if (!ObjectId.isValid(id)) return null;
+  const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
+  if (!row) return null;
+  const u = await db.collection("users").findOne({ email: row.ownerEmail });
+  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
   return {
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    category: p.category,
-    body: p.body,
-    author: { email: p.ownerEmail, name: u?.name || p.ownerEmail.split("@")[0], image: u?.image ?? null },
+    id: row._id.toString(),
+    name: row.name,
+    description: row.description,
+    category: row.category,
+    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    files,
+    author: { email: row.ownerEmail, name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null },
   };
 }
