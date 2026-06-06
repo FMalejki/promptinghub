@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Avatar } from "../../Avatar";
+import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
 
 type PromptFile = { path: string; content: string; language: string };
 type Detail = {
@@ -18,6 +19,7 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
   const [copied, setCopied] = useState(false);
   return (
     <button
+      type="button"
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
@@ -33,6 +35,7 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
 export default function PromptDetailPage({ params }: { params: { id: string } }) {
   const [prompt, setPrompt] = useState<Detail | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "notfound">("loading");
+  const [values, setValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch(`/api/prompts/${params.id}`)
@@ -44,8 +47,14 @@ export default function PromptDetailPage({ params }: { params: { id: string } })
       .catch(() => setStatus("notfound"));
   }, [params.id]);
 
-  const multi = (prompt?.files.length ?? 0) > 1;
-  const allText = prompt?.files.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n") ?? "";
+  const vars = useMemo(() => (prompt ? extractVariablesFromFiles(prompt.files) : []), [prompt]);
+  const filled = useMemo(
+    () => (prompt ? prompt.files.map((f) => ({ ...f, content: applyVariables(f.content, values) })) : []),
+    [prompt, values]
+  );
+
+  const multi = filled.length > 1;
+  const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
 
   return (
     <main className="min-h-screen">
@@ -75,13 +84,32 @@ export default function PromptDetailPage({ params }: { params: { id: string } })
                 <span>{prompt.author.name}</span>
               </div>
               <div className="flex items-center gap-2">
-                {multi && <span className="text-xs text-gray-400">{prompt.files.length} files</span>}
+                {multi && <span className="text-xs text-gray-400">{filled.length} files</span>}
                 <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} />
               </div>
             </div>
 
+            {vars.length > 0 && (
+              <div className="mt-6 border border-gray-200 rounded bg-gray-50 p-4">
+                <div className="text-xs font-medium text-gray-700 mb-2">Customize ({vars.length})</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {vars.map((v) => (
+                    <label key={v.name} className="text-xs text-gray-600">
+                      <span className="font-mono text-gray-500">{v.name}</span>
+                      <input
+                        className="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-gray-500"
+                        placeholder={v.default || v.name}
+                        value={values[v.name] ?? ""}
+                        onChange={(e) => setValues((cur) => ({ ...cur, [v.name]: e.target.value }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 space-y-4">
-              {prompt.files.map((f) => (
+              {filled.map((f) => (
                 <div key={f.path} className="border border-gray-200 rounded bg-white">
                   <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
