@@ -118,34 +118,121 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
+type DraftFile = { path: string; content: string };
+
 function AddPromptForm({ categories, onAdded }: { categories: string[]; onAdded: () => void }) {
-  const [form, setForm] = useState({ name: "", description: "", category: "", body: "" });
+  const [meta, setMeta] = useState({ name: "", description: "", category: "" });
+  const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+  const setM = (k: keyof typeof meta) => (e: React.ChangeEvent<HTMLInputElement>) => setMeta({ ...meta, [k]: e.target.value });
+
+  function addFiles(incoming: DraftFile[]) {
+    if (!incoming.length) return;
+    setFiles((cur) => {
+      const blankOnly = cur.length === 1 && !cur[0].content.trim() && cur[0].path === "prompt.txt";
+      return (blankOnly ? [] : cur).concat(incoming);
+    });
+  }
+
+  async function readFileList(list: FileList) {
+    const read = await Promise.all(
+      Array.from(list).map(async (f) => ({ path: f.name, content: await f.text() }))
+    );
+    addFiles(read);
+  }
+
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files?.length) await readFileList(e.dataTransfer.files);
+  }
+
+  function updateFile(i: number, patch: Partial<DraftFile>) {
+    setFiles((cur) => cur.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  }
+  function removeFile(i: number) {
+    setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
-    const res = await fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const payloadFiles = files.filter((f) => f.content.trim().length).map((f) => ({ path: f.path.trim() || "prompt.txt", content: f.content }));
+    if (!payloadFiles.length) return setError("Add at least one file with content.");
+    setSaving(true);
+    const res = await fetch("/api/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...meta, files: payloadFiles }),
+    });
     setSaving(false);
     if (res.ok) onAdded();
-    else setError("Could not save — fill every field.");
+    else setError("Could not save — fill name, description and category.");
   }
 
   const input = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500";
   return (
     <form onSubmit={submit} className="mt-3 border border-gray-200 rounded bg-white p-4 space-y-2">
-      <input className={input} placeholder="Name" value={form.name} onChange={set("name")} required />
-      <input className={input} placeholder="Short description" value={form.description} onChange={set("description")} required />
-      <input className={input} placeholder="Category" list="cats" value={form.category} onChange={set("category")} required />
+      <input className={input} placeholder="Name" value={meta.name} onChange={setM("name")} required />
+      <input className={input} placeholder="Short description" value={meta.description} onChange={setM("description")} required />
+      <input className={input} placeholder="Category" list="cats" value={meta.category} onChange={setM("category")} required />
       <datalist id="cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-      <textarea className={input} placeholder="Prompt body" rows={4} value={form.body} onChange={set("body")} required />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <button disabled={saving} className="bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm rounded py-2 px-4">
-        {saving ? "Saving…" : "Save prompt"}
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={`rounded border border-dashed px-3 py-4 text-center text-xs ${dragging ? "border-gray-800 bg-gray-50 text-gray-700" : "border-gray-300 text-gray-500"}`}
+      >
+        Drag &amp; drop files (.txt .md .py .ts .yaml …), or{" "}
+        <label className="text-gray-800 underline cursor-pointer">
+          select files
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) readFileList(e.target.files); e.target.value = ""; }}
+          />
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        {files.map((f, i) => (
+          <div key={i} className="border border-gray-200 rounded">
+            <div className="flex items-center gap-2 border-b border-gray-200 px-2 py-1.5">
+              <input
+                className="flex-1 text-xs font-mono px-1 py-0.5 focus:outline-none"
+                value={f.path}
+                placeholder="file path e.g. prompt.md"
+                onChange={(e) => updateFile(i, { path: e.target.value })}
+              />
+              {files.length > 1 && (
+                <button type="button" onClick={() => removeFile(i)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">remove</button>
+              )}
+            </div>
+            <textarea
+              className="w-full px-3 py-2 text-sm font-mono focus:outline-none"
+              rows={4}
+              placeholder="File content…"
+              value={f.content}
+              onChange={(e) => updateFile(i, { content: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+
+      <button type="button" onClick={() => addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }])} className="text-xs text-gray-600 hover:text-gray-900">
+        + Add file
       </button>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div>
+        <button disabled={saving} className="bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-sm rounded py-2 px-4">
+          {saving ? "Saving…" : "Save prompt"}
+        </button>
+      </div>
     </form>
   );
 }
