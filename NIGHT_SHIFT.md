@@ -32,8 +32,8 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ✅ 4. Upload UX: drag-and-drop + multi-select files, infer language from extension, preview — PR #3
 
 ### Phase 2 — Customization / templating
-- ⬜ 5. Variable extraction: parse `{{var}}` / `{{var:default}}` → `extractVariables()`
-- ⬜ 6. Detail page: fillable inputs per variable, live substitution, copy filled result
+- ✅ 5. Variable extraction: parse `{{var}}` / `{{var:default}}` → `extractVariables()` — PR #4
+- ✅ 6. Detail page: fillable inputs per variable, live substitution, copy filled result — PR #4
 - ⬜ 7. Fork/customize: logged-in user forks a prompt with their values as a new prompt
 
 ### Phase 3 — Namespacing & install
@@ -55,10 +55,18 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ⬜ 19. Repo README + CONTRIBUTING
 - ⬜ 20. Full E2E click-through verification
 
+## Gotchas
+- Do NOT run `npm run build` while the Preview dev server is running — both share `.next`,
+  the prod build clobbers dev chunks → `Cannot find module './276.js'` 500s. Verify UI on the
+  dev server; let `vercel deploy` do the prod build remotely. If it happens: stop preview,
+  `rm -rf .next`, restart preview.
+
 ## Progress log
 - (setup) night-shift branched off main; Vercel CLI authed (project promptinghub); 24 baseline tests green.
 - PR #1 merged: prompt detail page + detail API. Deploy pipeline proven — public alias live, DB + routes verified (16 prompts). 28 tests green.
 - PR #2 merged: multi-file prompt model + multi-file detail rendering. 35 tests.
 - PR #3 merged: drag-and-drop multi-file upload form + shared newPromptSchema. 43 tests.
 - UI verified via Preview MCP: browse (16 prompts, chips, avatars) + detail page (file panel, copy-all) render correctly with live data.
-- Phase 1 COMPLETE. Next: Phase 2 (templating/customization — task 5 extractVariables).
+- Phase 1 COMPLETE.
+- PR #4 merged: template variables {{var}}/{{var:default}} → live customizable fields on detail page. 54 tests. Verified live click-through (Sarah/Acme). Demo cold-email template seeded.
+- Next: task 7 (fork/customize — save filled template as your own prompt), then Phase 3 (namespacing/install).
