@@ -10,13 +10,15 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q") || undefined;
   const category = url.searchParams.get("category") || undefined;
-  const sort = (url.searchParams.get("sort") as "recent" | "popular") || "recent";
+  const model = url.searchParams.get("model") || undefined;
+  const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied") || "recent";
   const ownerEmail = url.searchParams.get("owner") || undefined;
-  
+
   const db = await getDb();
   const prompts = await listPrompts(db, {
     q,
     category,
+    model,
     sort,
     ownerEmail,
     includePrivate: !!session?.user?.email,
