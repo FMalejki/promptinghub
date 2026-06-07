@@ -59,16 +59,16 @@ export function CreatorClient({ handle }: { handle: string }) {
           <div className="animate-pulse h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
         ) : data ? (
           <>
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
-              <div className="flex items-center gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 sm:p-8 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <Avatar name={data.creator.name} image={data.creator.image} size={96} />
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{data.creator.name}</h1>
                     {data.creator.verified && <VerifiedBadge />}
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 font-mono">@{data.creator.handle}</p>
-                  <div className="flex items-center gap-6 mt-3">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-3">
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{data.prompts.length}</span> <span className="text-sm text-gray-600 dark:text-gray-400">prompts</span></div>
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{totalStars}</span> <span className="text-sm text-gray-600 dark:text-gray-400">stars</span></div>
                     {data.stats && (
@@ -94,7 +94,7 @@ export function CreatorClient({ handle }: { handle: string }) {
                       <a href={`https://github.com/${data.creator.github}`} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">GitHub</a>
                     )}
                   </div>
-                  <div className="mt-4 flex items-center gap-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
                     <FollowButton handle={data.creator.handle} />
                     <Link
                       href={`/u/${data.creator.handle}/followers`}

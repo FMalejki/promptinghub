@@ -272,7 +272,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={toggleStar}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
