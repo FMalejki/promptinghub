@@ -10,7 +10,10 @@ export const metadata = {
   title: "PromptingHub",
   description: "Discover and share AI prompts",
   alternates: {
-    types: { "application/rss+xml": [{ url: "/feed.xml", title: "PromptingHub — Trending prompts" }] },
+    types: {
+      "application/rss+xml": [{ url: "/feed.xml", title: "PromptingHub — Trending prompts" }],
+      "application/feed+json": [{ url: "/feed.json", title: "PromptingHub — Trending prompts" }],
+    },
   },
 };
 
