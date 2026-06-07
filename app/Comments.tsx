@@ -6,7 +6,15 @@ import { Avatar } from "./Avatar";
 import { renderMentions } from "@/lib/mentions";
 
 type Author = { email: string; name: string; image: string | null };
-type Comment = { id: string; body: string; author: Author; parentId: string | null; createdAt: string };
+type Comment = {
+  id: string;
+  body: string;
+  author: Author;
+  parentId: string | null;
+  createdAt: string;
+  likeCount?: number;
+  liked?: boolean;
+};
 
 // Linkify @handles in a comment body (mentions resolve to /u/<handle>).
 function Body({ text }: { text: string }) {
@@ -79,6 +87,18 @@ export function Comments({ promptId }: { promptId: string }) {
     if (res.ok) setComments((cs) => cs.filter((c) => c.id !== id && c.parentId !== id));
   }
 
+  async function toggleLike(id: string) {
+    if (!session?.user?.email) {
+      router.push("/login");
+      return;
+    }
+    const res = await fetch(`/api/comments/${id}/like`, { method: "POST" });
+    if (res.ok) {
+      const { liked, count } = await res.json();
+      setComments((cs) => cs.map((c) => (c.id === id ? { ...c, liked, likeCount: count } : c)));
+    }
+  }
+
   // Group replies under their parent; the list arrives newest-first.
   const roots = comments.filter((c) => !c.parentId);
   const repliesByParent = new Map<string, Comment[]>();
@@ -106,14 +126,29 @@ export function Comments({ promptId }: { promptId: string }) {
             )}
           </div>
           <Body text={c.body} />
-          {!isReply && session?.user?.email && (
+          <div className="mt-1 flex items-center gap-3">
             <button
-              onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}
-              className="mt-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              onClick={() => toggleLike(c.id)}
+              title="Like this comment"
+              className={`inline-flex items-center gap-1 text-xs ${
+                c.liked ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              }`}
             >
-              {replyTo === c.id ? "Cancel" : "Reply"}
+              <svg className="w-3.5 h-3.5" fill={c.liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-7a2 2 0 012-2h2.5" />
+              </svg>
+              {c.likeCount ? c.likeCount : ""}
+              <span className="sr-only">like</span>
             </button>
-          )}
+            {!isReply && session?.user?.email && (
+              <button
+                onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                {replyTo === c.id ? "Cancel" : "Reply"}
+              </button>
+            )}
+          </div>
           {replyTo === c.id && (
             <div className="mt-2">
               <textarea
