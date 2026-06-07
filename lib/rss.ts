@@ -85,6 +85,18 @@ export function buildJsonFeed(baseUrl: string, prompts: RssPrompt[], channel: Rs
   return feed;
 }
 
+// Channel metadata for a category's RSS feed. Category is URL-encoded in paths,
+// raw in the human-readable text.
+export function categoryRssChannel(category: string): Required<RssChannel> {
+  const enc = encodeURIComponent(category);
+  return {
+    title: `${category} prompts on PromptingHub`,
+    description: `Latest public ${category} prompts.`,
+    selfPath: `/c/${enc}/feed.xml`,
+    link: `/c/${enc}`,
+  };
+}
+
 export function buildRssFeed(baseUrl: string, prompts: RssPrompt[], channel: RssChannel = {}): string {
   const base = baseUrl.replace(/\/$/, "");
   const title = channel.title ?? "PromptingHub — Trending prompts";
