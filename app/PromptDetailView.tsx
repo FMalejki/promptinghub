@@ -15,6 +15,7 @@ import { SaveToCollection } from "./SaveToCollection";
 import { isImagePrompt, imageModelHome } from "@/lib/imageModels";
 import { isVerifiedHandle } from "@/lib/verified";
 import { formatPrice, isPaid } from "@/lib/pricing";
+import { Comments } from "./Comments";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -343,6 +344,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         </div>
       )}
+
+      {/* Comments */}
+      <Comments promptId={prompt.id} />
     </main>
   );
 }
