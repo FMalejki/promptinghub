@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { listPrompts, createPrompt } from "@/lib/prompts";
 import { newPromptSchema } from "@/lib/promptInput";
+import { rankBySearch } from "@/lib/search";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -28,8 +29,10 @@ export async function GET(req: Request) {
     includePrivate: !!session?.user?.email,
     userEmail: session?.user?.email || undefined,
   });
-  
-  return NextResponse.json({ prompts });
+
+  // When searching, order by relevance (name > tags > description) instead of the default sort.
+  const ranked = q ? rankBySearch(q, prompts) : prompts;
+  return NextResponse.json({ prompts: ranked });
 }
 
 export async function POST(req: Request) {

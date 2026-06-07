@@ -148,7 +148,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   }
   if (opts.q) {
     const rx = { $regex: opts.q, $options: "i" };
-    orGroups.push([{ name: rx }, { description: rx }]);
+    orGroups.push([{ name: rx }, { description: rx }, { tags: rx }]);
   }
 
   if (orGroups.length === 1) {
