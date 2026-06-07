@@ -11,6 +11,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false });
+  const [price, setPrice] = useState("0");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p) => {
         setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate });
+        setPrice(((p.priceCents || 0) / 100).toString());
         setFiles((p.files?.length ? p.files : [{ path: "prompt.txt", content: p.body || "" }]).map((f: DraftFile) => ({ path: f.path, content: f.content })));
         setOwnerEmail(p.author.email);
         setLoaded(true);
@@ -56,7 +58,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     const res = await fetch(`/api/prompts/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, image: meta.image || undefined, files: payloadFiles }),
+      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), files: payloadFiles }),
     });
     setSaving(false);
     if (res.ok) router.push(`/prompt/${params.id}`);
@@ -106,6 +108,11 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
             <div>
               <label className={label}>Cover Image URL (optional)</label>
               <input className={input} value={meta.image} onChange={(e) => setMeta({ ...meta, image: e.target.value })} placeholder="https://…" />
+            </div>
+            <div>
+              <label className={label}>Price (USD) — 0 = free</label>
+              <input className={input} type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
+              <p className="mt-1 text-xs text-gray-400">Marketplace is in preview — payments aren’t live yet.</p>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="priv" checked={meta.isPrivate} onChange={(e) => setMeta({ ...meta, isPrivate: e.target.checked })} className="w-4 h-4" />

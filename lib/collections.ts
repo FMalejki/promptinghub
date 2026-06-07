@@ -71,6 +71,7 @@ export async function getCollectionDetail(db: Db, id: string): Promise<Collectio
       isPrivate: p.isPrivate,
       testedModels: p.testedModels,
       copyCount: p.copyCount,
+      priceCents: p.priceCents,
       createdAt: p.createdAt,
     }));
   return { ...c, prompts };
