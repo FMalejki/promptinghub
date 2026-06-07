@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
+import { ApiKeysManager } from "../ApiKeysManager";
 import { Avatar } from "../Avatar";
 
 export default function SettingsPage() {
@@ -169,6 +170,9 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* API Keys */}
+        <ApiKeysManager />
 
         {/* Danger Zone */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 p-6">
