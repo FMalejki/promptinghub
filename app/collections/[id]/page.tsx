@@ -59,14 +59,24 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
                 {collection.description && <p className="mt-2 text-gray-600 dark:text-gray-400">{collection.description}</p>}
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-500">{collection.prompts.length} prompts</p>
               </div>
-              {isOwner && (
-                <button
-                  onClick={del}
-                  className="px-4 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-                >
-                  Delete
-                </button>
-              )}
+              <div className="flex items-center gap-3 shrink-0">
+                {collection.prompts.length > 0 && (
+                  <a
+                    href={`/api/collections/${params.id}/export`}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    Export JSON
+                  </a>
+                )}
+                {isOwner && (
+                  <button
+                    onClick={del}
+                    className="px-4 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
 
             {collection.prompts.length === 0 ? (
