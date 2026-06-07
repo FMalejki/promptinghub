@@ -1,4 +1,4 @@
-import { buildRssFeed, type RssPrompt } from "../lib/rss";
+import { buildRssFeed, toRssPrompts, type RssPrompt } from "../lib/rss";
 
 const base = "https://hub.example.com";
 
@@ -45,6 +45,16 @@ describe("buildRssFeed", () => {
     expect(xml).toContain("<title>PromptingHub — Trending prompts</title>");
     expect(xml).toContain(`<link>${base}</link>`);
     expect(xml).toContain(`<atom:link href="${base}/feed.xml"`);
+  });
+
+  it("toRssPrompts drops private prompts and keeps handle/slug/createdAt", () => {
+    const d = new Date("2026-02-01T00:00:00Z");
+    const out = toRssPrompts([
+      { id: "1", name: "Pub", description: "x", handle: "alice", slug: "pub", createdAt: d },
+      { id: "2", name: "Secret", description: "y", isPrivate: true },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ id: "1", name: "Pub", description: "x", handle: "alice", slug: "pub", createdAt: d });
   });
 
   it("accepts per-channel title/description/self path overrides (escaped)", () => {

@@ -10,6 +10,16 @@ export type RssPrompt = {
   createdAt?: Date;
 };
 
+// Map a list of prompt-ish rows to RSS items, dropping private ones. Handy for
+// building a feed from a collection's resolved prompts.
+export function toRssPrompts(
+  prompts: { id: string; name: string; description: string; isPrivate?: boolean; handle?: string; slug?: string; createdAt?: Date }[],
+): RssPrompt[] {
+  return prompts
+    .filter((p) => !p.isPrivate)
+    .map((p) => ({ id: p.id, name: p.name, description: p.description, handle: p.handle, slug: p.slug, createdAt: p.createdAt }));
+}
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
