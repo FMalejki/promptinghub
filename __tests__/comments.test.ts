@@ -18,6 +18,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection("comments").deleteMany({});
   await db.collection("users").deleteMany({});
+  await db.collection("prompts").deleteMany({});
+  await db.collection("notifications").deleteMany({});
 });
 
 describe("comments", () => {
@@ -58,5 +60,50 @@ describe("comments", () => {
 
   it("returns false deleting a malformed id", async () => {
     expect(await deleteComment(db, "nope", "a@x.com")).toBe(false);
+  });
+});
+
+describe("comment threads + mentions", () => {
+  const { ObjectId } = require("mongodb");
+
+  it("stores parentId on a reply and returns it in the list", async () => {
+    const top = await addComment(db, "p1", "a@x.com", "top-level");
+    await addComment(db, "p1", "b@x.com", "a reply", top.id);
+    const list = await listComments(db, "p1");
+    const reply = list.find((c) => c.body === "a reply")!;
+    const root = list.find((c) => c.body === "top-level")!;
+    expect(reply.parentId).toBe(top.id);
+    expect(root.parentId).toBeNull();
+  });
+
+  it("notifies the parent comment author on a reply", async () => {
+    const top = await addComment(db, "p1", "owner@x.com", "first");
+    await addComment(db, "p1", "replier@x.com", "thanks!", top.id);
+    const notes = await db.collection("notifications").find({ recipientEmail: "owner@x.com" }).toArray();
+    expect(notes.some((n) => n.type === "reply")).toBe(true);
+  });
+
+  it("notifies @mentioned users by handle, never the author, once each", async () => {
+    await db.collection("users").insertMany([
+      { email: "carol@x.com", handle: "carol", name: "Carol" },
+      { email: "dave@x.com", handle: "dave", name: "Dave" },
+    ]);
+    const pid = new ObjectId();
+    await db.collection("prompts").insertOne({ _id: pid, ownerEmail: "owner@x.com", name: "Cool" });
+    await addComment(db, pid.toString(), "carol@x.com", "hey @dave and @carol check this");
+    const dave = await db.collection("notifications").find({ recipientEmail: "dave@x.com" }).toArray();
+    const carol = await db.collection("notifications").find({ recipientEmail: "carol@x.com" }).toArray();
+    expect(dave.some((n) => n.type === "mention")).toBe(true);
+    expect(carol).toHaveLength(0); // author mentioned themselves — no self-notify
+  });
+
+  it("does not double-notify when the prompt owner is also the parent author", async () => {
+    const pid = new ObjectId();
+    await db.collection("prompts").insertOne({ _id: pid, ownerEmail: "owner@x.com", name: "Cool" });
+    const top = await addComment(db, pid.toString(), "owner@x.com", "my own prompt comment");
+    await addComment(db, pid.toString(), "fan@x.com", "great work!", top.id);
+    const owner = await db.collection("notifications").find({ recipientEmail: "owner@x.com" }).toArray();
+    expect(owner).toHaveLength(1); // reply wins; not also a separate comment notification
+    expect(owner[0].type).toBe("reply");
   });
 });
