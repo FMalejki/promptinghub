@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getPromptDetailByHandleAndSlug } from "@/lib/prompts";
 import { promptOgMetadata } from "@/lib/meta";
+import { getPlaceholderImage } from "@/lib/constants";
 import { NamespacedPromptClient } from "./NamespacedPromptClient";
 
 // Server-side metadata so shared @handle/slug links render a rich preview.
@@ -9,7 +10,7 @@ export async function generateMetadata({ params }: { params: { handle: string; s
   try {
     const detail = await getPromptDetailByHandleAndSlug(await getDb(), params.handle, params.slug);
     if (!detail || detail.isPrivate) return promptOgMetadata(null);
-    return promptOgMetadata({ name: detail.name, description: detail.description, image: detail.image });
+    return promptOgMetadata({ name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) });
   } catch {
     return promptOgMetadata(null);
   }
