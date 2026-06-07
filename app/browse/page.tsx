@@ -21,6 +21,8 @@ type Prompt = {
   isPrivate: boolean;
 };
 
+const PAGE_SIZE = 12;
+
 export default function BrowsePage() {
   const { status, data } = useSession();
   const [q, setQ] = useState("");
@@ -29,6 +31,8 @@ export default function BrowsePage() {
   const [imageOnly, setImageOnly] = useState(false);
   const [tag, setTag] = useState<string | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
@@ -64,27 +68,53 @@ export default function BrowsePage() {
     if (query) setQ(query);
   }, []);
 
-  const load = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (category) params.set("category", category);
-    if (imageOnly) params.set("image", "1");
-    if (tag) params.set("tag", tag);
-    params.set("sort", sort);
+  const buildParams = useCallback(
+    (offset: number) => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (category) params.set("category", category);
+      if (imageOnly) params.set("image", "1");
+      if (tag) params.set("tag", tag);
+      params.set("sort", sort);
+      params.set("limit", String(PAGE_SIZE));
+      if (offset) params.set("offset", String(offset));
+      return params;
+    },
+    [q, category, sort, imageOnly, tag],
+  );
 
+  const load = useCallback(async () => {
     setError(false);
     try {
-      const res = await fetch("/api/prompts" + (params.toString() ? `?${params}` : ""));
+      const res = await fetch(`/api/prompts?${buildParams(0)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
       setPrompts(body.prompts || []);
+      setNextCursor(typeof body.nextOffset === "number" ? body.nextOffset : null);
     } catch {
       setError(true);
       setPrompts([]);
+      setNextCursor(null);
     } finally {
       setLoaded(true);
     }
-  }, [q, category, sort, imageOnly, tag]);
+  }, [buildParams]);
+
+  const loadMore = useCallback(async () => {
+    if (nextCursor == null || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/prompts?${buildParams(nextCursor)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      setPrompts((cur) => cur.concat(body.prompts || []));
+      setNextCursor(typeof body.nextOffset === "number" ? body.nextOffset : null);
+    } catch {
+      // Keep what's already shown; the button stays so the user can retry.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, buildParams]);
 
   useEffect(() => {
     const t = setTimeout(load, 200);
@@ -303,11 +333,24 @@ export default function BrowsePage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {prompts.map((prompt) => (
-              <PromptCard key={prompt.id} {...prompt} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {prompts.map((prompt) => (
+                <PromptCard key={prompt.id} {...prompt} />
+              ))}
+            </div>
+            {nextCursor != null && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Loading skeleton */}
