@@ -23,8 +23,16 @@ function promptPath(p: RssPrompt): string {
   return p.handle && p.slug ? `/p/${p.handle}/${p.slug}` : `/prompt/${p.id}`;
 }
 
-export function buildRssFeed(baseUrl: string, prompts: RssPrompt[]): string {
+// Optional channel overrides so the same builder powers the global trending feed
+// and per-creator feeds (different title/description/self link).
+export type RssChannel = { title?: string; description?: string; selfPath?: string; link?: string };
+
+export function buildRssFeed(baseUrl: string, prompts: RssPrompt[], channel: RssChannel = {}): string {
   const base = baseUrl.replace(/\/$/, "");
+  const title = channel.title ?? "PromptingHub — Trending prompts";
+  const description = channel.description ?? "The most popular prompts on PromptingHub, updated continuously.";
+  const selfPath = channel.selfPath ?? "/feed.xml";
+  const channelLink = channel.link ? `${base}${channel.link}` : base;
   const items = prompts
     .map((p) => {
       const link = `${base}${promptPath(p)}`;
@@ -41,11 +49,11 @@ export function buildRssFeed(baseUrl: string, prompts: RssPrompt[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>PromptingHub — Trending prompts</title>
-    <link>${base}</link>
-    <description>The most popular prompts on PromptingHub, updated continuously.</description>
+    <title>${esc(title)}</title>
+    <link>${channelLink}</link>
+    <description>${esc(description)}</description>
     <language>en</language>
-    <atom:link href="${base}/feed.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="${base}${selfPath}" rel="self" type="application/rss+xml" />
 ${items}
   </channel>
 </rss>`;

@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: { params: { handle: string } 
       description,
       openGraph: { title, description, type: "profile", images: creator.image ? [{ url: creator.image }] : undefined },
       twitter: { card: "summary", title, description },
+      alternates: { types: { "application/rss+xml": `/u/${creator.handle}/feed.xml` } },
     };
   } catch {
     return { title: "Creator · PromptingHub" };
