@@ -20,6 +20,7 @@ import { VersionHistory } from "./VersionHistory";
 import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
+import { promptStats } from "@/lib/promptStats";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -150,6 +151,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => pickReadme(files), [files]);
+  const stats = useMemo(() => promptStats(allText), [allText]);
   const installRef = prompt.handle && prompt.slug ? `${prompt.handle}/${prompt.slug}` : null;
   const imageGen = isImagePrompt({ testedModels: prompt.testedModels, category: prompt.category });
   const imageGenLinks = (prompt.testedModels || [])
@@ -409,8 +411,16 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
       {/* Files */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{multi ? `${filled.length} files` : "Prompt"}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white shrink-0">{multi ? `${filled.length} files` : "Prompt"}</h2>
+            <span
+              title={`${stats.words} words · ${stats.chars} characters · ~${stats.tokens} tokens (estimate)`}
+              className="text-xs text-gray-400 dark:text-gray-500 truncate"
+            >
+              {stats.words} words · ~{stats.tokens} tokens
+            </span>
+          </div>
           <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
         </div>
         {filled.map((f) => (
