@@ -39,6 +39,7 @@ export type PromptDetail = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount?: number;
+  viewCount?: number;
   priceCents?: number;
   tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
@@ -69,6 +70,15 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [forking, setForking] = useState(false);
   const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
+  const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
+
+  // Record a view once per page load (soft signal, best-effort).
+  useEffect(() => {
+    fetch(`/api/prompts/${prompt.id}/view`, { method: "POST" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && typeof d.viewCount === "number" && setViewCount(d.viewCount))
+      .catch(() => {});
+  }, [prompt.id]);
 
   useEffect(() => {
     let active = true;
@@ -264,6 +274,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               <span>{copyCount}</span>
+            </span>
+
+            <span
+              title="Times viewed"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>{viewCount}</span>
             </span>
 
             {(prompt.forkCount ?? 0) > 0 && (

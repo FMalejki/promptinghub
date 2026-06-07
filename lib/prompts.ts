@@ -58,6 +58,7 @@ export type PromptDetail = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount: number;
+  viewCount: number;
   priceCents: number;
   tags: string[];
   forkedFrom: { id: string; name: string } | null;
@@ -447,6 +448,7 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
+    viewCount: row.viewCount || 0,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
@@ -477,6 +479,22 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
     /* analytics is best-effort */
   }
   return doc.copyCount;
+}
+
+/**
+ * Bump a prompt's view counter and return the new total. A soft engagement
+ * signal — public and not auth-gated. Returns null for a malformed/missing id.
+ */
+export async function incrementViewCount(db: Db, id: string): Promise<number | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const res = await db.collection("prompts").findOneAndUpdate(
+    { _id: new ObjectId(id) },
+    { $inc: { viewCount: 1 } },
+    { returnDocument: "after" },
+  );
+  const doc = (res as { value?: { viewCount?: number } } | null)?.value ?? (res as { viewCount?: number } | null);
+  if (!doc || typeof doc.viewCount !== "number") return null;
+  return doc.viewCount;
 }
 
 /**
@@ -590,6 +608,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
+    viewCount: row.viewCount || 0,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
