@@ -19,9 +19,11 @@ describe("promptOgMetadata", () => {
     expect((m.description as string).length).toBeLessThanOrEqual(200);
   });
 
-  it("omits images when none is provided", () => {
-    const m = promptOgMetadata({ name: "P", description: "d" });
-    expect(m.openGraph?.images).toBeUndefined();
+  it("falls back to the dynamic OG image when none is provided", () => {
+    const m = promptOgMetadata({ name: "Hello World", description: "a nice prompt" });
+    const url = (m.openGraph?.images as { url: string }[])?.[0]?.url;
+    expect(url).toContain("/api/og?");
+    expect(url).toContain("title=Hello+World");
   });
 
   it("falls back to a generic card when the prompt is missing/private", () => {

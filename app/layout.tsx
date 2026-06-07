@@ -3,7 +3,10 @@ import { Providers } from "./providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
+
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "PromptingHub",
   description: "Discover and share AI prompts",
   alternates: {
