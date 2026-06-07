@@ -118,5 +118,6 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
 - PR #30 merged: Comments — lib/comments.ts (add/list/delete/count, author-resolved, author-only delete), GET/POST /api/prompts/[id]/comments + DELETE /api/comments/[id], Comments component on detail. 164 tests. Live (GET [] 200, POST unauth 401).
 - PR #31 merged: Collection export — getCollectionExport + GET /api/collections/[id]/export (downloadable .json), Export button on collection page. 166 tests. Live (404 missing).
 - PR #32 merged: API keys — lib/apiKeys.ts (ph_ keys, SHA-256 hash-only storage, raw shown once, verify+lastUsedAt, owner revoke), /api/keys (GET/POST), /api/keys/[id] DELETE, /api/v1/prompts (Bearer auth → caller's prompts), ApiKeysManager in settings. 171 tests. Live (all 401 without valid key).
-- **19 PRs this session (#14–#32).** REMAINING QUEUE: (a) prompt versioning/changelog; (b) ingested-drafts curation UI; (c) full E2E Preview click-through (needs login).
+- PR #33 merged: Prompt versioning — updatePrompt snapshots prior name/body/files into promptVersions on content edits (owner-scoped, inline to avoid import cycle), lib/versions.ts listVersions, GET /api/prompts/[id]/versions, VersionHistory UI on detail. 175 tests. Live (versions [] for unedited).
+- **20 PRs this session (#14–#33).** REMAINING QUEUE: (a) ingested-drafts curation UI (review pending → publish); (b) full E2E Preview click-through (needs login).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
