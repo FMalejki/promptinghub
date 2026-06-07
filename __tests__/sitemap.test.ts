@@ -35,6 +35,23 @@ describe("buildSitemapEntries", () => {
     expect(entry?.lastModified).toEqual(d);
   });
 
+  it("prefers updatedAt over createdAt for lastModified", () => {
+    const created = new Date("2026-03-04");
+    const updated = new Date("2026-05-06");
+    const entry = buildSitemapEntries(base, [
+      { id: "x", isPrivate: false, createdAt: created, updatedAt: updated },
+    ]).find((e) => e.url.includes("/prompt/x"));
+    expect(entry?.lastModified).toEqual(updated);
+  });
+
+  it("falls back to createdAt when updatedAt is null", () => {
+    const created = new Date("2026-03-04");
+    const entry = buildSitemapEntries(base, [
+      { id: "x", isPrivate: false, createdAt: created, updatedAt: null },
+    ]).find((e) => e.url.includes("/prompt/x"));
+    expect(entry?.lastModified).toEqual(created);
+  });
+
   it("includes the taxonomy index pages", () => {
     const urls = buildSitemapEntries(base, []).map((e) => e.url);
     for (const p of ["/tags", "/categories", "/creators", "/collections"]) {

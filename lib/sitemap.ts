@@ -4,6 +4,7 @@ export type SitemapPrompt = {
   slug?: string;
   isPrivate: boolean;
   createdAt?: Date;
+  updatedAt?: Date | null;
 };
 
 export type SitemapEntry = { url: string; lastModified?: Date };
@@ -34,7 +35,8 @@ export function buildSitemapEntries(baseUrl: string, prompts: SitemapPrompt[], e
   for (const p of prompts) {
     if (p.isPrivate) continue;
     const path = p.handle && p.slug ? `/p/${p.handle}/${p.slug}` : `/prompt/${p.id}`;
-    add(path, p.createdAt);
+    // Prefer the last edit time so search engines re-crawl updated prompts.
+    add(path, p.updatedAt ?? p.createdAt);
   }
 
   for (const tag of extras.tags ?? []) add(`/t/${encodeURIComponent(tag)}`);
