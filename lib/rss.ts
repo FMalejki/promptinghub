@@ -49,6 +49,42 @@ export function tagRssChannel(tag: string): Required<RssChannel> {
   };
 }
 
+// JSON Feed 1.1 (https://jsonfeed.org) — a JSON alternative to the RSS feed,
+// built from the same prompt rows. Pure; the route layer serializes it.
+export type JsonFeedItem = {
+  id: string;
+  url: string;
+  title: string;
+  content_text: string;
+  date_published?: string;
+};
+export type JsonFeed = {
+  version: string;
+  title: string;
+  description?: string;
+  home_page_url: string;
+  feed_url: string;
+  items: JsonFeedItem[];
+};
+
+export function buildJsonFeed(baseUrl: string, prompts: RssPrompt[], channel: RssChannel = {}): JsonFeed {
+  const base = baseUrl.replace(/\/$/, "");
+  const feed: JsonFeed = {
+    version: "https://jsonfeed.org/version/1.1",
+    title: channel.title ?? "PromptingHub — Trending prompts",
+    home_page_url: base,
+    feed_url: `${base}${channel.selfPath ?? "/feed.json"}`,
+    items: prompts.map((p) => {
+      const url = `${base}${promptPath(p)}`;
+      const item: JsonFeedItem = { id: url, url, title: p.name, content_text: p.description };
+      if (p.createdAt) item.date_published = new Date(p.createdAt).toISOString();
+      return item;
+    }),
+  };
+  if (channel.description) feed.description = channel.description;
+  return feed;
+}
+
 export function buildRssFeed(baseUrl: string, prompts: RssPrompt[], channel: RssChannel = {}): string {
   const base = baseUrl.replace(/\/$/, "");
   const title = channel.title ?? "PromptingHub — Trending prompts";
