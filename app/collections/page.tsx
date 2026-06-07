@@ -36,8 +36,13 @@ export default async function CollectionsPage() {
               <Link
                 key={c.id}
                 href={`/collections/${c.id}`}
-                className="block p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all"
+                className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all overflow-hidden"
               >
+                {c.cover && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.cover} alt="" className="w-full h-32 object-cover" />
+                )}
+                <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{c.name}</h2>
                   <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded-full">
@@ -48,6 +53,7 @@ export default async function CollectionsPage() {
                 <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   by {c.owner.handle ? `@${c.owner.handle}` : c.owner.name}
                 </p>
+                </div>
               </Link>
             ))}
           </div>
