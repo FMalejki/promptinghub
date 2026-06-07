@@ -178,7 +178,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 {prompt.tags.map((t) => (
                   <Link
                     key={t}
-                    href={`/browse?tag=${encodeURIComponent(t)}`}
+                    href={`/t/${encodeURIComponent(t)}`}
                     className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
                   >
                     #{t}

@@ -205,6 +205,21 @@ export async function listCategories(db: Db): Promise<string[]> {
   return ((await db.collection("prompts").distinct("category")) as string[]).sort();
 }
 
+/** Most-used tags across public prompts, descending by count. */
+export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count: number }[]> {
+  const rows = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { isPrivate: { $ne: true }, tags: { $type: "array", $ne: [] } } },
+      { $unwind: "$tags" },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: limit },
+    ])
+    .toArray();
+  return rows.map((r: any) => ({ tag: r._id as string, count: r.count as number }));
+}
+
 export async function uniqueSlug(db: Db, ownerEmail: string, name: string): Promise<string> {
   const base = slugify(name);
   let slug = base;
