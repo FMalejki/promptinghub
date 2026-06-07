@@ -1,6 +1,8 @@
 // oEmbed (rich type) support so a prompt URL can be embedded in blogs, Notion,
 // etc. See https://oembed.com/. We render a small responsive iframe.
 
+import type { Metadata } from "next";
+
 export const DEFAULT_EMBED_WIDTH = 600;
 export const DEFAULT_EMBED_HEIGHT = 400;
 const PROVIDER_NAME = "PromptingHub";
@@ -61,6 +63,19 @@ export function parseOEmbedTarget(url: string): OEmbedTarget | null {
 export function oembedDiscoveryUrl(siteUrl: string, targetUrl: string): string {
   const base = siteUrl.replace(/\/$/, "");
   return `${base}/api/oembed?url=${encodeURIComponent(targetUrl)}&format=json`;
+}
+
+// Metadata for the /embed/<id> iframe page. It is thin, chrome-free, duplicate
+// content, so it must be noindex (follow so crawlers still reach the canonical
+// /prompt/<id>); it keeps advertising the oEmbed discovery link.
+export function embedMetadata(siteUrl: string, promptId: string): Metadata {
+  const base = siteUrl.replace(/\/$/, "");
+  const oembed = oembedDiscoveryUrl(base, `${base}/prompt/${promptId}`);
+  return {
+    title: "Embedded prompt — PromptingHub",
+    robots: { index: false, follow: true },
+    alternates: { types: { "application/json+oembed": oembed } },
+  };
 }
 
 export function buildOEmbed(baseUrl: string, prompt: EmbedPrompt, opts: OEmbedOpts): OEmbed {

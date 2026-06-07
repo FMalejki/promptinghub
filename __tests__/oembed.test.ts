@@ -1,7 +1,24 @@
-import { buildOEmbed, embedHtml, oembedDiscoveryUrl, parseOEmbedTarget } from "../lib/oembed";
+import { buildOEmbed, embedHtml, oembedDiscoveryUrl, parseOEmbedTarget, embedMetadata } from "../lib/oembed";
 
 const base = "https://example.com";
 const prompt = { id: "abc123", name: "SEO Title Writer", author: { name: "Ada" } };
+
+describe("embedMetadata", () => {
+  it("marks the embed page noindex but lets crawlers follow to the canonical prompt", () => {
+    const m = embedMetadata(base, "abc123");
+    expect(m.robots).toEqual({ index: false, follow: true });
+  });
+
+  it("still advertises the oEmbed discovery link pointing at the canonical prompt url", () => {
+    const m = embedMetadata(base, "abc123");
+    const oembed = (m.alternates?.types as Record<string, unknown>)["application/json+oembed"];
+    expect(oembed).toBe(oembedDiscoveryUrl(base, `${base}/prompt/abc123`));
+  });
+
+  it("has a descriptive title", () => {
+    expect(embedMetadata(base, "abc123").title).toContain("PromptingHub");
+  });
+});
 
 describe("parseOEmbedTarget", () => {
   const id = "6a246476f014ab933b615829";
