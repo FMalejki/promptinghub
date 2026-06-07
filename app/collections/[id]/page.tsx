@@ -13,6 +13,54 @@ type CollectionDetail = {
   prompts: React.ComponentProps<typeof PromptCard>[];
 };
 
+function SubscribeButton({ id }: { id: string }) {
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [subscribers, setSubscribers] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/collections/${id}/subscribe`)
+      .then((r) => (r.ok ? r.json() : { subscribed: false, subscribers: 0 }))
+      .then((d) => {
+        setSubscribed(!!d.subscribed);
+        setSubscribers(d.subscribers || 0);
+      })
+      .catch(() => setSubscribed(false));
+  }, [id]);
+
+  async function toggle() {
+    if (subscribed === null || busy) return;
+    setBusy(true);
+    const next = !subscribed;
+    setSubscribed(next);
+    setSubscribers((n) => n + (next ? 1 : -1)); // optimistic
+    const res = await fetch(`/api/collections/${id}/subscribe`, { method: next ? "POST" : "DELETE" }).catch(() => null);
+    if (!res || !res.ok) {
+      setSubscribed(!next);
+      setSubscribers((n) => n + (next ? -1 : 1));
+      if (res?.status === 401) window.location.href = "/login";
+    }
+    setBusy(false);
+  }
+
+  if (subscribed === null) return null;
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title={`${subscribers} subscriber${subscribers === 1 ? "" : "s"}`}
+      className={
+        subscribed
+          ? "px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          : "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+      }
+    >
+      {subscribed ? "Subscribed" : "Subscribe"}
+      {subscribers > 0 && <span className="ml-1.5 opacity-70">· {subscribers}</span>}
+    </button>
+  );
+}
+
 export default function CollectionPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -72,6 +120,7 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
                 </a>
               </div>
               <div className="flex items-center gap-3 shrink-0">
+                {!isOwner && <SubscribeButton id={params.id} />}
                 {collection.prompts.length > 0 && (
                   <>
                     <a
