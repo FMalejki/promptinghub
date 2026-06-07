@@ -108,6 +108,20 @@ export function Comments({ promptId }: { promptId: string }) {
     }
   }
 
+  async function report(id: string) {
+    if (!session?.user?.email) {
+      router.push("/login");
+      return;
+    }
+    const reason = window.prompt("Why are you reporting this comment? (optional)") ?? "";
+    const res = await fetch(`/api/comments/${id}/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    if (res.ok) alert("Thanks — this comment has been flagged for moderation.");
+  }
+
   async function toggleLike(id: string) {
     if (!session?.user?.email) {
       router.push("/login");
@@ -200,6 +214,11 @@ export function Comments({ promptId }: { promptId: string }) {
                 className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
               >
                 {replyTo === c.id ? "Cancel" : "Reply"}
+              </button>
+            )}
+            {session?.user?.email && session.user.email !== c.author.email && (
+              <button onClick={() => report(c.id)} className="text-xs text-gray-400 hover:text-red-600" title="Report this comment">
+                report
               </button>
             )}
           </div>
