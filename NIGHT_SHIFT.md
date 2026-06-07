@@ -108,4 +108,10 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
 - PR #23 merged: Collections — lib/collections.ts (owner-scoped CRUD + add/remove, unique slug, deduped ordered ids), /api/collections + /api/collections/[id], /collections/[id] page, SaveToCollection dropdown on detail, collections row on profile. 141 tests. Verified live (API 200/401/404).
 - PR #24 merged: image-gen support — lib/imageModels.ts (image model set incl gpt-image-2/gemini-image, isImagePrompt, model playground links), listPrompts imageOnly (+$and OR-accumulator refactor), API ?image=1, browse "Images" toggle, card "Image" badge, detail playground-links panel, new "Image Generation" category. 147 tests. Live (filter works; 0/17 since existing prompts are text).
 - PR #25 merged: creator pages — /u/[handle] (no email in URL), GET /api/u/[handle] (email stripped), lib/verified.ts isVerifiedHandle (founders + env), getCreatorProfile, verified checkmark on creator page + detail author, server generateMetadata type=profile. 150 tests. Live (@alice verified=False 8 prompts no-email-leak; @filipmalejki verified=True; /u/alice 200).
+- BUILD-EVERYTHING SPRINT (Adrian: "WSZYSTKO zrob") — 6 more PRs:
+  - PR #24 image-gen support; PR #23 Collections; PR #25 creator pages + verified.
+  - PR #26 marketplace scaffolding — lib/pricing.ts, priceCents through model + forms + badges + Buy stub (payments NOT live, honest). 154 tests.
+  - PR #27 X/Twitter daily ingest cron — lib/ingest.ts runIngest (dedup by body hash, pending status), /api/cron/ingest (CRON_SECRET-gated), vercel.json daily cron. Honest no-op without TWITTER_BEARER_TOKEN. Verified live ({enabled:false,imported:0}). 157 tests.
+  - PR #28 docs — CONTRIBUTING.md + .env.local.example feature flags.
+- **GRAND TOTAL this session: 15 feature PRs (#14–#28), 157 tests, all on night-shift + live.** Everything proposed is now built. Blocked-only remainders: seed real prompts (Adrian), npm publish CLI (npm acct), set TWITTER_BEARER_TOKEN/CRON_SECRET to actually run ingest.
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
