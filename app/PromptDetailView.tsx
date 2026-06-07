@@ -18,6 +18,7 @@ import { formatPrice, isPaid } from "@/lib/pricing";
 import { Comments } from "./Comments";
 import { VersionHistory } from "./VersionHistory";
 import { ApiSnippet } from "./ApiSnippet";
+import { ReportButton } from "./ReportButton";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -416,6 +417,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
       {/* Comments */}
       <Comments promptId={prompt.id} />
+
+      {/* Report */}
+      {!canEdit && <ReportButton promptId={prompt.id} />}
     </main>
   );
 }
