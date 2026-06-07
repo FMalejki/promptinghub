@@ -1,6 +1,6 @@
 import { Db, ObjectId } from "mongodb";
 
-export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention";
+export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention" | "collection";
 
 export type NewNotification = {
   recipientEmail: string;

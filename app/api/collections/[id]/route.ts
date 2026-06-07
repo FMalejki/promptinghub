@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getCollectionDetail, addPromptToCollection, removePromptFromCollection, deleteCollection } from "@/lib/collections";
+import { notifyCollectionSubscribers } from "@/lib/collectionFollows";
+import { getPromptDetail } from "@/lib/prompts";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const detail = await getCollectionDetail(await getDb(), params.id);
@@ -29,6 +31,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       ? await addPromptToCollection(db, params.id, email, parsed.data.promptId)
       : await removePromptFromCollection(db, params.id, email, parsed.data.promptId);
   if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+
+  // Best-effort: notify subscribers when a prompt is added.
+  if (parsed.data.action === "add") {
+    try {
+      const prompt = await getPromptDetail(db, parsed.data.promptId);
+      await notifyCollectionSubscribers(db, params.id, email, prompt?.name);
+    } catch {
+      /* notifications are non-critical */
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 

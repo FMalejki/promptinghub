@@ -6,7 +6,7 @@ import { Navbar } from "../components/Navbar";
 
 type Notif = {
   id: string;
-  type: "follow" | "comment" | "fork" | "reply" | "mention";
+  type: "follow" | "comment" | "fork" | "reply" | "mention" | "collection";
   actorName?: string;
   actorEmail: string;
   promptId?: string;
@@ -23,6 +23,7 @@ function summarize(n: Notif): string {
   if (n.type === "fork") return `${who} forked your prompt${n.promptName ? ` “${n.promptName}”` : ""}`;
   if (n.type === "reply") return `${who} replied to your comment on${on}`;
   if (n.type === "mention") return `${who} mentioned you on${on}`;
+  if (n.type === "collection") return `${who} ${n.text || "updated a collection you follow"}`;
   return `${who} commented on${on}`;
 }
 
@@ -83,14 +84,19 @@ export default function NotificationsPage() {
               const inner = (
                 <div className={`p-4 rounded-lg border ${n.read ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"}`}>
                   <p className="text-sm text-gray-900 dark:text-white">{summarize(n)}</p>
-                  {n.text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">“{n.text}”</p>}
+                  {n.text && n.type !== "collection" && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">“{n.text}”</p>
+                  )}
                   <p className="mt-1 text-xs text-gray-400">{new Date(n.createdAt).toLocaleString()}</p>
                 </div>
               );
               return (
                 <li key={n.id}>
                   {n.promptId ? (
-                    <Link href={`/prompt/${n.promptId}`} onClick={() => markOne(n.id)}>
+                    <Link
+                      href={n.type === "collection" ? `/collections/${n.promptId}` : `/prompt/${n.promptId}`}
+                      onClick={() => markOne(n.id)}
+                    >
                       {inner}
                     </Link>
                   ) : (
