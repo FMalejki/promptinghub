@@ -115,5 +115,6 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
   - PR #28 docs — CONTRIBUTING.md + .env.local.example feature flags.
 - **GRAND TOTAL this session: 15 feature PRs (#14–#28), 157 tests, all on night-shift + live.** Everything proposed is now built. Blocked-only remainders: seed real prompts (Adrian), npm publish CLI (npm acct), set TWITTER_BEARER_TOKEN/CRON_SECRET to actually run ingest.
 - PR #29 merged: Trending — sort=trending (copyCount+stars composite score), /trending page w/ podium top-3, Navbar Browse+Trending links. 158 tests. Live (order correct).
-- **16 PRs this session (#14–#29).** NEXT COOL FEATURES QUEUE (keep building per "WSZYSTKO"): (a) ingested-drafts curation UI (review pending → publish); (b) comments/discussion on prompts; (c) prompt versioning/changelog; (d) export collection as bundle/manifest; (e) API keys for programmatic fetch; (f) full E2E Preview click-through of Collections/pricing/image badges (needs login).
+- PR #30 merged: Comments — lib/comments.ts (add/list/delete/count, author-resolved, author-only delete), GET/POST /api/prompts/[id]/comments + DELETE /api/comments/[id], Comments component on detail. 164 tests. Live (GET [] 200, POST unauth 401).
+- **17 PRs this session (#14–#30).** REMAINING QUEUE: (a) prompt versioning/changelog; (b) export collection as bundle/manifest; (c) API keys for programmatic fetch; (d) ingested-drafts curation UI; (e) full E2E Preview click-through (needs login).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
