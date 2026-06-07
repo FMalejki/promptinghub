@@ -121,6 +121,7 @@ describe("getPromptDetail", () => {
       isPrivate: false,
       testedModels: [],
       copyCount: 0,
+      viewCount: 0,
       priceCents: 0,
       tags: [],
       forkedFrom: null,
