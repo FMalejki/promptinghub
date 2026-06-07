@@ -14,15 +14,20 @@ export async function generateMetadata({ params }: { params: { handle: string } 
 export default async function FollowersPage({ params }: { params: { handle: string } }) {
   let followers: Follower[] = [];
   let name = params.handle;
+  let known = true;
   try {
     const db = await getDb();
     const creator = await getCreatorProfile(db, params.handle);
-    if (!creator) notFound();
-    name = creator.name || params.handle;
-    followers = await listFollowers(db, params.handle);
+    if (!creator) {
+      known = false;
+    } else {
+      name = creator.name || params.handle;
+      followers = await listFollowers(db, params.handle);
+    }
   } catch {
-    // DB unavailable — render the empty state.
+    // DB unavailable — render the empty state rather than a 404.
   }
+  if (!known) notFound(); // outside try/catch so the NEXT_NOT_FOUND signal isn't swallowed
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
