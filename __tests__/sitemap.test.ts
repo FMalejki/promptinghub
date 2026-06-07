@@ -34,4 +34,28 @@ describe("buildSitemapEntries", () => {
     const entry = buildSitemapEntries(base, [{ id: "x", isPrivate: false, createdAt: d }]).find((e) => e.url.includes("/prompt/x"));
     expect(entry?.lastModified).toEqual(d);
   });
+
+  it("includes the taxonomy index pages", () => {
+    const urls = buildSitemapEntries(base, []).map((e) => e.url);
+    for (const p of ["/tags", "/categories", "/creators", "/collections"]) {
+      expect(urls).toContain(`${base}${p}`);
+    }
+  });
+
+  it("adds tag, collection and creator entries (URL-encoded)", () => {
+    const urls = buildSitemapEntries(base, [], {
+      tags: ["c++", "seo"],
+      collections: ["abc123"],
+      creators: ["alice"],
+    }).map((e) => e.url);
+    expect(urls).toContain(`${base}/t/c%2B%2B`);
+    expect(urls).toContain(`${base}/t/seo`);
+    expect(urls).toContain(`${base}/collections/abc123`);
+    expect(urls).toContain(`${base}/u/alice`);
+  });
+
+  it("de-duplicates repeated urls", () => {
+    const urls = buildSitemapEntries(base, [], { tags: ["seo", "seo"] }).map((e) => e.url);
+    expect(urls.filter((u) => u === `${base}/t/seo`)).toHaveLength(1);
+  });
 });
