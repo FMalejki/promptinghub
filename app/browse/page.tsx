@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
+import { PromptOfDay } from "../components/PromptOfDay";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 
 type Author = { email: string; name: string; image: string | null };
@@ -86,6 +87,9 @@ export default function BrowsePage() {
             </div>
           )}
         </div>
+
+        {/* Prompt of the day — only on the default, unfiltered view */}
+        {!q && !category && !tag && !imageOnly && <PromptOfDay />}
 
         {/* Search Bar */}
         <div className="mb-8">
