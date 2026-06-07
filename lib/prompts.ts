@@ -1,5 +1,6 @@
 import { Db, ObjectId } from "mongodb";
 import { slugify } from "./slug";
+import { IMAGE_MODEL_IDS } from "./imageModels";
 
 export type Author = { email: string; name: string; image: string | null };
 
@@ -63,6 +64,7 @@ export type ListOpts = {
   q?: string;
   category?: string;
   model?: string;
+  imageOnly?: boolean;
   ownerEmail?: string;
   sort?: "recent" | "popular" | "copied";
   includePrivate?: boolean;
@@ -106,31 +108,38 @@ export function normalizeFiles(row: { files?: PromptFile[]; body?: string }): Pr
 
 export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]> {
   const match: Record<string, unknown> = {};
+  // Each OR-group is ANDed together so privacy / image / search filters never clobber each other.
+  const orGroups: Record<string, unknown>[][] = [];
 
   // Privacy filter
   if (!opts.includePrivate) {
     match.isPrivate = { $ne: true };
   } else if (opts.userEmail) {
-    match.$or = [
+    orGroups.push([
       { isPrivate: { $ne: true } },
       { ownerEmail: opts.userEmail },
-      { sharedWith: opts.userEmail }
-    ];
+      { sharedWith: opts.userEmail },
+    ]);
   }
 
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
   if (opts.category) match.category = opts.category;
   if (opts.model) match["testedModels.modelId"] = opts.model;
+  if (opts.imageOnly) {
+    orGroups.push([
+      { category: { $regex: "^image generation$", $options: "i" } },
+      { "testedModels.modelId": { $in: [...IMAGE_MODEL_IDS] } },
+    ]);
+  }
   if (opts.q) {
     const rx = { $regex: opts.q, $options: "i" };
-    // Combine with $and so a search $or doesn't clobber the privacy $or above.
-    const searchOr = [{ name: rx }, { description: rx }];
-    if (match.$or) {
-      match.$and = [{ $or: match.$or }, { $or: searchOr }];
-      delete match.$or;
-    } else {
-      match.$or = searchOr;
-    }
+    orGroups.push([{ name: rx }, { description: rx }]);
+  }
+
+  if (orGroups.length === 1) {
+    match.$or = orGroups[0];
+  } else if (orGroups.length > 1) {
+    match.$and = orGroups.map((g) => ({ $or: g }));
   }
 
   const sortField =

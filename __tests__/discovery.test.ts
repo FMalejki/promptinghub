@@ -44,6 +44,14 @@ describe("listPrompts discovery", () => {
     expect(gem.map((p) => p.name)).toEqual(["Gem"]);
   });
 
+  it("filters to image-gen prompts when imageOnly is set", async () => {
+    await createPrompt(db, "a@x.com", { name: "Mid", description: "d", category: "Creative", body: "b", testedModels: [{ modelId: "midjourney" }] });
+    await createPrompt(db, "a@x.com", { name: "Img", description: "d", category: "Image Generation", body: "b" });
+    await createPrompt(db, "a@x.com", { name: "Text", description: "d", category: "Writing", body: "b", testedModels: [{ modelId: "gpt-4" }] });
+    const imgs = await listPrompts(db, { imageOnly: true });
+    expect(imgs.map((p) => p.name).sort()).toEqual(["Img", "Mid"]);
+  });
+
   it("does not leak private prompts when q is combined with the privacy filter", async () => {
     // Mallory's private prompt matches the query but must stay hidden from a signed-in stranger.
     await createPrompt(db, "mallory@x.com", { name: "Secret Sauce", description: "hidden", category: "Writing", body: "b", isPrivate: true });
