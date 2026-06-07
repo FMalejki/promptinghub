@@ -12,6 +12,10 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: "",
     image: "",
+    bio: "",
+    website: "",
+    x: "",
+    github: "",
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,10 +55,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      setForm({
-        name: session.user.name || "",
-        image: session.user.image || "",
-      });
+      // Seed name/image from the session, then hydrate bio/links from the profile API.
+      setForm((f) => ({ ...f, name: session.user?.name || "", image: session.user?.image || "" }));
+      fetch("/api/profile")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (p) setForm((f) => ({ ...f, bio: p.bio || "", website: p.website || "", x: p.x || "", github: p.github || "" }));
+        })
+        .catch(() => {});
     }
   }, [status, session]);
 
@@ -73,6 +81,10 @@ export default function SettingsPage() {
         body: JSON.stringify({
           name: form.name,
           image: form.image || null,
+          bio: form.bio,
+          website: form.website,
+          x: form.x,
+          github: form.github,
         }),
       });
 
@@ -151,6 +163,33 @@ export default function SettingsPage() {
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Enter a URL to an image for your profile picture
               </p>
+            </div>
+
+            <div>
+              <label className={label}>Bio</label>
+              <textarea
+                value={form.bio}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                className={input}
+                rows={3}
+                maxLength={280}
+                placeholder="A sentence or two about you and the prompts you share."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={label}>Website</label>
+                <input type="text" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className={input} placeholder="https://you.dev" />
+              </div>
+              <div>
+                <label className={label}>X / Twitter</label>
+                <input type="text" value={form.x} onChange={(e) => setForm({ ...form, x: e.target.value })} className={input} placeholder="handle" />
+              </div>
+              <div>
+                <label className={label}>GitHub</label>
+                <input type="text" value={form.github} onChange={(e) => setForm({ ...form, github: e.target.value })} className={input} placeholder="username" />
+              </div>
             </div>
 
             <div>

@@ -15,6 +15,10 @@ export async function GET() {
 const schema = z.object({
   name: z.string().min(1).max(60).optional(),
   image: z.string().url().max(500).or(z.literal("")).optional(),
+  bio: z.string().max(280).optional(),
+  website: z.string().max(200).optional(),
+  x: z.string().max(60).optional(),
+  github: z.string().max(60).optional(),
 });
 
 export async function PUT(req: Request) {

@@ -4,7 +4,8 @@ import { slugify } from "./slug";
 import { isVerifiedHandle } from "./verified";
 
 export type User = { id: string; email: string; name: string; image: string | null };
-export type Profile = { email: string; name: string; image: string | null };
+export type ProfileLinks = { website: string | null; x: string | null; github: string | null };
+export type Profile = { email: string; name: string; image: string | null; bio: string | null } & ProfileLinks;
 export type Creator = Profile & { handle: string; verified: boolean };
 
 // Returns the user's stable @handle, generating + persisting a unique one on first call.
@@ -21,9 +22,18 @@ export async function ensureHandle(db: Db, email: string): Promise<string> {
   return handle;
 }
 
+function profileFields(row: any) {
+  return {
+    bio: row.bio ?? null,
+    website: row.website ?? null,
+    x: row.x ?? null,
+    github: row.github ?? null,
+  };
+}
+
 export async function getUserByHandle(db: Db, handle: string): Promise<(Profile & { handle: string }) | null> {
   const row = await db.collection("users").findOne({ handle });
-  return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle } : null;
+  return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle, ...profileFields(row) } : null;
 }
 
 export type TopCreator = {
@@ -107,13 +117,26 @@ export async function verifyCredentials(db: Db, email: string, password: string)
 
 export async function getProfile(db: Db, email: string): Promise<Profile | null> {
   const row = await db.collection("users").findOne({ email });
-  return row ? { email: row.email, name: row.name, image: row.image ?? null } : null;
+  return row ? { email: row.email, name: row.name, image: row.image ?? null, ...profileFields(row) } : null;
 }
 
-export async function updateProfile(db: Db, email: string, patch: { name?: string; image?: string | null }): Promise<Profile | null> {
+export type ProfilePatch = {
+  name?: string;
+  image?: string | null;
+  bio?: string | null;
+  website?: string | null;
+  x?: string | null;
+  github?: string | null;
+};
+
+export async function updateProfile(db: Db, email: string, patch: ProfilePatch): Promise<Profile | null> {
   const set: Record<string, unknown> = {};
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.image !== undefined) set.image = patch.image;
+  if (patch.bio !== undefined) set.bio = patch.bio || null;
+  if (patch.website !== undefined) set.website = patch.website || null;
+  if (patch.x !== undefined) set.x = patch.x || null;
+  if (patch.github !== undefined) set.github = patch.github || null;
   await db.collection("users").updateOne({ email }, { $set: set });
   return getProfile(db, email);
 }
