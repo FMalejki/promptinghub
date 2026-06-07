@@ -37,6 +37,18 @@ function promptPath(p: RssPrompt): string {
 // and per-creator feeds (different title/description/self link).
 export type RssChannel = { title?: string; description?: string; selfPath?: string; link?: string };
 
+// Channel metadata for a tag's RSS feed. Tag is URL-encoded in paths (the
+// human-readable title keeps the raw tag).
+export function tagRssChannel(tag: string): Required<RssChannel> {
+  const enc = encodeURIComponent(tag);
+  return {
+    title: `#${tag} on PromptingHub`,
+    description: `Latest public prompts tagged #${tag}.`,
+    selfPath: `/t/${enc}/feed.xml`,
+    link: `/t/${enc}`,
+  };
+}
+
 export function buildRssFeed(baseUrl: string, prompts: RssPrompt[], channel: RssChannel = {}): string {
   const base = baseUrl.replace(/\/$/, "");
   const title = channel.title ?? "PromptingHub — Trending prompts";
