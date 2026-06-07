@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { buildShareLinks } from "@/lib/share";
 
-export function ShareButtons({ title }: { title: string }) {
+export function ShareButtons({ title, promptId }: { title: string; promptId?: string }) {
   const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const url = typeof window !== "undefined" ? window.location.href : "";
   const links = buildShareLinks(url, title);
 
@@ -12,6 +13,19 @@ export function ShareButtons({ title }: { title: string }) {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  async function copyEmbed() {
+    if (!promptId || typeof window === "undefined") return;
+    const origin = window.location.origin;
+    const snippet = `<iframe src="${origin}/embed/${promptId}" width="600" height="400" style="border:1px solid #e5e7eb;border-radius:12px;max-width:100%;" title="${title.replace(/"/g, "&quot;")}" frameborder="0" loading="lazy"></iframe>`;
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setEmbedCopied(true);
+      setTimeout(() => setEmbedCopied(false), 1500);
     } catch {
       /* clipboard unavailable */
     }
@@ -27,6 +41,11 @@ export function ShareButtons({ title }: { title: string }) {
       <a href={links.linkedin} target="_blank" rel="noreferrer" className={btn}>LinkedIn</a>
       <a href={links.reddit} target="_blank" rel="noreferrer" className={btn}>Reddit</a>
       <button onClick={copyLink} className={btn}>{copied ? "Copied!" : "Copy link"}</button>
+      {promptId && (
+        <button onClick={copyEmbed} className={btn} title="Copy an iframe to embed this prompt">
+          {embedCopied ? "Embed copied!" : "Embed"}
+        </button>
+      )}
     </div>
   );
 }

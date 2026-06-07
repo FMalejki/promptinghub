@@ -452,7 +452,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       )}
 
       {/* Share */}
-      {!prompt.isPrivate && <ShareButtons title={prompt.name} />}
+      {!prompt.isPrivate && <ShareButtons title={prompt.name} promptId={prompt.id} />}
 
       {/* Use via API */}
       {!prompt.isPrivate && <ApiSnippet promptId={prompt.id} />}
