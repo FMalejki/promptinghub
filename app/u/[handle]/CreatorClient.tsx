@@ -87,6 +87,12 @@ export function CreatorClient({ handle }: { handle: string }) {
                   </div>
                   <div className="mt-4 flex items-center gap-3">
                     <FollowButton handle={data.creator.handle} />
+                    <Link
+                      href={`/u/${data.creator.handle}/followers`}
+                      className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      Followers
+                    </Link>
                     <a
                       href={`/u/${data.creator.handle}/feed.xml`}
                       target="_blank"
