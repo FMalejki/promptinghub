@@ -1,4 +1,21 @@
-import { isEmbedPath, frameHeaders } from "../lib/securityHeaders";
+import { isEmbedPath, frameHeaders, securityHeaders } from "../lib/securityHeaders";
+
+describe("securityHeaders", () => {
+  it("applies baseline hardening on every path, plus same-origin framing on normal pages", () => {
+    const byName = Object.fromEntries(securityHeaders("/browse").map((x) => [x.name, x.value]));
+    expect(byName["X-Content-Type-Options"]).toBe("nosniff");
+    expect(byName["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    expect(byName["Permissions-Policy"]).toContain("geolocation=()");
+    expect(byName["X-Frame-Options"]).toBe("SAMEORIGIN");
+  });
+
+  it("applies baseline hardening to the embed route while keeping it framable", () => {
+    const byName = Object.fromEntries(securityHeaders("/embed/abc").map((x) => [x.name, x.value]));
+    expect(byName["X-Content-Type-Options"]).toBe("nosniff");
+    expect(byName["Content-Security-Policy"]).toBe("frame-ancestors *");
+    expect(byName["X-Frame-Options"]).toBeUndefined();
+  });
+});
 
 describe("isEmbedPath", () => {
   it("is true for the embed route and its children", () => {
