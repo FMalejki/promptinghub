@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
 import { pickReadme } from "@/lib/markdown";
 import { Markdown } from "./Markdown";
+import { PromptCard } from "./components/PromptCard";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -51,6 +52,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
   const [forking, setForking] = useState(false);
+  const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/prompts/${prompt.id}/related`)
+      .then((r) => (r.ok ? r.json() : { prompts: [] }))
+      .then((d) => active && setRelated(d.prompts || []))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [prompt.id]);
 
   async function handleFork() {
     if (!session?.user?.email) {
@@ -260,6 +273,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         ))}
       </div>
+
+      {/* Related prompts (same category) */}
+      {related.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {related.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
