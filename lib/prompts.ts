@@ -75,7 +75,7 @@ export type ListOpts = {
   imageOnly?: boolean;
   tag?: string;
   ownerEmail?: string;
-  sort?: "recent" | "popular" | "copied" | "trending";
+  sort?: "recent" | "popular" | "copied" | "trending" | "viewed";
   includePrivate?: boolean;
   userEmail?: string;
 };
@@ -165,6 +165,8 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
       ? { copyCount: -1, createdAt: -1 }
       : opts.sort === "trending"
       ? { trendingScore: -1, createdAt: -1 }
+      : opts.sort === "viewed"
+      ? { viewCount: -1, createdAt: -1 }
       : { createdAt: -1, _id: -1 };
 
   const rows = await db
@@ -175,6 +177,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         $addFields: {
           stars: { $size: { $ifNull: ["$starredBy", []] } },
           copyCount: { $ifNull: ["$copyCount", 0] },
+          viewCount: { $ifNull: ["$viewCount", 0] },
           // Trending = copies + stars (recency breaks ties via the $sort below).
           trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
         },
