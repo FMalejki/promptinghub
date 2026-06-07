@@ -1,5 +1,5 @@
 import { Db } from "mongodb";
-import { getUserByHandle } from "./users";
+import { getUserByHandle, topCreators, type TopCreator } from "./users";
 import { addNotification, actorName } from "./notifications";
 import type { Prompt } from "./prompts";
 
@@ -90,4 +90,18 @@ export async function followingFeed(db: Db, followerEmail: string, limit = 50): 
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
+}
+
+// "You might also like" creator suggestions: the top creators, excluding the
+// viewer and anyone they already follow. Anonymous viewer (no email) → plain
+// top creators. Pulls a few extra to backfill after filtering.
+export async function recommendCreators(db: Db, viewerEmail: string | undefined, limit = 6): Promise<TopCreator[]> {
+  const exclude = new Set<string>();
+  if (viewerEmail) {
+    for (const h of await listFollowingHandles(db, viewerEmail)) exclude.add(h);
+    const me = await db.collection("users").findOne({ email: viewerEmail }, { projection: { handle: 1 } });
+    if (me?.handle) exclude.add(me.handle as string);
+  }
+  const creators = await topCreators(db, limit + exclude.size + 5);
+  return creators.filter((c) => !exclude.has(c.handle)).slice(0, limit);
 }

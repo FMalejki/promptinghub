@@ -6,6 +6,7 @@ import { Navbar } from "../../components/Navbar";
 import { PromptCard } from "../../components/PromptCard";
 import { Avatar } from "../../Avatar";
 import { FollowButton } from "../../FollowButton";
+import { RecommendedCreators } from "../../RecommendedCreators";
 
 type Creator = {
   handle: string;
@@ -140,6 +141,8 @@ export function CreatorClient({ handle }: { handle: string }) {
                 ))}
               </div>
             )}
+
+            <RecommendedCreators exclude={data.creator.handle} />
           </>
         ) : null}
       </main>
