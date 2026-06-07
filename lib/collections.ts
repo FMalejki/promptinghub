@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { slugify } from "./slug";
 import { getPromptDetail, type Prompt } from "./prompts";
+import { collectionCover } from "./collectionCover";
 
 export type Collection = {
   id: string;
@@ -110,6 +111,7 @@ export type PublicCollection = {
   slug: string;
   description: string;
   promptCount: number;
+  cover: string | null;
   owner: { email: string; name: string; handle: string | null };
   createdAt: Date;
 };
@@ -127,14 +129,29 @@ export async function listPublicCollections(db: Db, limit = 50): Promise<PublicC
   const users = await db.collection("users").find({ email: { $in: emails } }).toArray();
   const byEmail = new Map(users.map((u) => [u.email, u]));
 
+  // Derive a cover from the prompts' images in one batched lookup.
+  const promptIds = [
+    ...new Set(rows.flatMap((r) => (r.promptIds || []).map((p: any) => p.toString()))),
+  ].filter((id) => ObjectId.isValid(id));
+  const promptDocs = promptIds.length
+    ? await db
+        .collection("prompts")
+        .find({ _id: { $in: promptIds.map((id) => new ObjectId(id)) }, isPrivate: { $ne: true } })
+        .project({ image: 1 })
+        .toArray()
+    : [];
+  const imageById = new Map(promptDocs.map((p) => [p._id.toString(), (p as any).image ?? null]));
+
   return rows.map((r) => {
     const u = byEmail.get(r.ownerEmail);
+    const ids = (r.promptIds || []).map((p: any) => p.toString());
     return {
       id: r._id.toString(),
       name: r.name,
       slug: r.slug,
       description: r.description || "",
-      promptCount: (r.promptIds || []).length,
+      promptCount: ids.length,
+      cover: collectionCover(ids.map((id: string) => ({ image: imageById.get(id) }))),
       owner: { email: r.ownerEmail, name: u?.name || r.ownerEmail.split("@")[0], handle: u?.handle ?? null },
       createdAt: r.createdAt,
     };
