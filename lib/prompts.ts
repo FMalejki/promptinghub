@@ -64,6 +64,7 @@ export type PromptDetail = {
   forkedFrom: { id: string; name: string } | null;
   forkCount: number;
   createdAt: Date;
+  updatedAt: Date | null;
 };
 
 export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: string };
@@ -392,6 +393,7 @@ export async function updatePrompt(db: Db, id: string, ownerEmail: string, data:
     });
   }
 
+  set.updatedAt = new Date();
   const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
   return res.matchedCount > 0;
 }
@@ -457,6 +459,7 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     forkedFrom,
     forkCount,
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt ?? null,
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
@@ -656,6 +659,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     forkedFrom,
     forkCount,
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt ?? null,
     handle,
     slug,
   };
