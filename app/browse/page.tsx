@@ -1,11 +1,12 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
 import { PromptOfDay } from "../components/PromptOfDay";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { hasActiveFilters } from "@/lib/browseFilters";
+import { isSearchFocusTrigger } from "@/lib/shortcuts";
 import Link from "next/link";
 
 type Author = { email: string; name: string; image: string | null };
@@ -31,6 +32,20 @@ export default function BrowsePage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Press "/" anywhere (outside a field) to jump to the search box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (isSearchFocusTrigger({ key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, target: { tagName: t?.tagName, isContentEditable: t?.isContentEditable } })) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     fetch("/api/stats")
@@ -124,8 +139,9 @@ export default function BrowsePage() {
         <div className="mb-8">
           <div className="relative max-w-3xl mx-auto">
             <input
+              ref={searchRef}
               type="search"
-              placeholder="Search prompts..."
+              placeholder="Search prompts...  (press /)"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="w-full px-6 py-4 pl-12 text-base border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 shadow-sm"
