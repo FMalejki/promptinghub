@@ -38,4 +38,9 @@ describe("buildJsonFeed", () => {
     expect(feed.title).toBe("Tag feed");
     expect(feed.description).toBe("tagged");
   });
+
+  it("uses a custom selfPath for feed_url (e.g. a collection feed)", () => {
+    const feed = buildJsonFeed(base, [], { selfPath: "/collections/abc/feed.json" });
+    expect(feed.feed_url).toBe(`${base}/collections/abc/feed.json`);
+  });
 });
