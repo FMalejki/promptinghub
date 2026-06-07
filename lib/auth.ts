@@ -3,8 +3,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { getDb } from "./db";
 import { verifyCredentials } from "./users";
+import { resolveAuthSecret } from "./authSecret";
 
 export const authOptions: NextAuthOptions = {
+  secret: resolveAuthSecret(process.env),
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
