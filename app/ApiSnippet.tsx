@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { buildApiSnippets } from "@/lib/apiSnippet";
+import { COPY_FEEDBACK_MS, copyLabel } from "@/lib/clipboard";
 
 export function ApiSnippet({ promptId }: { promptId: string }) {
   const [open, setOpen] = useState(false);
@@ -15,7 +16,7 @@ export function ApiSnippet({ promptId }: { promptId: string }) {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
     } catch {
       /* clipboard unavailable */
     }
@@ -52,7 +53,7 @@ export function ApiSnippet({ promptId }: { promptId: string }) {
               ))}
             </div>
             <button onClick={copy} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-              {copied ? "Copied!" : "Copy"}
+              {copyLabel(copied, "Copy")}
             </button>
           </div>
           <pre className="px-3 py-3 text-xs font-mono whitespace-pre-wrap break-words bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 overflow-x-auto">{code}</pre>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { buildShareLinks } from "@/lib/share";
+import { COPY_FEEDBACK_MS, copyLabel } from "@/lib/clipboard";
 
 export function ShareButtons({ title, promptId }: { title: string; promptId?: string }) {
   const [copied, setCopied] = useState(false);
@@ -12,7 +13,7 @@ export function ShareButtons({ title, promptId }: { title: string; promptId?: st
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
     } catch {
       /* clipboard unavailable */
     }
@@ -25,7 +26,7 @@ export function ShareButtons({ title, promptId }: { title: string; promptId?: st
     try {
       await navigator.clipboard.writeText(snippet);
       setEmbedCopied(true);
-      setTimeout(() => setEmbedCopied(false), 1500);
+      setTimeout(() => setEmbedCopied(false), COPY_FEEDBACK_MS);
     } catch {
       /* clipboard unavailable */
     }
@@ -40,10 +41,10 @@ export function ShareButtons({ title, promptId }: { title: string; promptId?: st
       <a href={links.x} target="_blank" rel="noreferrer" className={btn}>X</a>
       <a href={links.linkedin} target="_blank" rel="noreferrer" className={btn}>LinkedIn</a>
       <a href={links.reddit} target="_blank" rel="noreferrer" className={btn}>Reddit</a>
-      <button onClick={copyLink} className={btn}>{copied ? "Copied!" : "Copy link"}</button>
+      <button onClick={copyLink} className={btn}>{copyLabel(copied, "Copy link")}</button>
       {promptId && (
         <button onClick={copyEmbed} className={btn} title="Copy an iframe to embed this prompt">
-          {embedCopied ? "Embed copied!" : "Embed"}
+          {copyLabel(embedCopied, "Embed", "Embed copied!")}
         </button>
       )}
     </div>
