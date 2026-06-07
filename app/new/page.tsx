@@ -6,6 +6,7 @@ import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES, AI_MODELS } from "@/lib/constants";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
+type DraftFile = { path: string; content: string };
 
 export default function NewPromptPage() {
   const { status } = useSession();
@@ -14,10 +15,11 @@ export default function NewPromptPage() {
     name: "",
     description: "",
     category: "",
-    body: "",
     image: "",
     isPrivate: false,
   });
+  const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
+  const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
   const [modelVersions, setModelVersions] = useState<Record<string, string>>({});
@@ -49,9 +51,40 @@ export default function NewPromptPage() {
     setSelectedModels(newSelected);
   }
 
+  function addFiles(incoming: DraftFile[]) {
+    if (!incoming.length) return;
+    setFiles((cur) => {
+      const blankOnly = cur.length === 1 && !cur[0].content.trim() && cur[0].path === "prompt.txt";
+      return (blankOnly ? [] : cur).concat(incoming);
+    });
+  }
+  async function readFileList(list: FileList) {
+    const read = await Promise.all(Array.from(list).map(async (f) => ({ path: f.name, content: await f.text() })));
+    addFiles(read);
+  }
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files?.length) await readFileList(e.dataTransfer.files);
+  }
+  function updateFile(i: number, patch: Partial<DraftFile>) {
+    setFiles((cur) => cur.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  }
+  function removeFile(i: number) {
+    setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const payloadFiles = files
+      .filter((f) => f.content.trim().length)
+      .map((f) => ({ path: f.path.trim() || "prompt.txt", content: f.content }));
+    if (!payloadFiles.length) {
+      setError("Add at least one file with content.");
+      return;
+    }
     setSaving(true);
 
     // Build tested models array
@@ -63,6 +96,7 @@ export default function NewPromptPage() {
 
     const data = {
       ...form,
+      files: payloadFiles,
       image: form.image || undefined,
       testedModels: models.length > 0 ? models : undefined,
     };
@@ -175,24 +209,69 @@ export default function NewPromptPage() {
             </div>
           </div>
 
-          {/* Prompt Body */}
+          {/* Prompt Files */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Prompt Content</h2>
-            <div>
-              <label className={label}>Prompt Text *</label>
-              <textarea
-                value={form.body}
-                onChange={(e) => setForm({ ...form, body: e.target.value })}
-                className={`${input} font-mono text-sm`}
-                rows={12}
-                placeholder="Enter your prompt here... Use placeholders like <TOPIC>, <TEXT>, etc."
-                required
-                maxLength={5000}
-              />
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {form.body.length}/5000 characters
-              </p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Prompt Files</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              A prompt can be one file or a whole package (.md .py .yaml .ts …). Use{" "}
+              <code className="text-gray-800 dark:text-gray-200">{"{{variable}}"}</code> or{" "}
+              <code className="text-gray-800 dark:text-gray-200">{"{{variable:default}}"}</code> for fields users can fill in.
+            </p>
+
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              className={`rounded-lg border-2 border-dashed px-4 py-6 text-center text-sm mb-4 transition-colors ${
+                dragging
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300"
+                  : "border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              Drag &amp; drop files here, or{" "}
+              <label className="text-blue-600 dark:text-blue-400 underline cursor-pointer">
+                select files
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files) readFileList(e.target.files); e.target.value = ""; }}
+                />
+              </label>
             </div>
+
+            <div className="space-y-3">
+              {files.map((f, i) => (
+                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
+                    <input
+                      className="flex-1 text-sm font-mono bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
+                      value={f.path}
+                      placeholder="file path e.g. prompt.md"
+                      onChange={(e) => updateFile(i, { path: e.target.value })}
+                    />
+                    {files.length > 1 && (
+                      <button type="button" onClick={() => removeFile(i)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">remove</button>
+                    )}
+                  </div>
+                  <textarea
+                    className="w-full px-4 py-3 text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none"
+                    rows={8}
+                    placeholder="File content…"
+                    value={f.content}
+                    onChange={(e) => updateFile(i, { content: e.target.value })}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }])}
+              className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              + Add file
+            </button>
           </div>
 
           {/* Tested Models */}
