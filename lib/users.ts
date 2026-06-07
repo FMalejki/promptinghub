@@ -99,6 +99,33 @@ export async function getCreatorProfile(db: Db, handle: string): Promise<Creator
   return { ...u, verified: isVerifiedHandle(u.handle) };
 }
 
+export type CreatorStats = { joinedAt: Date | null; totalViews: number; totalCopies: number };
+
+// Aggregate public-facing stats for a creator (by email): join date and the
+// summed views/copies across their public prompts. Unknown creator → zeros.
+export async function creatorStats(db: Db, email: string): Promise<CreatorStats> {
+  const user = await db.collection("users").findOne({ email }, { projection: { createdAt: 1 } });
+  const agg = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { ownerEmail: email, isPrivate: { $ne: true } } },
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: { $ifNull: ["$viewCount", 0] } },
+          totalCopies: { $sum: { $ifNull: ["$copyCount", 0] } },
+        },
+      },
+    ])
+    .toArray();
+  const row = agg[0];
+  return {
+    joinedAt: user?.createdAt ?? null,
+    totalViews: row?.totalViews ?? 0,
+    totalCopies: row?.totalCopies ?? 0,
+  };
+}
+
 export async function createUser(db: Db, email: string, password: string, name?: string): Promise<User> {
   const users = db.collection("users");
   if (await users.findOne({ email })) throw new Error("User already exists");
