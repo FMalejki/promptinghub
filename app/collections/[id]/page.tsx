@@ -98,7 +98,7 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
           </div>
         ) : collection ? (
           <>
-            <div className="mb-8 flex items-start justify-between gap-4">
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               <div>
                 <div className="inline-flex items-center gap-2 mb-2 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md px-2 py-1">
                   Collection
@@ -119,7 +119,7 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
                   RSS
                 </a>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
                 {!isOwner && <SubscribeButton id={params.id} />}
                 {collection.prompts.length > 0 && (
                   <>

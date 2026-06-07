@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "../Avatar";
 import { getPlaceholderImage, getModelName } from "@/lib/constants";
@@ -25,7 +26,7 @@ type PromptCardProps = {
 };
 
 export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
-  const displayImage = image || getPlaceholderImage(id);
+  const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
 
@@ -37,8 +38,10 @@ export function PromptCard({ id, name, description, category, author, image, sta
       {/* Image */}
       <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
         <img
-          src={displayImage}
+          src={imgSrc}
           alt={name}
+          loading="lazy"
+          onError={() => setImgSrc(getPlaceholderImage(id))}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
         />
         {isPrivate && (

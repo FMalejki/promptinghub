@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CoverImage } from "../components/CoverImage";
 import { getDb } from "@/lib/db";
 import { listPublicCollections, type PublicCollection } from "@/lib/collections";
 import { Navbar } from "../components/Navbar";
@@ -39,8 +40,7 @@ export default async function CollectionsPage() {
                 className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all overflow-hidden"
               >
                 {c.cover && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.cover} alt="" className="w-full h-32 object-cover" />
+                  <CoverImage src={c.cover} seed={c.id} className="w-full h-32 object-cover" />
                 )}
                 <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
