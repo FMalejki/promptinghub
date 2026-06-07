@@ -26,6 +26,12 @@ export async function getUserByHandle(db: Db, handle: string): Promise<(Profile 
   return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle } : null;
 }
 
+// True only when the account's handle is a verified one (used to gate curation).
+export async function isVerifiedEmail(db: Db, email: string): Promise<boolean> {
+  const row = await db.collection("users").findOne({ email });
+  return !!row?.handle && isVerifiedHandle(row.handle);
+}
+
 // Public creator profile resolved by handle, with verified flag. Null if unknown.
 export async function getCreatorProfile(db: Db, handle: string): Promise<Creator | null> {
   const u = await getUserByHandle(db, handle);
