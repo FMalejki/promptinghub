@@ -20,7 +20,21 @@ export default function NewPromptPage() {
   });
   const [price, setPrice] = useState("0");
   const [tags, setTags] = useState("");
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [similar, setSimilar] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/tags")
+      .then((r) => (r.ok ? r.json() : { tags: [] }))
+      .then((d) => setTagSuggestions((d.tags || []).map((t: { tag: string }) => t.tag)))
+      .catch(() => {});
+  }, []);
+
+  function addTag(tag: string) {
+    const current = tags.split(",").map((t) => t.trim()).filter(Boolean);
+    if (current.includes(tag)) return;
+    setTags([...current, tag].join(", "));
+  }
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
@@ -289,6 +303,21 @@ export default function NewPromptPage() {
                 maxLength={400}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Comma-separated. Up to 10 tags help people find your prompt.</p>
+              {tagSuggestions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 self-center">Popular:</span>
+                  {tagSuggestions.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => addTag(t)}
+                      className="px-2 py-0.5 text-xs rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      #{t}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

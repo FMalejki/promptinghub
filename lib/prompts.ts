@@ -242,6 +242,26 @@ export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count:
   return rows.map((r: any) => ({ tag: r._id as string, count: r.count as number }));
 }
 
+// Tag autocomplete: public tags containing the query substring (case-insensitive),
+// ranked by usage then alphabetically. Empty query → []. Query is regex-escaped.
+export async function searchTags(db: Db, query: string, limit = 10): Promise<{ tag: string; count: number }[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rows = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { isPrivate: { $ne: true }, tags: { $type: "array", $ne: [] } } },
+      { $unwind: "$tags" },
+      { $match: { tags: { $regex: escaped } } },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: limit },
+    ])
+    .toArray();
+  return rows.map((r: any) => ({ tag: r._id as string, count: r.count as number }));
+}
+
 // Tags trending by recent copy activity. Each copy of a public prompt in the
 // window adds 1 to every tag on that prompt; ranked desc. `now` is injectable
 // for deterministic tests.
