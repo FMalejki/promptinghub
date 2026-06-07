@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+export function CopyButton({ text, label = "Copy", onCopy }: { text: string; label?: string; onCopy?: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -9,6 +9,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
+        onCopy?.();
         setTimeout(() => setCopied(false), 1500);
       }}
       className="text-xs bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white rounded px-3 py-1 shrink-0"
