@@ -257,6 +257,23 @@ export async function updatePrompt(db: Db, id: string, ownerEmail: string, data:
     set.body = data.body;
   }
   if (Object.keys(set).length === 0) return false;
+
+  // Snapshot the prior content before applying a content edit (owner-scoped).
+  const current = await db.collection("prompts").findOne({ _id: new ObjectId(id), ownerEmail });
+  if (!current) return false;
+  const contentChanged = set.name !== undefined || set.body !== undefined || set.files !== undefined;
+  if (contentChanged) {
+    const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;
+    await db.collection("promptVersions").insertOne({
+      promptId: id,
+      version,
+      name: current.name,
+      body: current.body ?? "",
+      files: current.files ?? null,
+      createdAt: new Date(),
+    });
+  }
+
   const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
   return res.matchedCount > 0;
 }
