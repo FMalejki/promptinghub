@@ -104,4 +104,6 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
   4. Creator onboarding / verified handles + per-creator pages polish.
   5. Marketplace scaffolding (paid/free flag, Stripe later).
   6. CONTRIBUTING.md + finish task 19 docs.
+- **ADRIAN GREEN-LIT EVERYTHING (build all proposals, sensible first then unsure):** building Collections → image-gen → creator pages → marketplace → X cron → CONTRIBUTING.
+- PR #23 merged: Collections — lib/collections.ts (owner-scoped CRUD + add/remove, unique slug, deduped ordered ids), /api/collections + /api/collections/[id], /collections/[id] page, SaveToCollection dropdown on detail, collections row on profile. 141 tests. Verified live (API 200/401/404).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
