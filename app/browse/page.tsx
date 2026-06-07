@@ -39,10 +39,14 @@ export default function BrowsePage() {
       .catch(() => {});
   }, []);
 
-  // Seed the tag filter from ?tag= so /browse?tag=seo deep-links work.
+  // Seed filters from the URL so /browse?tag=seo and /browse?q=email (and the
+  // OpenSearch engine) deep-link into a filtered view.
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tag");
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tag");
     if (t) setTag(t);
+    const query = params.get("q");
+    if (query) setQ(query);
   }, []);
 
   const load = useCallback(async () => {
