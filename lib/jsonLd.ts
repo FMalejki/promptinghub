@@ -62,3 +62,31 @@ export function promptBreadcrumbJsonLd(
     })),
   };
 }
+
+// schema.org ProfilePage wrapping a Person for a creator page, so search engines
+// can associate the profile with the creator's external links (sameAs).
+export function creatorJsonLd(
+  c: { name: string; handle: string; image?: string | null; bio?: string | null; website?: string | null; x?: string | null; github?: string | null },
+  baseUrl: string,
+): Record<string, any> {
+  const base = baseUrl.replace(/\/+$/, "");
+  const sameAs: string[] = [];
+  if (c.website && c.website.trim()) sameAs.push(c.website.trim());
+  if (c.x && c.x.trim()) sameAs.push(`https://x.com/${c.x.trim().replace(/^@/, "")}`);
+  if (c.github && c.github.trim()) sameAs.push(`https://github.com/${c.github.trim()}`);
+
+  const person: Record<string, any> = {
+    "@type": "Person",
+    name: c.name,
+    url: `${base}/u/${c.handle}`,
+  };
+  if (c.image) person.image = c.image;
+  if (c.bio && c.bio.trim()) person.description = c.bio;
+  if (sameAs.length) person.sameAs = sameAs;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    mainEntity: person,
+  };
+}
