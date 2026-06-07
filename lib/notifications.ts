@@ -1,4 +1,4 @@
-import { Db } from "mongodb";
+import { Db, ObjectId } from "mongodb";
 
 export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention";
 
@@ -54,6 +54,14 @@ export async function countUnread(db: Db, email: string): Promise<number> {
 export async function markAllRead(db: Db, email: string): Promise<number> {
   const res = await db.collection("notifications").updateMany({ recipientEmail: email, read: { $ne: true } }, { $set: { read: true } });
   return res.modifiedCount || 0;
+}
+
+// Mark a single notification read — scoped to its recipient so you can only mark
+// your own. Returns false for a malformed id or one that isn't yours.
+export async function markRead(db: Db, id: string, email: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const res = await db.collection("notifications").updateOne({ _id: new ObjectId(id), recipientEmail: email }, { $set: { read: true } });
+  return res.matchedCount > 0;
 }
 
 // Resolve a display name for an actor email (best-effort).

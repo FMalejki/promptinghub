@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { addNotification, listNotifications, countUnread, markAllRead } from "../lib/notifications";
+import { addNotification, listNotifications, countUnread, markAllRead, markRead } from "../lib/notifications";
 import { createUser, ensureHandle } from "../lib/users";
 import { createPrompt } from "../lib/prompts";
 import { addComment } from "../lib/comments";
@@ -39,6 +39,19 @@ describe("notifications core", () => {
   it("never notifies yourself", async () => {
     await addNotification(db, { recipientEmail: "me@x.com", type: "follow", actorEmail: "me@x.com" });
     expect(await countUnread(db, "me@x.com")).toBe(0);
+  });
+
+  it("marks a single notification read, scoped to its recipient", async () => {
+    await addNotification(db, { recipientEmail: "me@x.com", type: "follow", actorEmail: "a@x.com" });
+    await addNotification(db, { recipientEmail: "me@x.com", type: "comment", actorEmail: "b@x.com" });
+    const list = await listNotifications(db, "me@x.com");
+    expect(await markRead(db, list[0].id, "me@x.com")).toBe(true);
+    expect(await countUnread(db, "me@x.com")).toBe(1);
+    // someone else can't mark my notification read
+    expect(await markRead(db, list[1].id, "intruder@x.com")).toBe(false);
+    expect(await countUnread(db, "me@x.com")).toBe(1);
+    // malformed id
+    expect(await markRead(db, "nope", "me@x.com")).toBe(false);
   });
 });
 
