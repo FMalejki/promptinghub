@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           { $match: { isPrivate: { $ne: true } } },
           { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
           { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
-          { $project: { slug: 1, createdAt: 1, "u.handle": 1 } },
+          { $project: { slug: 1, createdAt: 1, updatedAt: 1, "u.handle": 1 } },
         ])
         .toArray(),
       topTags(db, 100),
@@ -34,6 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       slug: r.slug,
       isPrivate: false,
       createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
     }));
     extras = {
       tags: tags.map((t) => t.tag),
