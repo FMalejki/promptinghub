@@ -387,7 +387,11 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       )}
 
       {/* Version history */}
-      <VersionHistory promptId={prompt.id} canRestore={canEdit} />
+      <VersionHistory
+        promptId={prompt.id}
+        canRestore={canEdit}
+        current={{ body: prompt.body, files: prompt.files ?? null }}
+      />
 
       {/* Comments */}
       <Comments promptId={prompt.id} />
