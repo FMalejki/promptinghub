@@ -68,6 +68,11 @@ export function getPlaceholderImage(seed: string): string {
   return PLACEHOLDER_IMAGES[hash % PLACEHOLDER_IMAGES.length];
 }
 
+// Resolve a prompt's banner image, falling back to a deterministic placeholder.
+export function promptImageSrc(image: string | null | undefined, seed: string): string {
+  return image && image.trim() ? image : getPlaceholderImage(seed);
+}
+
 export function getModelName(modelId: string): string {
   const model = AI_MODELS.find(m => m.id === modelId);
   return model ? model.name : modelId;

@@ -1,38 +1,35 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { PromptView, PromptViewData } from "../../../PromptView";
+import { useRouter } from "next/navigation";
+import { Navbar } from "../../../components/Navbar";
+import { PromptDetailView, PromptDetail } from "../../../PromptDetailView";
 
 export default function NamespacedPromptPage({ params }: { params: { handle: string; slug: string } }) {
-  const [prompt, setPrompt] = useState<PromptViewData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "notfound">("loading");
+  const router = useRouter();
+  const [prompt, setPrompt] = useState<PromptDetail | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`/api/p/${params.handle}/${params.slug}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => {
-        setPrompt(d);
-        setStatus("ready");
-      })
-      .catch(() => setStatus("notfound"));
-  }, [params.handle, params.slug]);
+      .then(setPrompt)
+      .catch(() => router.push("/browse"))
+      .finally(() => setLoading(false));
+  }, [params.handle, params.slug, router]);
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/browse" className="text-sm font-medium text-gray-800 hover:underline">← PromptingHub</Link>
-        </div>
-      </header>
-      <section className="max-w-3xl mx-auto px-4 py-8">
-        {status === "loading" && <p className="text-sm text-gray-400">Loading…</p>}
-        {status === "notfound" && (
-          <div className="text-sm text-gray-500">
-            Prompt not found. <Link href="/browse" className="text-gray-800 hover:underline">Back to browse</Link>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navbar />
+      {loading ? (
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
           </div>
-        )}
-        {status === "ready" && prompt && <PromptView prompt={prompt} />}
-      </section>
-    </main>
+        </div>
+      ) : (
+        prompt && <PromptDetailView prompt={prompt} />
+      )}
+    </div>
   );
 }
