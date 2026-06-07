@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Providers } from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = { title: "PromptingHub", description: "Discover and share AI prompts" };
 
@@ -8,6 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="bg-gray-50 dark:bg-gray-900 transition-colors">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
