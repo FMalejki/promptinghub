@@ -117,5 +117,6 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
 - PR #29 merged: Trending — sort=trending (copyCount+stars composite score), /trending page w/ podium top-3, Navbar Browse+Trending links. 158 tests. Live (order correct).
 - PR #30 merged: Comments — lib/comments.ts (add/list/delete/count, author-resolved, author-only delete), GET/POST /api/prompts/[id]/comments + DELETE /api/comments/[id], Comments component on detail. 164 tests. Live (GET [] 200, POST unauth 401).
 - PR #31 merged: Collection export — getCollectionExport + GET /api/collections/[id]/export (downloadable .json), Export button on collection page. 166 tests. Live (404 missing).
-- **18 PRs this session (#14–#31).** REMAINING QUEUE: (a) prompt versioning/changelog; (b) API keys for programmatic fetch; (c) ingested-drafts curation UI; (d) full E2E Preview click-through (needs login).
+- PR #32 merged: API keys — lib/apiKeys.ts (ph_ keys, SHA-256 hash-only storage, raw shown once, verify+lastUsedAt, owner revoke), /api/keys (GET/POST), /api/keys/[id] DELETE, /api/v1/prompts (Bearer auth → caller's prompts), ApiKeysManager in settings. 171 tests. Live (all 401 without valid key).
+- **19 PRs this session (#14–#32).** REMAINING QUEUE: (a) prompt versioning/changelog; (b) ingested-drafts curation UI; (c) full E2E Preview click-through (needs login).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
