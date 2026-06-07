@@ -105,3 +105,24 @@ export async function recommendCreators(db: Db, viewerEmail: string | undefined,
   const creators = await topCreators(db, limit + exclude.size + 5);
   return creators.filter((c) => !exclude.has(c.handle)).slice(0, limit);
 }
+
+export type Follower = { handle: string | null; name: string; image: string | null };
+
+// Creators who follow `targetHandle`, most-recent follow first. Unknown handle → [].
+export async function listFollowers(db: Db, targetHandle: string, limit = 100): Promise<Follower[]> {
+  const targetEmail = await emailForHandle(db, targetHandle);
+  if (!targetEmail) return [];
+  const rows = await db.collection("follows").find({ targetEmail }).sort({ createdAt: -1, _id: -1 }).limit(limit).toArray();
+  if (!rows.length) return [];
+  const emails = rows.map((r) => r.followerEmail);
+  const users = await db.collection("users").find({ email: { $in: emails } }).toArray();
+  const byEmail = new Map(users.map((u) => [u.email, u]));
+  return rows.map((r) => {
+    const u = byEmail.get(r.followerEmail);
+    return {
+      handle: (u?.handle as string) ?? null,
+      name: u?.name || r.followerEmail.split("@")[0],
+      image: u?.image ?? null,
+    };
+  });
+}
