@@ -127,6 +127,7 @@ describe("getPromptDetail", () => {
       forkedFrom: null,
       forkCount: 0,
       createdAt: new Date("2026-01-01"),
+      updatedAt: null,
     });
   });
 

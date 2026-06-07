@@ -22,6 +22,7 @@ import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
 import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
+import { relativeTime } from "@/lib/relativeTime";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -46,6 +47,7 @@ export type PromptDetail = {
   forkedFrom?: { id: string; name: string } | null;
   forkCount?: number;
   createdAt: string;
+  updatedAt?: string | null;
   handle?: string;
   slug?: string;
 };
@@ -261,7 +263,10 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                     </svg>
                   )}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(prompt.createdAt).toLocaleDateString()}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {new Date(prompt.createdAt).toLocaleDateString()}
+                  {prompt.updatedAt && <span title={new Date(prompt.updatedAt).toLocaleString()}> · updated {relativeTime(prompt.updatedAt)}</span>}
+                </div>
               </div>
             </Link>
           </div>
