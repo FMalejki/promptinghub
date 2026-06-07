@@ -12,6 +12,7 @@ type Comment = {
   author: Author;
   parentId: string | null;
   createdAt: string;
+  edited?: boolean;
   likeCount?: number;
   liked?: boolean;
 };
@@ -42,6 +43,8 @@ export function Comments({ promptId }: { promptId: string }) {
   const [posting, setPosting] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
 
   function load() {
     fetch(`/api/prompts/${promptId}/comments`)
@@ -87,6 +90,22 @@ export function Comments({ promptId }: { promptId: string }) {
     if (res.ok) setComments((cs) => cs.filter((c) => c.id !== id && c.parentId !== id));
   }
 
+  async function saveEdit(id: string) {
+    if (!editBody.trim()) return;
+    const res = await fetch(`/api/comments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: editBody.trim() }),
+    });
+    if (res.ok) {
+      setComments((cs) => cs.map((c) => (c.id === id ? { ...c, body: editBody.trim(), edited: true } : c)));
+      setEditing(null);
+      setEditBody("");
+    } else if (res.status === 409) {
+      alert("The edit window for this comment has closed.");
+    }
+  }
+
   async function toggleLike(id: string) {
     if (!session?.user?.email) {
       router.push("/login");
@@ -119,13 +138,46 @@ export function Comments({ promptId }: { promptId: string }) {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-900 dark:text-white">{c.author.name}</span>
             <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+            {c.edited && <span className="text-xs text-gray-400 italic">(edited)</span>}
             {session?.user?.email === c.author.email && (
-              <button onClick={() => remove(c.id)} className="ml-auto text-xs text-gray-400 hover:text-red-600">
-                delete
-              </button>
+              <span className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditing(editing === c.id ? null : c.id);
+                    setEditBody(c.body);
+                  }}
+                  className="text-xs text-gray-400 hover:text-blue-600"
+                >
+                  {editing === c.id ? "cancel" : "edit"}
+                </button>
+                <button onClick={() => remove(c.id)} className="text-xs text-gray-400 hover:text-red-600">
+                  delete
+                </button>
+              </span>
             )}
           </div>
-          <Body text={c.body} />
+          {editing === c.id ? (
+            <div className="mt-1">
+              <textarea
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                rows={2}
+                maxLength={2000}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="mt-1 flex justify-end">
+                <button
+                  onClick={() => saveEdit(c.id)}
+                  disabled={!editBody.trim()}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Body text={c.body} />
+          )}
           <div className="mt-1 flex items-center gap-3">
             <button
               onClick={() => toggleLike(c.id)}

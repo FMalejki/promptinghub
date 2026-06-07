@@ -9,8 +9,13 @@ export type Comment = {
   body: string;
   author: Author;
   parentId: string | null;
+  edited: boolean;
   createdAt: Date;
 };
+
+// Authors may edit their own comment for a short window after posting.
+export const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+export type EditResult = "ok" | "not_owner" | "empty" | "expired" | "not_found";
 
 // Add a comment to a prompt, optionally as a reply to another comment (parentId).
 // Throws on empty/whitespace body. Emits best-effort notifications to the prompt
@@ -80,12 +85,33 @@ export async function listComments(db: Db, promptId: string): Promise<Comment[]>
       body: r.body,
       author: { email: r.authorEmail, name: u?.name || r.authorEmail.split("@")[0], image: u?.image ?? null },
       parentId: r.parentId ?? null,
+      edited: !!r.editedAt,
       createdAt: r.createdAt,
     };
   });
 }
 
 // Delete a comment — only its author may. Returns false for a malformed id or non-author.
+// Edit a comment's body. Author-only and only within EDIT_WINDOW_MS of posting.
+// `now` is injectable for deterministic tests.
+export async function editComment(
+  db: Db,
+  id: string,
+  authorEmail: string,
+  body: string,
+  now: Date = new Date(),
+): Promise<EditResult> {
+  if (!ObjectId.isValid(id)) return "not_found";
+  const trimmed = body.trim();
+  if (!trimmed) return "empty";
+  const row = await db.collection("comments").findOne({ _id: new ObjectId(id) });
+  if (!row) return "not_found";
+  if (row.authorEmail !== authorEmail) return "not_owner";
+  if (now.getTime() - new Date(row.createdAt).getTime() > EDIT_WINDOW_MS) return "expired";
+  await db.collection("comments").updateOne({ _id: row._id }, { $set: { body: trimmed.slice(0, 2000), editedAt: now } });
+  return "ok";
+}
+
 export async function deleteComment(db: Db, id: string, authorEmail: string): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
   const res = await db.collection("comments").deleteOne({ _id: new ObjectId(id), authorEmail });
