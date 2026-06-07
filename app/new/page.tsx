@@ -26,6 +26,37 @@ export default function NewPromptPage() {
   const [modelNotes, setModelNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  // Parse pasted text (optionally with --- frontmatter) into the form. Preview-only:
+  // the server returns a draft, the user reviews/edits it, then submits as usual.
+  async function applyImport() {
+    if (!importText.trim()) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: importText, source: "paste" }),
+      });
+      if (!res.ok) {
+        setError("Could not parse that text.");
+        return;
+      }
+      const { draft } = await res.json();
+      setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category }));
+      setFiles([{ path: "prompt.txt", content: draft.body }]);
+      if (Array.isArray(draft.testedModels)) {
+        setSelectedModels(new Set(draft.testedModels.map((m: TestedModel) => m.modelId)));
+        setTestedModels(draft.testedModels);
+      }
+      setImportText("");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -137,6 +168,34 @@ export default function NewPromptPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Quick import: paste existing prompt text to pre-fill the form */}
+          <details className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-6">
+            <summary className="cursor-pointer text-sm font-semibold text-blue-800 dark:text-blue-300">
+              Import from text — paste a prompt to auto-fill
+            </summary>
+            <p className="mt-3 text-xs text-blue-700/80 dark:text-blue-300/70">
+              Paste raw prompt text, or add a{" "}
+              <code className="font-mono">---</code> frontmatter block with{" "}
+              <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
+              <code className="font-mono">category</code>, <code className="font-mono">models</code>. We fill the form below — you review before publishing.
+            </p>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={5}
+              placeholder={"---\nname: My Prompt\ncategory: Coding\nmodels: gpt-4o\n---\nWrite a function that…"}
+              className={`${input} mt-3 font-mono text-sm`}
+            />
+            <button
+              type="button"
+              onClick={applyImport}
+              disabled={importing || !importText.trim()}
+              className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+            >
+              {importing ? "Parsing…" : "Fill form from text"}
+            </button>
+          </details>
+
           {/* Basic Info */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Basic Information</h2>

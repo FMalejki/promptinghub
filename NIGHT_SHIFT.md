@@ -34,7 +34,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 ### Phase 2 — Customization / templating
 - ✅ 5. Variable extraction: parse `{{var}}` / `{{var:default}}` → `extractVariables()` — PR #4
 - ✅ 6. Detail page: fillable inputs per variable, live substitution, copy filled result — PR #4
-- ⬜ 7. Fork/customize: logged-in user forks a prompt with their values as a new prompt
+- ✅ 7. Fork/customize: logged-in user forks a prompt with their values as a new prompt — PR #13
 
 ### Phase 3 — Namespacing & install
 - ✅ 8. User handles `@handle` + per-prompt slug → canonical `/p/owner/slug` — PR #5
