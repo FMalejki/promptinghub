@@ -106,4 +106,5 @@ Greenlit roadmap is essentially complete. Remaining items are blocked or need yo
   6. CONTRIBUTING.md + finish task 19 docs.
 - **ADRIAN GREEN-LIT EVERYTHING (build all proposals, sensible first then unsure):** building Collections → image-gen → creator pages → marketplace → X cron → CONTRIBUTING.
 - PR #23 merged: Collections — lib/collections.ts (owner-scoped CRUD + add/remove, unique slug, deduped ordered ids), /api/collections + /api/collections/[id], /collections/[id] page, SaveToCollection dropdown on detail, collections row on profile. 141 tests. Verified live (API 200/401/404).
+- PR #24 merged: image-gen support — lib/imageModels.ts (image model set incl gpt-image-2/gemini-image, isImagePrompt, model playground links), listPrompts imageOnly (+$and OR-accumulator refactor), API ?image=1, browse "Images" toggle, card "Image" badge, detail playground-links panel, new "Image Generation" category. 147 tests. Live (filter works; 0/17 since existing prompts are text).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
