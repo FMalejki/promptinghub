@@ -196,6 +196,35 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
   };
 }
 
+// Owner-scoped update. Returns true only when the prompt exists AND belongs to ownerEmail.
+export async function updatePrompt(db: Db, id: string, ownerEmail: string, data: Partial<NewPrompt>): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const set: Record<string, unknown> = {};
+  if (data.name !== undefined) set.name = data.name;
+  if (data.description !== undefined) set.description = data.description;
+  if (data.category !== undefined) set.category = data.category;
+  if (data.image !== undefined) set.image = data.image || null;
+  if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
+  if (data.testedModels !== undefined) set.testedModels = data.testedModels;
+  if (data.files !== undefined) {
+    const files = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
+    set.files = files;
+    set.body = files.map((f) => f.content).join("\n\n");
+  } else if (data.body !== undefined) {
+    set.body = data.body;
+  }
+  if (Object.keys(set).length === 0) return false;
+  const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
+  return res.matchedCount > 0;
+}
+
+// Owner-scoped delete. Returns true only when a prompt owned by ownerEmail was removed.
+export async function deletePrompt(db: Db, id: string, ownerEmail: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const res = await db.collection("prompts").deleteOne({ _id: new ObjectId(id), ownerEmail });
+  return res.deletedCount > 0;
+}
+
 export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | null> {
   if (!ObjectId.isValid(id)) return null;
   const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) });

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getPrompt, getPromptDetail } from "@/lib/prompts";
+import { getPrompt, getPromptDetail, updatePrompt, deletePrompt } from "@/lib/prompts";
+import { newPromptSchema } from "@/lib/promptInput";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -30,4 +31,24 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const detail = await getPromptDetail(db, params.id);
   if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(detail);
+}
+
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  const ok = await updatePrompt(await getDb(), params.id, email, { ...parsed.data, image: parsed.data.image || undefined });
+  if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ok = await deletePrompt(await getDb(), params.id, email);
+  if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }
