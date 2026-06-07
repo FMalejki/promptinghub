@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "./Avatar";
 import { renderMentions } from "@/lib/mentions";
+import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
 
 type Author = { email: string; name: string; image: string | null };
@@ -18,7 +19,27 @@ type Comment = {
   liked?: boolean;
 };
 
-// Linkify @handles in a comment body (mentions resolve to /u/<handle>).
+// Render a plain-text segment with inline markdown (**bold**, *italic*, `code`).
+function Formatted({ text }: { text: string }) {
+  return (
+    <>
+      {parseInline(text).map((s, i) => {
+        if (s.type === "bold") return <strong key={i}>{s.text}</strong>;
+        if (s.type === "italic") return <em key={i}>{s.text}</em>;
+        if (s.type === "code")
+          return (
+            <code key={i} className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[0.85em] font-mono">
+              {s.text}
+            </code>
+          );
+        return <span key={i}>{s.text}</span>;
+      })}
+    </>
+  );
+}
+
+// Linkify @handles in a comment body (mentions resolve to /u/<handle>) and
+// render inline markdown within the non-mention segments.
 function Body({ text }: { text: string }) {
   const parts = renderMentions(text);
   return (
@@ -29,7 +50,7 @@ function Body({ text }: { text: string }) {
             @{p.handle}
           </a>
         ) : (
-          <span key={i}>{p.text}</span>
+          <Formatted key={i} text={p.text} />
         ),
       )}
     </p>
