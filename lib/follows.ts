@@ -1,5 +1,6 @@
 import { Db } from "mongodb";
 import { getUserByHandle } from "./users";
+import { addNotification, actorName } from "./notifications";
 import type { Prompt } from "./prompts";
 
 // Resolve a target creator's email from their handle. Null if unknown.
@@ -12,11 +13,19 @@ async function emailForHandle(db: Db, handle: string): Promise<string | null> {
 export async function followCreator(db: Db, followerEmail: string, targetHandle: string): Promise<boolean> {
   const targetEmail = await emailForHandle(db, targetHandle);
   if (!targetEmail || targetEmail === followerEmail) return false;
-  await db.collection("follows").updateOne(
+  const res = await db.collection("follows").updateOne(
     { followerEmail, targetEmail },
     { $setOnInsert: { followerEmail, targetEmail, createdAt: new Date() } },
     { upsert: true },
   );
+  // Notify the followed creator, but only on a brand-new follow.
+  if (res.upsertedCount) {
+    try {
+      await addNotification(db, { recipientEmail: targetEmail, type: "follow", actorEmail: followerEmail, actorName: await actorName(db, followerEmail) });
+    } catch {
+      /* notifications are best-effort */
+    }
+  }
   return true;
 }
 

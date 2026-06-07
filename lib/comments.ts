@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { addNotification, actorName } from "./notifications";
 
 export type Author = { email: string; name: string; image: string | null };
 export type Comment = {
@@ -15,6 +16,25 @@ export async function addComment(db: Db, promptId: string, authorEmail: string, 
   if (!trimmed) throw new Error("Comment body is required");
   const doc = { promptId, authorEmail, body: trimmed.slice(0, 2000), createdAt: new Date() };
   const { insertedId } = await db.collection("comments").insertOne(doc);
+  // Notify the prompt owner (best-effort; no self-notify).
+  try {
+    if (ObjectId.isValid(promptId)) {
+      const prompt = await db.collection("prompts").findOne({ _id: new ObjectId(promptId) }, { projection: { ownerEmail: 1, name: 1 } });
+      if (prompt?.ownerEmail) {
+        await addNotification(db, {
+          recipientEmail: prompt.ownerEmail,
+          type: "comment",
+          actorEmail: authorEmail,
+          actorName: await actorName(db, authorEmail),
+          promptId,
+          promptName: prompt.name,
+          text: trimmed.slice(0, 140),
+        });
+      }
+    }
+  } catch {
+    /* notifications are best-effort */
+  }
   return { id: insertedId.toString() };
 }
 

@@ -248,9 +248,13 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
   const slug = await uniqueSlug(db, ownerEmail, data.name);
   // Only record lineage when forkedFrom points at an existing prompt.
   let forkedFrom: string | null = null;
+  let forkSource: { ownerEmail: string; name: string } | null = null;
   if (data.forkedFrom && ObjectId.isValid(data.forkedFrom)) {
-    const src = await db.collection("prompts").findOne({ _id: new ObjectId(data.forkedFrom) }, { projection: { _id: 1 } });
-    if (src) forkedFrom = data.forkedFrom;
+    const src = await db.collection("prompts").findOne({ _id: new ObjectId(data.forkedFrom) }, { projection: { ownerEmail: 1, name: 1 } });
+    if (src) {
+      forkedFrom = data.forkedFrom;
+      forkSource = { ownerEmail: src.ownerEmail, name: src.name };
+    }
   }
   const doc: Record<string, unknown> = {
     ownerEmail,
@@ -271,6 +275,22 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
   };
   if (files) doc.files = files;
   const { insertedId } = await db.collection("prompts").insertOne(doc);
+  // Notify the source owner when their prompt is forked (best-effort, no self-notify).
+  if (forkSource) {
+    try {
+      const { addNotification, actorName } = await import("./notifications");
+      await addNotification(db, {
+        recipientEmail: forkSource.ownerEmail,
+        type: "fork",
+        actorEmail: ownerEmail,
+        actorName: await actorName(db, ownerEmail),
+        promptId: insertedId.toString(),
+        promptName: forkSource.name,
+      });
+    } catch {
+      /* notifications are best-effort */
+    }
+  }
   return {
     id: insertedId.toString(),
     name: data.name,
