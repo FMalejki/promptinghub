@@ -20,6 +20,7 @@ export default function NewPromptPage() {
   });
   const [price, setPrice] = useState("0");
   const [tags, setTags] = useState("");
+  const [similar, setSimilar] = useState<{ id: string; name: string }[]>([]);
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
@@ -30,6 +31,22 @@ export default function NewPromptPage() {
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+
+  // Debounced check for existing prompts with a similar name (duplicate warning).
+  useEffect(() => {
+    const name = form.name.trim();
+    if (name.length < 4) {
+      setSimilar([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/prompts/similar?name=${encodeURIComponent(name)}`)
+        .then((r) => (r.ok ? r.json() : { similar: [] }))
+        .then((d) => setSimilar(d.similar || []))
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form.name]);
 
   // Parse pasted text (optionally with --- frontmatter) into the form. Preview-only:
   // the server returns a draft, the user reviews/edits it, then submits as usual.
@@ -215,6 +232,20 @@ export default function NewPromptPage() {
                 required
                 maxLength={100}
               />
+              {similar.length > 0 && (
+                <div className="mt-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  Similar prompts already exist:{" "}
+                  {similar.map((s, i) => (
+                    <span key={s.id}>
+                      {i > 0 && ", "}
+                      <a href={`/prompt/${s.id}`} target="_blank" rel="noreferrer" className="underline hover:no-underline">
+                        {s.name}
+                      </a>
+                    </span>
+                  ))}
+                  . Consider forking one instead of duplicating.
+                </div>
+              )}
             </div>
 
             <div>
