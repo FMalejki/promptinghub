@@ -52,6 +52,7 @@ export type PromptDetail = {
   stars: number;
   isPrivate: boolean;
   testedModels: TestedModel[];
+  copyCount: number;
   createdAt: Date;
 };
 
@@ -265,10 +266,27 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
+    copyCount: row.copyCount || 0,
     createdAt: row.createdAt,
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
+}
+
+/**
+ * Atomically bump a prompt's copy/usage counter and return the new total.
+ * Returns null for a malformed or missing id.
+ */
+export async function incrementCopyCount(db: Db, id: string): Promise<number | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const res = await db.collection("prompts").findOneAndUpdate(
+    { _id: new ObjectId(id) },
+    { $inc: { copyCount: 1 } },
+    { returnDocument: "after" }
+  );
+  const doc = (res as { value?: { copyCount?: number } } | null)?.value ?? (res as { copyCount?: number } | null);
+  if (!doc || typeof doc.copyCount !== "number") return null;
+  return doc.copyCount;
 }
 
 export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string): Promise<NamespacedPromptDetail | null> {
@@ -289,6 +307,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
+    copyCount: row.copyCount || 0,
     createdAt: row.createdAt,
     handle,
     slug,

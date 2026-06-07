@@ -120,6 +120,7 @@ describe("getPromptDetail", () => {
       stars: 0,
       isPrivate: false,
       testedModels: [],
+      copyCount: 0,
       createdAt: new Date("2026-01-01"),
     });
   });

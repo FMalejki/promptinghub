@@ -25,6 +25,7 @@ export type PromptDetail = {
   stars: number;
   isPrivate: boolean;
   testedModels: TestedModel[];
+  copyCount?: number;
   createdAt: string;
   handle?: string;
   slug?: string;
@@ -34,7 +35,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [stars, setStars] = useState(prompt.stars);
+  const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
+  const [counted, setCounted] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+
+  // Record a copy at most once per page view so the counter reflects users, not clicks.
+  async function recordCopy() {
+    if (counted) return;
+    setCounted(true);
+    setCopyCount((c) => c + 1);
+    fetch(`/api/prompts/${prompt.id}/copy`, { method: "POST" }).catch(() => {});
+  }
   const [values, setValues] = useState<Record<string, string>>({});
   const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
   const [forking, setForking] = useState(false);
@@ -142,6 +153,16 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               <span>{stars}</span>
             </button>
 
+            <span
+              title="Times copied or installed"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>{copyCount}</span>
+            </span>
+
             <button
               onClick={handleFork}
               disabled={forking}
@@ -167,7 +188,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {installRef && (
         <div className="mb-6 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-4 py-3">
           <code className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
-          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" />
+          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
         </div>
       )}
 
@@ -214,7 +235,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{multi ? `${filled.length} files` : "Prompt"}</h2>
-          <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} />
+          <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
         </div>
         {filled.map((f) => (
           <div key={f.path} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
