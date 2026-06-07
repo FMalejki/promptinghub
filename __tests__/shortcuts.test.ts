@@ -1,4 +1,4 @@
-import { SHORTCUTS, isHelpTrigger } from "../lib/shortcuts";
+import { SHORTCUTS, isHelpTrigger, isSearchFocusTrigger } from "../lib/shortcuts";
 
 const ev = (key: string, tag = "BODY", extra: Partial<{ metaKey: boolean; ctrlKey: boolean }> = {}) => ({
   key,
@@ -31,6 +31,28 @@ describe("isHelpTrigger", () => {
 
   it("is tolerant of a missing target", () => {
     expect(isHelpTrigger({ key: "?", metaKey: false, ctrlKey: false })).toBe(true);
+  });
+});
+
+describe("isSearchFocusTrigger", () => {
+  it("triggers on '/' outside of inputs", () => {
+    expect(isSearchFocusTrigger(ev("/"))).toBe(true);
+  });
+
+  it("ignores '/' typed into an input, textarea or contentEditable", () => {
+    expect(isSearchFocusTrigger(ev("/", "INPUT"))).toBe(false);
+    expect(isSearchFocusTrigger(ev("/", "TEXTAREA"))).toBe(false);
+    expect(isSearchFocusTrigger({ key: "/", target: { tagName: "DIV", isContentEditable: true } })).toBe(false);
+  });
+
+  it("ignores other keys and modified '/'", () => {
+    expect(isSearchFocusTrigger(ev("a"))).toBe(false);
+    expect(isSearchFocusTrigger(ev("/", "BODY", { metaKey: true }))).toBe(false);
+    expect(isSearchFocusTrigger(ev("/", "BODY", { ctrlKey: true }))).toBe(false);
+  });
+
+  it("is tolerant of a missing target", () => {
+    expect(isSearchFocusTrigger({ key: "/", metaKey: false, ctrlKey: false })).toBe(true);
   });
 });
 
