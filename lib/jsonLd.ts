@@ -37,3 +37,28 @@ export function promptJsonLd(p: JsonLdPrompt, baseUrl: string): Record<string, a
   if (keywords) ld.keywords = keywords;
   return ld;
 }
+
+// schema.org BreadcrumbList for a prompt page (Browse → Category → Prompt), so
+// search results can show a breadcrumb trail. Category level omitted when empty.
+export function promptBreadcrumbJsonLd(
+  p: { id: string; name: string; category: string },
+  baseUrl: string,
+): Record<string, any> {
+  const base = baseUrl.replace(/\/+$/, "");
+  const crumbs: { name: string; item: string }[] = [{ name: "Browse", item: `${base}/browse` }];
+  if (p.category && p.category.trim()) {
+    crumbs.push({ name: p.category, item: `${base}/c/${encodeURIComponent(p.category)}` });
+  }
+  crumbs.push({ name: p.name, item: `${base}/prompt/${p.id}` });
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: c.name,
+      item: c.item,
+    })),
+  };
+}

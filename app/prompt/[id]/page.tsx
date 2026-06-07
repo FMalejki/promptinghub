@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getPromptDetail } from "@/lib/prompts";
 import { promptOgMetadata } from "@/lib/meta";
-import { promptJsonLd } from "@/lib/jsonLd";
+import { promptJsonLd, promptBreadcrumbJsonLd } from "@/lib/jsonLd";
 import { getPlaceholderImage } from "@/lib/constants";
 import { PromptDetailClient } from "./PromptDetailClient";
 
@@ -25,7 +25,7 @@ async function promptLdJson(id: string): Promise<string | null> {
   try {
     const d = await getPromptDetail(await getDb(), id);
     if (!d || d.isPrivate) return null;
-    return JSON.stringify(promptJsonLd(d, SITE_URL));
+    return JSON.stringify([promptJsonLd(d, SITE_URL), promptBreadcrumbJsonLd(d, SITE_URL)]);
   } catch {
     return null;
   }
