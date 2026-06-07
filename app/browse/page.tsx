@@ -24,17 +24,26 @@ export default function BrowsePage() {
   const [sort, setSort] = useState<"recent" | "popular" | "copied">("recent");
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (category) params.set("category", category);
     params.set("sort", sort);
-    
-    const res = await fetch("/api/prompts" + (params.toString() ? `?${params}` : ""));
-    const body = res.ok ? await res.json() : { prompts: [] };
-    setPrompts(body.prompts || []);
-    setLoaded(true);
+
+    setError(false);
+    try {
+      const res = await fetch("/api/prompts" + (params.toString() ? `?${params}` : ""));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      setPrompts(body.prompts || []);
+    } catch {
+      setError(true);
+      setPrompts([]);
+    } finally {
+      setLoaded(true);
+    }
   }, [q, category, sort]);
 
   useEffect(() => {
@@ -143,7 +152,7 @@ export default function BrowsePage() {
         </div>
 
         {/* Results count */}
-        {loaded && (
+        {loaded && !error && (
           <div className="mb-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {prompts.length} {prompts.length === 1 ? "prompt" : "prompts"} found
@@ -151,8 +160,22 @@ export default function BrowsePage() {
           </div>
         )}
 
-        {/* Prompts Grid */}
-        {loaded && prompts.length === 0 ? (
+        {/* Error state with retry */}
+        {loaded && error ? (
+          <div className="text-center py-16">
+            <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Couldn&apos;t load prompts</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Something went wrong. Check your connection and try again.</p>
+            <button
+              onClick={load}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loaded && prompts.length === 0 ? (
           <div className="text-center py-16">
             <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
