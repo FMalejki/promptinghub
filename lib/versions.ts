@@ -1,5 +1,5 @@
 import { Db } from "mongodb";
-import { normalizeFiles, type PromptFile } from "./prompts";
+import { normalizeFiles, updatePrompt, type PromptFile } from "./prompts";
 
 export type PromptVersion = {
   version: number;
@@ -37,4 +37,17 @@ export async function listVersions(db: Db, promptId: string): Promise<PromptVers
     files: r.files ? normalizeFiles({ files: r.files }) : null,
     createdAt: r.createdAt,
   }));
+}
+
+// Restore a past version as the current content (owner-scoped). The pre-restore
+// state is itself snapshotted (via updatePrompt), so restores are reversible.
+// Returns false for a non-owner or an unknown version.
+export async function restoreVersion(db: Db, promptId: string, ownerEmail: string, version: number): Promise<boolean> {
+  const row = await db.collection("promptVersions").findOne({ promptId, version });
+  if (!row) return false;
+  if (row.files) {
+    const files = normalizeFiles({ files: row.files });
+    return updatePrompt(db, promptId, ownerEmail, { name: row.name, files });
+  }
+  return updatePrompt(db, promptId, ownerEmail, { name: row.name, body: row.body ?? "" });
 }

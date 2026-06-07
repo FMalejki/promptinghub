@@ -9,9 +9,10 @@ type Version = {
   createdAt: string;
 };
 
-export function VersionHistory({ promptId }: { promptId: string }) {
+export function VersionHistory({ promptId, canRestore = false }: { promptId: string; canRestore?: boolean }) {
   const [versions, setVersions] = useState<Version[]>([]);
   const [open, setOpen] = useState<number | null>(null);
+  const [restoring, setRestoring] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/prompts/${promptId}/versions`)
@@ -19,6 +20,14 @@ export function VersionHistory({ promptId }: { promptId: string }) {
       .then((d) => setVersions(d.versions || []))
       .catch(() => {});
   }, [promptId]);
+
+  async function restore(version: number) {
+    if (!confirm(`Restore version ${version}? The current content is saved to history first.`)) return;
+    setRestoring(version);
+    const res = await fetch(`/api/prompts/${promptId}/versions/${version}/restore`, { method: "POST" });
+    if (res.ok) window.location.reload();
+    else setRestoring(null);
+  }
 
   if (versions.length === 0) return null;
 
@@ -42,6 +51,17 @@ export function VersionHistory({ promptId }: { promptId: string }) {
             </button>
             {open === v.version && (
               <div className="p-4 space-y-3 bg-white dark:bg-gray-800">
+                {canRestore && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => restore(v.version)}
+                      disabled={restoring === v.version}
+                      className="px-3 py-1.5 text-xs bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg"
+                    >
+                      {restoring === v.version ? "Restoring…" : `Restore v${v.version}`}
+                    </button>
+                  </div>
+                )}
                 {(v.files ?? [{ path: "prompt.txt", content: v.body }]).map((f, i) => (
                   <div key={i}>
                     <div className="text-xs font-mono text-gray-400 mb-1">{f.path}</div>
