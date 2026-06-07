@@ -36,6 +36,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount?: number;
   priceCents?: number;
+  tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
   forkCount?: number;
   createdAt: string;
@@ -171,6 +172,20 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </div>
             )}
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">{prompt.description}</p>
+
+            {prompt.tags && prompt.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {prompt.tags.map((t) => (
+                  <Link
+                    key={t}
+                    href={`/browse?tag=${encodeURIComponent(t)}`}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    #{t}
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <Link href={prompt.handle ? `/u/${prompt.handle}` : `/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Avatar name={author.name} image={author.image} size={32} />

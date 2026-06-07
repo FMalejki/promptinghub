@@ -23,15 +23,23 @@ export default function BrowsePage() {
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<"recent" | "popular" | "copied">("recent");
   const [imageOnly, setImageOnly] = useState(false);
+  const [tag, setTag] = useState<string | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+
+  // Seed the tag filter from ?tag= so /browse?tag=seo deep-links work.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tag");
+    if (t) setTag(t);
+  }, []);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (category) params.set("category", category);
     if (imageOnly) params.set("image", "1");
+    if (tag) params.set("tag", tag);
     params.set("sort", sort);
 
     setError(false);
@@ -46,7 +54,7 @@ export default function BrowsePage() {
     } finally {
       setLoaded(true);
     }
-  }, [q, category, sort, imageOnly]);
+  }, [q, category, sort, imageOnly, tag]);
 
   useEffect(() => {
     const t = setTimeout(load, 200);
@@ -66,6 +74,17 @@ export default function BrowsePage() {
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Browse, share, and discover the best prompts for your AI workflows
           </p>
+          {tag && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => setTag(null)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50"
+              >
+                #{tag}
+                <span className="text-blue-400" aria-label="Clear tag filter">✕</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search Bar */}
