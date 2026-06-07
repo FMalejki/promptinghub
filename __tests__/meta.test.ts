@@ -1,4 +1,20 @@
-import { promptOgMetadata } from "../lib/meta";
+import { promptOgMetadata, canonicalPromptUrl } from "../lib/meta";
+
+describe("canonicalPromptUrl", () => {
+  it("prefers the namespaced /p/<handle>/<slug> form when available", () => {
+    expect(canonicalPromptUrl("https://site", { id: "x", handle: "ada", slug: "code-reviewer" })).toBe(
+      "https://site/p/ada/code-reviewer"
+    );
+  });
+
+  it("falls back to /prompt/<id> when there is no handle/slug", () => {
+    expect(canonicalPromptUrl("https://site", { id: "abc" })).toBe("https://site/prompt/abc");
+  });
+
+  it("trims a trailing slash on the base url", () => {
+    expect(canonicalPromptUrl("https://site/", { id: "abc" })).toBe("https://site/prompt/abc");
+  });
+});
 
 describe("promptOgMetadata", () => {
   it("builds title/description and OpenGraph + Twitter cards", () => {
@@ -42,6 +58,20 @@ describe("promptOgMetadata", () => {
     ];
     expect(oembed[0].url).toBe("https://site/api/oembed?url=x&format=json");
     expect(oembed[0].title).toBe("Cold Email");
+  });
+
+  it("sets a canonical url, alongside the oEmbed alternate, without clobbering either", () => {
+    const m = promptOgMetadata(
+      { name: "Cold Email", description: "desc" },
+      { canonical: "https://site/p/ada/cold-email", oembedUrl: "https://site/api/oembed?url=x&format=json" },
+    );
+    expect(m.alternates?.canonical).toBe("https://site/p/ada/cold-email");
+    expect((m.alternates?.types as Record<string, unknown>)["application/json+oembed"]).toBeTruthy();
+  });
+
+  it("omits canonical when not supplied", () => {
+    const m = promptOgMetadata({ name: "X", description: "y" });
+    expect(m.alternates?.canonical).toBeUndefined();
   });
 
   it("omits the oEmbed alternate when no oembedUrl is given", () => {
