@@ -70,6 +70,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [forking, setForking] = useState(false);
   const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
+  const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
 
   // Record a view once per page load (soft signal, best-effort).
@@ -88,6 +89,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         if (!active) return;
         setRelated(d.prompts || []);
         setRelatedByTag(d.byTag || []);
+        setByAuthor(d.byAuthor || []);
       })
       .catch(() => {});
     return () => {
@@ -476,6 +478,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {relatedByTag.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* More from the same author */}
+      {byAuthor.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More from {author.name}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {byAuthor.map((p) => (
               <PromptCard key={p.id} {...p} />
             ))}
           </div>
