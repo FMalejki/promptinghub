@@ -23,6 +23,7 @@ import { ShareButtons } from "./ShareButtons";
 import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
+import { buildLlmLinks } from "@/lib/llmLinks";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -449,6 +450,34 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <Markdown src={readme} />
         </div>
       )}
+
+      {/* Run this prompt in an assistant (text prompts only) */}
+      {!imageGen && (() => {
+        const llm = buildLlmLinks(allText);
+        return llm ? (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400 mr-1">Run it:</span>
+            <a
+              href={llm.chatgpt}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={recordCopy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Open in ChatGPT ↗
+            </a>
+            <a
+              href={llm.claude}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={recordCopy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Open in Claude ↗
+            </a>
+          </div>
+        ) : null;
+      })()}
 
       {/* Files */}
       <div className="space-y-4">
