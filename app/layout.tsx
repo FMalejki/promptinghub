@@ -3,7 +3,13 @@ import { Providers } from "./providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
-export const metadata = { title: "PromptingHub", description: "Discover and share AI prompts" };
+export const metadata = {
+  title: "PromptingHub",
+  description: "Discover and share AI prompts",
+  alternates: {
+    types: { "application/rss+xml": [{ url: "/feed.xml", title: "PromptingHub — Trending prompts" }] },
+  },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
