@@ -3,7 +3,10 @@ import Link from "next/link";
 import { CoverImage } from "../components/CoverImage";
 import { getDb } from "@/lib/db";
 import { listPublicCollections, type PublicCollection } from "@/lib/collections";
+import { collectionsItemListJsonLd } from "@/lib/jsonLd";
 import { Navbar } from "../components/Navbar";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
 export const metadata: Metadata = {
   title: "Collections · PromptingHub",
@@ -22,6 +25,12 @@ export default async function CollectionsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {collections.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionsItemListJsonLd(collections, SITE_URL)) }}
+        />
+      )}
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-10">

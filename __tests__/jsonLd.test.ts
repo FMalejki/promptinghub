@@ -1,6 +1,39 @@
-import { promptJsonLd, siteJsonLd } from "../lib/jsonLd";
+import { promptJsonLd, siteJsonLd, collectionsItemListJsonLd } from "../lib/jsonLd";
 
 const base = "https://promptinghub.app";
+
+describe("collectionsItemListJsonLd", () => {
+  const collections = [
+    { id: "c1", name: "Writing kit" },
+    { id: "c2", name: "Dev tools" },
+  ];
+
+  it("builds an ItemList with 1-based positions and canonical collection urls", () => {
+    const ld = collectionsItemListJsonLd(collections, base);
+    expect(ld["@type"]).toBe("ItemList");
+    expect(ld.itemListElement).toHaveLength(2);
+    expect(ld.itemListElement[0]).toEqual({
+      "@type": "ListItem",
+      position: 1,
+      url: `${base}/collections/c1`,
+      name: "Writing kit",
+    });
+    expect(ld.itemListElement[1].position).toBe(2);
+    expect(ld.itemListElement[1].url).toBe(`${base}/collections/c2`);
+  });
+
+  it("trims a trailing slash and reports the list length", () => {
+    const ld = collectionsItemListJsonLd(collections, "https://promptinghub.app/");
+    expect(ld.itemListElement[0].url).toBe("https://promptinghub.app/collections/c1");
+    expect(ld.numberOfItems).toBe(2);
+  });
+
+  it("is well-formed for an empty list", () => {
+    const ld = collectionsItemListJsonLd([], base);
+    expect(ld.itemListElement).toEqual([]);
+    expect(ld.numberOfItems).toBe(0);
+  });
+});
 
 describe("siteJsonLd", () => {
   it("describes the site as a WebSite with a name and canonical url", () => {
