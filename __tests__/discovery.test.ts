@@ -44,6 +44,20 @@ describe("listPrompts discovery", () => {
     expect(gem.map((p) => p.name)).toEqual(["Gem"]);
   });
 
+  it("ranks by a trending score (copies + stars) when sort=trending", async () => {
+    const a = await createPrompt(db, "a@x.com", { name: "Aaa", description: "d", category: "Writing", body: "b" });
+    const b = await createPrompt(db, "a@x.com", { name: "Bbb", description: "d", category: "Writing", body: "b" });
+    const c = await createPrompt(db, "a@x.com", { name: "Ccc", description: "d", category: "Writing", body: "b" });
+    // a: 3 copies (score 3); b: 1 star + 1 copy (score 2); c: nothing
+    await incrementCopyCount(db, a.id);
+    await incrementCopyCount(db, a.id);
+    await incrementCopyCount(db, a.id);
+    await incrementCopyCount(db, b.id);
+    await db.collection("prompts").updateOne({ name: "Bbb" }, { $set: { starredBy: ["x@x.com"] } });
+    const ranked = await listPrompts(db, { sort: "trending" });
+    expect(ranked.slice(0, 3).map((p) => p.name)).toEqual(["Aaa", "Bbb", "Ccc"]);
+  });
+
   it("filters to image-gen prompts when imageOnly is set", async () => {
     await createPrompt(db, "a@x.com", { name: "Mid", description: "d", category: "Creative", body: "b", testedModels: [{ modelId: "midjourney" }] });
     await createPrompt(db, "a@x.com", { name: "Img", description: "d", category: "Image Generation", body: "b" });
