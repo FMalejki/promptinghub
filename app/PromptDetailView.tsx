@@ -13,6 +13,7 @@ import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
 import { isImagePrompt, imageModelHome } from "@/lib/imageModels";
+import { isVerifiedHandle } from "@/lib/verified";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -151,10 +152,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             {installRef && <div className="text-sm font-mono text-gray-400 dark:text-gray-500 mb-2">{installRef}</div>}
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">{prompt.description}</p>
 
-            <Link href={`/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link href={prompt.handle ? `/u/${prompt.handle}` : `/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Avatar name={author.name} image={author.image} size={32} />
               <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">{author.name}</div>
+                <div className="flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-white">
+                  {author.name}
+                  {prompt.handle && isVerifiedHandle(prompt.handle) && (
+                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20" aria-label="Verified">
+                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(prompt.createdAt).toLocaleDateString()}</div>
               </div>
             </Link>
