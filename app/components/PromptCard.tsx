@@ -4,6 +4,7 @@ import { Avatar } from "../Avatar";
 import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
+import { lengthLabel } from "@/lib/promptLength";
 
 type Author = { email: string; name: string; image: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -20,11 +21,13 @@ type PromptCardProps = {
   testedModels?: TestedModel[];
   copyCount?: number;
   priceCents?: number;
+  tokens?: number;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0 }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
   const displayImage = image || getPlaceholderImage(id);
   const imageGen = isImagePrompt({ testedModels, category });
+  const length = lengthLabel(tokens);
 
   return (
     <Link
@@ -63,11 +66,19 @@ export function PromptCard({ id, name, description, category, author, image, sta
 
       {/* Content */}
       <div className="p-4">
-        {/* Category badge */}
-        <div className="mb-2">
+        {/* Category + length badges */}
+        <div className="mb-2 flex items-center gap-2">
           <span className="inline-block px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md">
             {category}
           </span>
+          {length && (
+            <span
+              title={`~${length.tokens} tokens`}
+              className="inline-block px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 rounded-md"
+            >
+              {length.label}
+            </span>
+          )}
         </div>
 
         {/* Title */}

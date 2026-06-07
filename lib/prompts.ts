@@ -2,6 +2,8 @@ import { Db, ObjectId } from "mongodb";
 import { slugify } from "./slug";
 import { IMAGE_MODEL_IDS } from "./imageModels";
 import { normalizeTags } from "./tags";
+import { promptToText } from "./promptText";
+import { estimateTokens } from "./promptStats";
 
 export type Author = { email: string; name: string; image: string | null };
 
@@ -27,6 +29,7 @@ export type Prompt = {
   priceCents: number;
   tags: string[];
   createdAt: Date;
+  tokens?: number; // rough length estimate for the card badge (optional)
 };
 
 export type PromptWithBody = {
@@ -202,6 +205,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
+    tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
 }
