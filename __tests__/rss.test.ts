@@ -39,4 +39,24 @@ describe("buildRssFeed", () => {
     expect(xml).toContain("<pubDate>Sun, 01 Feb 2026 00:00:00 GMT</pubDate>");
     expect(xml).not.toContain("example.com//");
   });
+
+  it("defaults to the global trending channel metadata", () => {
+    const xml = buildRssFeed(base, items);
+    expect(xml).toContain("<title>PromptingHub — Trending prompts</title>");
+    expect(xml).toContain(`<link>${base}</link>`);
+    expect(xml).toContain(`<atom:link href="${base}/feed.xml"`);
+  });
+
+  it("accepts per-channel title/description/self path overrides (escaped)", () => {
+    const xml = buildRssFeed(base, items, {
+      title: "Alice & friends",
+      description: "Prompts by <alice>",
+      selfPath: "/u/alice/feed.xml",
+      link: "/u/alice",
+    });
+    expect(xml).toContain("<title>Alice &amp; friends</title>");
+    expect(xml).toContain("<description>Prompts by &lt;alice&gt;</description>");
+    expect(xml).toContain(`<link>${base}/u/alice</link>`);
+    expect(xml).toContain(`<atom:link href="${base}/u/alice/feed.xml" rel="self" type="application/rss+xml" />`);
+  });
 });
