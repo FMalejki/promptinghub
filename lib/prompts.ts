@@ -21,6 +21,7 @@ export type Prompt = {
   stars: number;
   isPrivate: boolean;
   testedModels: TestedModel[];
+  copyCount: number;
   createdAt: Date;
 };
 
@@ -61,8 +62,9 @@ export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: stri
 export type ListOpts = {
   q?: string;
   category?: string;
+  model?: string;
   ownerEmail?: string;
-  sort?: "recent" | "popular";
+  sort?: "recent" | "popular" | "copied";
   includePrivate?: boolean;
   userEmail?: string;
 };
@@ -118,18 +120,31 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
 
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
   if (opts.category) match.category = opts.category;
+  if (opts.model) match["testedModels.modelId"] = opts.model;
   if (opts.q) {
     const rx = { $regex: opts.q, $options: "i" };
-    match.$or = [{ name: rx }, { description: rx }];
+    // Combine with $and so a search $or doesn't clobber the privacy $or above.
+    const searchOr = [{ name: rx }, { description: rx }];
+    if (match.$or) {
+      match.$and = [{ $or: match.$or }, { $or: searchOr }];
+      delete match.$or;
+    } else {
+      match.$or = searchOr;
+    }
   }
 
-  const sortField = opts.sort === "popular" ? { stars: -1, createdAt: -1 } : { createdAt: -1, _id: -1 };
+  const sortField =
+    opts.sort === "popular"
+      ? { stars: -1, createdAt: -1 }
+      : opts.sort === "copied"
+      ? { copyCount: -1, createdAt: -1 }
+      : { createdAt: -1, _id: -1 };
 
   const rows = await db
     .collection("prompts")
     .aggregate([
       { $match: match },
-      { $addFields: { stars: { $size: { $ifNull: ["$starredBy", []] } } } },
+      { $addFields: { stars: { $size: { $ifNull: ["$starredBy", []] } }, copyCount: { $ifNull: ["$copyCount", 0] } } },
       { $sort: sortField },
       { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
       { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
@@ -145,6 +160,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     stars: r.stars || 0,
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
+    copyCount: r.copyCount || 0,
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
@@ -193,6 +209,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     stars: 0,
     isPrivate: doc.isPrivate as boolean,
     testedModels: doc.testedModels as TestedModel[],
+    copyCount: 0,
     createdAt: doc.createdAt as Date,
   };
 }

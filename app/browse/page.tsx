@@ -21,7 +21,7 @@ export default function BrowsePage() {
   const { status, data } = useSession();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<"recent" | "popular">("recent");
+  const [sort, setSort] = useState<"recent" | "popular" | "copied">("recent");
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -101,6 +101,16 @@ export default function BrowsePage() {
               }`}
             >
               Popular
+            </button>
+            <button
+              onClick={() => setSort("copied")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sort === "copied"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              Most copied
             </button>
           </div>
 
