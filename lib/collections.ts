@@ -72,6 +72,7 @@ export async function getCollectionDetail(db: Db, id: string): Promise<Collectio
       testedModels: p.testedModels,
       copyCount: p.copyCount,
       priceCents: p.priceCents,
+      tags: p.tags,
       createdAt: p.createdAt,
     }));
   return { ...c, prompts };

@@ -19,6 +19,7 @@ export default function NewPromptPage() {
     isPrivate: false,
   });
   const [price, setPrice] = useState("0");
+  const [tags, setTags] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
@@ -132,6 +133,7 @@ export default function NewPromptPage() {
       image: form.image || undefined,
       testedModels: models.length > 0 ? models : undefined,
       priceCents: Math.round((parseFloat(price) || 0) * 100),
+      tags: tags.trim() ? tags : undefined,
     };
 
     try {
@@ -243,6 +245,19 @@ export default function NewPromptPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className={label}>Tags (optional)</label>
+              <input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className={input}
+                placeholder="cold-email, seo, gpt-4"
+                maxLength={400}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Comma-separated. Up to 10 tags help people find your prompt.</p>
             </div>
 
             <div>

@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { slugify } from "./slug";
 import { IMAGE_MODEL_IDS } from "./imageModels";
+import { normalizeTags } from "./tags";
 
 export type Author = { email: string; name: string; image: string | null };
 
@@ -24,6 +25,7 @@ export type Prompt = {
   testedModels: TestedModel[];
   copyCount: number;
   priceCents: number;
+  tags: string[];
   createdAt: Date;
 };
 
@@ -57,6 +59,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount: number;
   priceCents: number;
+  tags: string[];
   forkedFrom: { id: string; name: string } | null;
   forkCount: number;
   createdAt: Date;
@@ -69,6 +72,7 @@ export type ListOpts = {
   category?: string;
   model?: string;
   imageOnly?: boolean;
+  tag?: string;
   ownerEmail?: string;
   sort?: "recent" | "popular" | "copied" | "trending";
   includePrivate?: boolean;
@@ -87,6 +91,7 @@ export type NewPrompt = {
   isPrivate?: boolean;
   testedModels?: TestedModel[];
   priceCents?: number;
+  tags?: string[] | string;
   forkedFrom?: string;
 };
 
@@ -131,6 +136,10 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
   if (opts.category) match.category = opts.category;
   if (opts.model) match["testedModels.modelId"] = opts.model;
+  if (opts.tag) {
+    const t = normalizeTags(opts.tag)[0];
+    if (t) match.tags = t;
+  }
   if (opts.imageOnly) {
     orGroups.push([
       { category: { $regex: "^image generation$", $options: "i" } },
@@ -186,6 +195,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
     priceCents: r.priceCents || 0,
+    tags: r.tags || [],
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
@@ -225,6 +235,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     isPrivate: !!data.isPrivate,
     testedModels: data.testedModels || [],
     priceCents: data.priceCents || 0,
+    tags: normalizeTags(data.tags),
     forkedFrom,
     starredBy: [],
     sharedWith: [],
@@ -244,6 +255,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     testedModels: doc.testedModels as TestedModel[],
     copyCount: 0,
     priceCents: doc.priceCents as number,
+    tags: doc.tags as string[],
     createdAt: doc.createdAt as Date,
   };
 }
@@ -259,6 +271,7 @@ export async function updatePrompt(db: Db, id: string, ownerEmail: string, data:
   if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
   if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
+  if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
   if (data.files !== undefined) {
     const files = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
     set.files = files;
@@ -344,6 +357,7 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     priceCents: row.priceCents || 0,
+    tags: row.tags || [],
     forkedFrom,
     forkCount,
     createdAt: row.createdAt,
@@ -401,6 +415,7 @@ export async function getRelatedPrompts(db: Db, id: string, limit = 4): Promise<
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
     priceCents: r.priceCents || 0,
+    tags: r.tags || [],
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
@@ -432,6 +447,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     priceCents: row.priceCents || 0,
+    tags: row.tags || [],
     forkedFrom,
     forkCount,
     createdAt: row.createdAt,
