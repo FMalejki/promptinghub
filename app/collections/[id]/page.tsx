@@ -73,12 +73,20 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {collection.prompts.length > 0 && (
-                  <a
-                    href={`/api/collections/${params.id}/export`}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    Export JSON
-                  </a>
+                  <>
+                    <a
+                      href={`/api/collections/${params.id}/export`}
+                      className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Export JSON
+                    </a>
+                    <a
+                      href={`/api/collections/${params.id}/export?format=md`}
+                      className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Export Markdown
+                    </a>
+                  </>
                 )}
                 {isOwner && (
                   <button
