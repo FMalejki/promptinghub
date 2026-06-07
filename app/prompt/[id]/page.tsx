@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getPromptDetail } from "@/lib/prompts";
 import { promptOgMetadata } from "@/lib/meta";
+import { oembedDiscoveryUrl } from "@/lib/oembed";
 import { promptJsonLd, promptBreadcrumbJsonLd } from "@/lib/jsonLd";
 import { getPlaceholderImage } from "@/lib/constants";
 import { PromptDetailClient } from "./PromptDetailClient";
@@ -14,7 +15,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   try {
     const detail = await getPromptDetail(await getDb(), params.id);
     if (!detail || detail.isPrivate) return promptOgMetadata(null);
-    return promptOgMetadata({ name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) });
+    return promptOgMetadata(
+      { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) },
+      { oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`) },
+    );
   } catch {
     return promptOgMetadata(null);
   }
