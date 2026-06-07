@@ -16,7 +16,14 @@ function truncate(s: string, max: number): string {
  * so shared links render a rich preview. Pass `null` for a missing or private prompt
  * to get a safe generic card that leaks nothing.
  */
-export function promptOgMetadata(input: PromptMetaInput | null): Metadata {
+export type PromptMetaOpts = {
+  // When set, advertise an oEmbed discovery link so consumers (WordPress,
+  // Discord, …) can auto-embed a shared prompt URL. Never attached to the
+  // generic/private card.
+  oembedUrl?: string;
+};
+
+export function promptOgMetadata(input: PromptMetaInput | null, opts: PromptMetaOpts = {}): Metadata {
   if (!input) {
     return {
       title: "Prompt · PromptingHub",
@@ -29,10 +36,16 @@ export function promptOgMetadata(input: PromptMetaInput | null): Metadata {
   // absolute URL by Next via metadataBase).
   const images = [{ url: input.image || ogImagePath(input.name, input.description) }];
 
-  return {
+  const meta: Metadata = {
     title,
     description,
     openGraph: { title, description, type: "article", images },
     twitter: { card: "summary_large_image", title, description, images: images?.map((i) => i.url) },
   };
+  if (opts.oembedUrl) {
+    meta.alternates = {
+      types: { "application/json+oembed": [{ url: opts.oembedUrl, title: input.name }] },
+    };
+  }
+  return meta;
 }

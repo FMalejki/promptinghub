@@ -1,7 +1,22 @@
-import { buildOEmbed, embedHtml } from "../lib/oembed";
+import { buildOEmbed, embedHtml, oembedDiscoveryUrl } from "../lib/oembed";
 
 const base = "https://example.com";
 const prompt = { id: "abc123", name: "SEO Title Writer", author: { name: "Ada" } };
+
+describe("oembedDiscoveryUrl", () => {
+  it("builds a /api/oembed discovery url with the target url-encoded and format=json", () => {
+    const url = oembedDiscoveryUrl("https://example.com", "https://example.com/prompt/abc123");
+    expect(url).toBe(
+      "https://example.com/api/oembed?url=https%3A%2F%2Fexample.com%2Fprompt%2Fabc123&format=json"
+    );
+  });
+
+  it("trims a trailing slash on the site url", () => {
+    const url = oembedDiscoveryUrl("https://example.com/", "https://example.com/prompt/x");
+    expect(url.startsWith("https://example.com/api/oembed?")).toBe(true);
+    expect(url).not.toContain("//api/oembed");
+  });
+});
 
 describe("oembed", () => {
   it("builds a rich oEmbed payload pointing at the embed iframe", () => {

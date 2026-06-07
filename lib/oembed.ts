@@ -40,6 +40,15 @@ export function embedHtml(baseUrl: string, prompt: EmbedPrompt, width: number, h
   );
 }
 
+// The href for a `<link rel="alternate" type="application/json+oembed">` tag, so
+// oEmbed consumers (WordPress, Discord, Slack, …) can auto-discover the embed
+// from a shared prompt URL. `targetUrl` is the page being embedded; it must be a
+// URL our /api/oembed endpoint can resolve (a /prompt/<id> or /embed/<id> URL).
+export function oembedDiscoveryUrl(siteUrl: string, targetUrl: string): string {
+  const base = siteUrl.replace(/\/$/, "");
+  return `${base}/api/oembed?url=${encodeURIComponent(targetUrl)}&format=json`;
+}
+
 export function buildOEmbed(baseUrl: string, prompt: EmbedPrompt, opts: OEmbedOpts): OEmbed {
   const base = baseUrl.replace(/\/$/, "");
   const width = Math.min(DEFAULT_EMBED_WIDTH, opts.maxwidth ?? DEFAULT_EMBED_WIDTH);

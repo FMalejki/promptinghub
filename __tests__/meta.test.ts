@@ -31,4 +31,26 @@ describe("promptOgMetadata", () => {
     expect(m.title).toBe("Prompt · PromptingHub");
     expect(typeof m.description).toBe("string");
   });
+
+  it("adds an oEmbed discovery alternate when an oembedUrl is supplied", () => {
+    const m = promptOgMetadata(
+      { name: "Cold Email", description: "desc" },
+      { oembedUrl: "https://site/api/oembed?url=x&format=json" },
+    );
+    const oembed = (m.alternates?.types as Record<string, { url: string; title?: string }[]>)[
+      "application/json+oembed"
+    ];
+    expect(oembed[0].url).toBe("https://site/api/oembed?url=x&format=json");
+    expect(oembed[0].title).toBe("Cold Email");
+  });
+
+  it("omits the oEmbed alternate when no oembedUrl is given", () => {
+    const m = promptOgMetadata({ name: "X", description: "y" });
+    expect(m.alternates).toBeUndefined();
+  });
+
+  it("never attaches an oEmbed alternate to the generic/private card", () => {
+    const m = promptOgMetadata(null, { oembedUrl: "https://site/api/oembed?url=x&format=json" });
+    expect(m.alternates).toBeUndefined();
+  });
 });
