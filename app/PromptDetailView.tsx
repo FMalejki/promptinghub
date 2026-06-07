@@ -63,12 +63,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
   const [forking, setForking] = useState(false);
   const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
+  const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
 
   useEffect(() => {
     let active = true;
     fetch(`/api/prompts/${prompt.id}/related`)
-      .then((r) => (r.ok ? r.json() : { prompts: [] }))
-      .then((d) => active && setRelated(d.prompts || []))
+      .then((r) => (r.ok ? r.json() : { prompts: [], byTag: [] }))
+      .then((d) => {
+        if (!active) return;
+        setRelated(d.prompts || []);
+        setRelatedByTag(d.byTag || []);
+      })
       .catch(() => {});
     return () => {
       active = false;
@@ -380,6 +385,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {related.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Related by tag */}
+      {relatedByTag.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {relatedByTag.map((p) => (
               <PromptCard key={p.id} {...p} />
             ))}
           </div>
