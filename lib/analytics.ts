@@ -1,5 +1,38 @@
 import { Db } from "mongodb";
 
+// Daily copy counts for an owner's prompts over the last `days` days (UTC),
+// oldest → newest, zero-filled. `now` is injectable for deterministic tests.
+export async function copyTimeseries(
+  db: Db,
+  email: string,
+  days = 14,
+  now: Date = new Date(),
+): Promise<{ day: string; count: number }[]> {
+  const owned = await db.collection("prompts").find({ ownerEmail: email }, { projection: { _id: 1 } }).toArray();
+  const ids = owned.map((p) => p._id.toString());
+
+  // Build the ordered list of day strings in the window.
+  const dayList: string[] = [];
+  const startMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (days - 1) * 86400000;
+  for (let i = 0; i < days; i++) {
+    dayList.push(new Date(startMs + i * 86400000).toISOString().slice(0, 10));
+  }
+  const counts = new Map<string, number>(dayList.map((d) => [d, 0]));
+
+  if (ids.length) {
+    const events = await db
+      .collection("copyEvents")
+      .find({ promptId: { $in: ids }, createdAt: { $gte: new Date(startMs) } })
+      .toArray();
+    for (const e of events) {
+      const day = new Date(e.createdAt).toISOString().slice(0, 10);
+      if (counts.has(day)) counts.set(day, (counts.get(day) || 0) + 1);
+    }
+  }
+
+  return dayList.map((day) => ({ day, count: counts.get(day) || 0 }));
+}
+
 export type PromptStats = {
   id: string;
   name: string;
