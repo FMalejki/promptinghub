@@ -153,9 +153,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <span className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+              <Link href={`/c/${encodeURIComponent(prompt.category)}`} className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
                 {prompt.category}
-              </span>
+              </Link>
               {prompt.isPrivate && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-md">
                   Private
