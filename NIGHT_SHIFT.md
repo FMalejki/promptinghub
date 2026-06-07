@@ -39,7 +39,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 ### Phase 3 — Namespacing & install
 - ✅ 8. User handles `@handle` + per-prompt slug → canonical `/p/owner/slug` — PR #5
 - 🔄 9. Install/use: copy command done (`npx promptinghub add owner/slug` box); manifest/download endpoint still TODO
-- ⬜ 10. Prompt metadata: model/tool tags (Gemini, GPT-Image-2, Claude…), README
+- ✅ 10. Prompt metadata: tested models (Filip) + README rendering — PR #18
 
 ### Phase 4 — Discovery & pool
 - ⬜ 11. Seed 20–30 real prompts + `public` flag + seed script
@@ -86,4 +86,6 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - PR #15 merged: copy/usage counter — incrementCopyCount (atomic $inc), copyCount in detail objects, POST /api/prompts/[id]/copy, CLI manifest install counts, detail-view badge + CopyButton onCopy. 98 tests. Verified live (0→POST→1 persisted). NOTE: Vercel build occasionally hangs at UNKNOWN status (one stuck deploy this session) — redeploy fresh in foreground capturing stdout JSON for the URL; alias only a READY deploy.
 - PR #16 merged: discovery — sort=copied (most-copied), ?model= filter (testedModels.modelId), copyCount on list items, "Most copied" browse button. Fixed a real privacy bug: search $or was overwriting the privacy $or (private prompts could leak under a text query) → now combined with $and + regression test. 102 tests. Verified live (sort order correct, model filter 17→2 all-match). NOTE: browse is a "use client" page — UI text isn't in SSR HTML, so curl-grep can't see buttons; verify client UI via Preview MCP or trust tsc + identical-sibling pattern.
 - PR #17 merged: prompt import foundation — parsePastedPrompt (text/--- frontmatter → reviewable draft), POST /api/import (auth-gated, preview-only, never publishes), "Import from text" box on /new, pluggable PromptSource + env-gated twitterSource (official API only, no scraping, enabled:false without TWITTER_BEARER_TOKEN). Addresses the X/Twitter daily-ingest ask honestly. 112 tests. Verified live (401 auth-gate, 405 on GET). Daily-cron wiring + curation UI still TODO (needs paid X API token to actually pull).
+- PR #18 merged: README rendering — dependency-free lib/markdown.ts (parseBlocks/parseInline/pickReadme), safe (http(s)-only links, javascript: neutralized, React auto-escape, no dangerouslySetInnerHTML), <Markdown> renderer, detail page shows README.md above files. 121 tests. Deployed (no-regression 200; visual confirm pending a prompt that actually ships a README.md — none seeded yet).
+- Session tally (this run): 5 feature PRs — #14 edit/delete, #15 copy-counter, #16 discovery (+privacy bug fix), #17 import foundation, #18 README rendering. 121 tests.
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
