@@ -19,6 +19,7 @@ import { Comments } from "./Comments";
 import { VersionHistory } from "./VersionHistory";
 import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
+import { ShareButtons } from "./ShareButtons";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -404,6 +405,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         </div>
       )}
+
+      {/* Share */}
+      {!prompt.isPrivate && <ShareButtons title={prompt.name} />}
 
       {/* Use via API */}
       {!prompt.isPrivate && <ApiSnippet promptId={prompt.id} />}
