@@ -92,6 +92,14 @@ export default function BrowsePage() {
               <span className="font-semibold text-gray-700 dark:text-gray-300">{stats.copies.toLocaleString()}</span> copies
             </p>
           )}
+          <div className="mt-5">
+            <a
+              href="/random"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              🎲 Surprise me
+            </a>
+          </div>
           {tag && (
             <div className="mt-4 flex justify-center">
               <button
