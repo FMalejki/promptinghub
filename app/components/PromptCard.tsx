@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "../Avatar";
 import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
+import { formatPrice, isPaid } from "@/lib/pricing";
 
 type Author = { email: string; name: string; image: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -18,9 +19,10 @@ type PromptCardProps = {
   isPrivate: boolean;
   testedModels?: TestedModel[];
   copyCount?: number;
+  priceCents?: number;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0 }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0 }: PromptCardProps) {
   const displayImage = image || getPlaceholderImage(id);
   const imageGen = isImagePrompt({ testedModels, category });
 
@@ -42,6 +44,11 @@ export function PromptCard({ id, name, description, category, author, image, sta
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             <span className="text-xs text-white font-medium">Private</span>
+          </div>
+        )}
+        {isPaid(priceCents) && (
+          <div className="absolute bottom-3 right-3 px-2 py-1 bg-green-600/90 backdrop-blur-sm rounded-md">
+            <span className="text-xs text-white font-semibold">{formatPrice(priceCents)}</span>
           </div>
         )}
         {imageGen && (

@@ -14,6 +14,7 @@ import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
 import { isImagePrompt, imageModelHome } from "@/lib/imageModels";
 import { isVerifiedHandle } from "@/lib/verified";
+import { formatPrice, isPaid } from "@/lib/pricing";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -32,6 +33,7 @@ export type PromptDetail = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount?: number;
+  priceCents?: number;
   createdAt: string;
   handle?: string;
   slug?: string;
@@ -147,6 +149,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                   Private
                 </span>
               )}
+              <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-md ${isPaid(prompt.priceCents) ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30" : "text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800"}`}>
+                {formatPrice(prompt.priceCents ?? 0)}
+              </span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">{prompt.name}</h1>
             {installRef && <div className="text-sm font-mono text-gray-400 dark:text-gray-500 mb-2">{installRef}</div>}
@@ -240,6 +245,23 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Paid prompt — marketplace is in preview (no live payments yet) */}
+      {isPaid(prompt.priceCents) && (
+        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-green-800 dark:text-green-300">{formatPrice(prompt.priceCents ?? 0)}</div>
+            <div className="text-xs text-green-700/80 dark:text-green-300/70">Marketplace is in preview — payments aren’t live yet.</div>
+          </div>
+          <button
+            disabled
+            title="Payments are coming soon"
+            className="px-4 py-2 rounded-lg font-medium bg-green-600/60 text-white cursor-not-allowed"
+          >
+            Buy (coming soon)
+          </button>
         </div>
       )}
 

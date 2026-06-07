@@ -18,6 +18,7 @@ export default function NewPromptPage() {
     image: "",
     isPrivate: false,
   });
+  const [price, setPrice] = useState("0");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
@@ -130,6 +131,7 @@ export default function NewPromptPage() {
       files: payloadFiles,
       image: form.image || undefined,
       testedModels: models.length > 0 ? models : undefined,
+      priceCents: Math.round((parseFloat(price) || 0) * 100),
     };
 
     try {
@@ -252,6 +254,20 @@ export default function NewPromptPage() {
                 className={input}
                 placeholder="https://example.com/image.jpg"
               />
+            </div>
+
+            <div>
+              <label className={label}>Price (USD) — 0 = free</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className={input}
+                placeholder="0.00"
+              />
+              <p className="mt-1 text-xs text-gray-400">Marketplace is in preview — payments aren’t live yet.</p>
             </div>
 
             <div className="flex items-center gap-2">

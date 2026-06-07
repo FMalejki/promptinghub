@@ -22,6 +22,7 @@ export const newPromptSchema = z
     image: z.string().url().or(z.literal("")).optional(),
     isPrivate: z.boolean().optional(),
     testedModels: z.array(testedModelSchema).max(50).optional(),
+    priceCents: z.number().int().min(0).max(1000000).optional(),
   })
   .refine((d) => Boolean(d.body && d.body.trim().length) || Boolean(d.files && d.files.length), {
     message: "Provide a prompt body or at least one file",

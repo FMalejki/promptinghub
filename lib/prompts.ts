@@ -23,6 +23,7 @@ export type Prompt = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount: number;
+  priceCents: number;
   createdAt: Date;
 };
 
@@ -55,6 +56,7 @@ export type PromptDetail = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount: number;
+  priceCents: number;
   createdAt: Date;
 };
 
@@ -82,6 +84,7 @@ export type NewPrompt = {
   image?: string;
   isPrivate?: boolean;
   testedModels?: TestedModel[];
+  priceCents?: number;
 };
 
 const LANG_BY_EXT: Record<string, string> = {
@@ -170,6 +173,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
+    priceCents: r.priceCents || 0,
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
@@ -202,6 +206,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     image: data.image || null,
     isPrivate: !!data.isPrivate,
     testedModels: data.testedModels || [],
+    priceCents: data.priceCents || 0,
     starredBy: [],
     sharedWith: [],
     createdAt: new Date(),
@@ -219,6 +224,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     isPrivate: doc.isPrivate as boolean,
     testedModels: doc.testedModels as TestedModel[],
     copyCount: 0,
+    priceCents: doc.priceCents as number,
     createdAt: doc.createdAt as Date,
   };
 }
@@ -233,6 +239,7 @@ export async function updatePrompt(db: Db, id: string, ownerEmail: string, data:
   if (data.image !== undefined) set.image = data.image || null;
   if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
+  if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.files !== undefined) {
     const files = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
     set.files = files;
@@ -293,6 +300,7 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
+    priceCents: row.priceCents || 0,
     createdAt: row.createdAt,
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
@@ -347,6 +355,7 @@ export async function getRelatedPrompts(db: Db, id: string, limit = 4): Promise<
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
+    priceCents: r.priceCents || 0,
     createdAt: r.createdAt,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
@@ -371,6 +380,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     isPrivate: row.isPrivate || false,
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
+    priceCents: row.priceCents || 0,
     createdAt: row.createdAt,
     handle,
     slug,

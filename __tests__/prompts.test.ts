@@ -121,6 +121,7 @@ describe("getPromptDetail", () => {
       isPrivate: false,
       testedModels: [],
       copyCount: 0,
+      priceCents: 0,
       createdAt: new Date("2026-01-01"),
     });
   });
