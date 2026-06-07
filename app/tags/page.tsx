@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { topTags } from "@/lib/prompts";
+import { topTags, trendingTags } from "@/lib/prompts";
 import { Navbar } from "../components/Navbar";
 
 export const metadata: Metadata = {
@@ -22,8 +22,10 @@ function sizeClass(count: number, max: number): string {
 
 export default async function TagsPage() {
   let tags: { tag: string; count: number }[] = [];
+  let trending: { tag: string; score: number }[] = [];
   try {
-    tags = await topTags(await getDb(), 100);
+    const db = await getDb();
+    [tags, trending] = await Promise.all([topTags(db, 100), trendingTags(db, { days: 7, limit: 12 })]);
   } catch {
     // DB unavailable — render the empty state.
   }
@@ -37,6 +39,29 @@ export default async function TagsPage() {
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Tags</h1>
           <p className="text-gray-600 dark:text-gray-400">Explore prompts by topic</p>
         </div>
+
+        {trending.length > 0 && (
+          <div className="mb-10">
+            <h2 className="flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">
+              <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              Trending this week
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {trending.map((t) => (
+                <Link
+                  key={t.tag}
+                  href={`/t/${encodeURIComponent(t.tag)}`}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                >
+                  <span className="text-orange-400">#</span>
+                  {t.tag}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {tags.length === 0 ? (
           <div className="text-center py-16 text-gray-500 dark:text-gray-400">No tags yet.</div>

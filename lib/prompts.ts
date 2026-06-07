@@ -233,6 +233,49 @@ export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count:
   return rows.map((r: any) => ({ tag: r._id as string, count: r.count as number }));
 }
 
+// Tags trending by recent copy activity. Each copy of a public prompt in the
+// window adds 1 to every tag on that prompt; ranked desc. `now` is injectable
+// for deterministic tests.
+export async function trendingTags(
+  db: Db,
+  opts: { days?: number; limit?: number; now?: Date } = {},
+): Promise<{ tag: string; score: number }[]> {
+  const days = opts.days ?? 7;
+  const limit = opts.limit ?? 20;
+  const now = opts.now ?? new Date();
+  const since = new Date(now.getTime() - days * 86400000);
+
+  // Copies per prompt within the window.
+  const events = await db
+    .collection("copyEvents")
+    .aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: "$promptId", copies: { $sum: 1 } } }])
+    .toArray();
+  if (!events.length) return [];
+
+  const copiesById = new Map<string, number>();
+  for (const e of events as any[]) {
+    if (ObjectId.isValid(e._id)) copiesById.set(e._id as string, e.copies as number);
+  }
+  if (!copiesById.size) return [];
+
+  const objIds = [...copiesById.keys()].map((id) => new ObjectId(id));
+  const prompts = await db
+    .collection("prompts")
+    .find({ _id: { $in: objIds }, isPrivate: { $ne: true }, tags: { $type: "array", $ne: [] } }, { projection: { tags: 1 } })
+    .toArray();
+
+  const scores = new Map<string, number>();
+  for (const p of prompts as any[]) {
+    const copies = copiesById.get(p._id.toString()) || 0;
+    for (const tag of p.tags as string[]) scores.set(tag, (scores.get(tag) || 0) + copies);
+  }
+
+  return [...scores.entries()]
+    .map(([tag, score]) => ({ tag, score }))
+    .sort((a, b) => b.score - a.score || a.tag.localeCompare(b.tag))
+    .slice(0, limit);
+}
+
 export async function uniqueSlug(db: Db, ownerEmail: string, name: string): Promise<string> {
   const base = slugify(name);
   let slug = base;
