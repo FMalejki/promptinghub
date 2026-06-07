@@ -2,18 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getPromptDetail } from "@/lib/prompts";
+import { embedMetadata } from "@/lib/oembed";
 import { CopyButton } from "../../PromptView";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
-// oEmbed discovery: point consumers at the JSON endpoint for this prompt.
+// Thin iframe page: noindex (follow) + oEmbed discovery link. See lib/oembed.
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const oembed = `${SITE_URL}/api/oembed?url=${encodeURIComponent(`${SITE_URL}/prompt/${params.id}`)}`;
-  return {
-    title: "Embedded prompt — PromptingHub",
-    other: { "oembed:json": oembed },
-    alternates: { types: { "application/json+oembed": oembed } },
-  };
+  return embedMetadata(SITE_URL, params.id);
 }
 
 // Minimal, chrome-free view designed to live inside an <iframe>.
