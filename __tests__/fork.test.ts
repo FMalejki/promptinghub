@@ -1,6 +1,7 @@
 import { buildForkInput } from "../lib/fork";
 
 const source = {
+  id: "src1",
   name: "Cold email",
   description: "A cold outreach email",
   category: "Marketing",
@@ -17,6 +18,7 @@ describe("buildForkInput", () => {
       name: "Cold email (fork)",
       description: "A cold outreach email",
       category: "Marketing",
+      forkedFrom: "src1",
       files: [
         { path: "email.md", content: "Hi Sarah, from Ada." },
         { path: "notes.txt", content: "tone warm" },

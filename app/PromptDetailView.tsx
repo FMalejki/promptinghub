@@ -36,6 +36,8 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount?: number;
   priceCents?: number;
+  forkedFrom?: { id: string; name: string } | null;
+  forkCount?: number;
   createdAt: string;
   handle?: string;
   slug?: string;
@@ -157,6 +159,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">{prompt.name}</h1>
             {installRef && <div className="text-sm font-mono text-gray-400 dark:text-gray-500 mb-2">{installRef}</div>}
+            {prompt.forkedFrom && (
+              <div className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7a2 2 0 110-4 2 2 0 010 4zm0 0v1a2 2 0 002 2h4a2 2 0 002 2v1m0 0a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                Forked from{" "}
+                <Link href={`/prompt/${prompt.forkedFrom.id}`} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                  {prompt.forkedFrom.name}
+                </Link>
+              </div>
+            )}
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">{prompt.description}</p>
 
             <Link href={prompt.handle ? `/u/${prompt.handle}` : `/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -199,6 +212,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </svg>
               <span>{copyCount}</span>
             </span>
+
+            {(prompt.forkCount ?? 0) > 0 && (
+              <span
+                title="Number of forks"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7a2 2 0 110-4 2 2 0 010 4zm0 0v1a2 2 0 002 2h4a2 2 0 002 2v1m0 0a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                <span>{prompt.forkCount}</span>
+              </span>
+            )}
 
             <button
               onClick={handleFork}
