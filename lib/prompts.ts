@@ -68,6 +68,9 @@ export type PromptDetail = {
   forkCount: number;
   createdAt: Date;
   updatedAt: Date | null;
+  // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
+  handle?: string;
+  slug?: string;
 };
 
 export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: string };

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getPromptDetail } from "@/lib/prompts";
-import { promptOgMetadata } from "@/lib/meta";
+import { promptOgMetadata, canonicalPromptUrl } from "@/lib/meta";
 import { oembedDiscoveryUrl } from "@/lib/oembed";
 import { promptJsonLd, promptBreadcrumbJsonLd } from "@/lib/jsonLd";
 import { getPlaceholderImage } from "@/lib/constants";
@@ -17,7 +17,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     if (!detail || detail.isPrivate) return promptOgMetadata(null);
     return promptOgMetadata(
       { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) },
-      { oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`) },
+      {
+        oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`),
+        canonical: canonicalPromptUrl(SITE_URL, detail),
+      },
     );
   } catch {
     return promptOgMetadata(null);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getPromptDetailByHandleAndSlug } from "@/lib/prompts";
-import { promptOgMetadata } from "@/lib/meta";
+import { promptOgMetadata, canonicalPromptUrl } from "@/lib/meta";
 import { oembedDiscoveryUrl } from "@/lib/oembed";
 import { getPlaceholderImage } from "@/lib/constants";
 import { NamespacedPromptClient } from "./NamespacedPromptClient";
@@ -16,7 +16,10 @@ export async function generateMetadata({ params }: { params: { handle: string; s
     // Discovery points at the /prompt/<id> form — the only shape /api/oembed resolves.
     return promptOgMetadata(
       { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) },
-      { oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`) },
+      {
+        oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`),
+        canonical: canonicalPromptUrl(SITE_URL, detail),
+      },
     );
   } catch {
     return promptOgMetadata(null);
