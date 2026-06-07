@@ -6,7 +6,7 @@ import { Navbar } from "../components/Navbar";
 
 type Notif = {
   id: string;
-  type: "follow" | "comment" | "fork";
+  type: "follow" | "comment" | "fork" | "reply" | "mention";
   actorName?: string;
   actorEmail: string;
   promptId?: string;
@@ -18,9 +18,12 @@ type Notif = {
 
 function summarize(n: Notif): string {
   const who = n.actorName || n.actorEmail.split("@")[0];
+  const on = n.promptName ? ` “${n.promptName}”` : " your prompt";
   if (n.type === "follow") return `${who} followed you`;
   if (n.type === "fork") return `${who} forked your prompt${n.promptName ? ` “${n.promptName}”` : ""}`;
-  return `${who} commented on${n.promptName ? ` “${n.promptName}”` : " your prompt"}`;
+  if (n.type === "reply") return `${who} replied to your comment on${on}`;
+  if (n.type === "mention") return `${who} mentioned you on${on}`;
+  return `${who} commented on${on}`;
 }
 
 export default function NotificationsPage() {

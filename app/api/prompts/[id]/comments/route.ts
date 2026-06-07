@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ comments });
 }
 
-const bodySchema = z.object({ body: z.string().min(1).max(2000) });
+const bodySchema = z.object({ body: z.string().min(1).max(2000), parentId: z.string().optional() });
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   try {
-    const created = await addComment(await getDb(), params.id, email, parsed.data.body);
+    const created = await addComment(await getDb(), params.id, email, parsed.data.body, parsed.data.parentId ?? null);
     return NextResponse.json(created, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });

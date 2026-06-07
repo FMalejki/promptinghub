@@ -1,5 +1,6 @@
 import { Db, ObjectId } from "mongodb";
-import { addNotification, actorName } from "./notifications";
+import { addNotification, actorName, NotificationType } from "./notifications";
+import { extractMentions } from "./mentions";
 
 export type Author = { email: string; name: string; image: string | null };
 export type Comment = {
@@ -7,30 +8,57 @@ export type Comment = {
   promptId: string;
   body: string;
   author: Author;
+  parentId: string | null;
   createdAt: Date;
 };
 
-// Add a comment to a prompt. Throws on empty/whitespace body.
-export async function addComment(db: Db, promptId: string, authorEmail: string, body: string): Promise<{ id: string }> {
+// Add a comment to a prompt, optionally as a reply to another comment (parentId).
+// Throws on empty/whitespace body. Emits best-effort notifications to the prompt
+// owner, the parent comment's author (replies), and any @mentioned handles —
+// each recipient at most once, never the author themselves.
+export async function addComment(
+  db: Db,
+  promptId: string,
+  authorEmail: string,
+  body: string,
+  parentId?: string | null,
+): Promise<{ id: string }> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("Comment body is required");
-  const doc = { promptId, authorEmail, body: trimmed.slice(0, 2000), createdAt: new Date() };
+  const parent = parentId && ObjectId.isValid(parentId) ? parentId : null;
+  const doc = { promptId, authorEmail, body: trimmed.slice(0, 2000), parentId: parent, createdAt: new Date() };
   const { insertedId } = await db.collection("comments").insertOne(doc);
-  // Notify the prompt owner (best-effort; no self-notify).
+
+  // Notifications — best-effort, deduped per recipient (author never notified).
   try {
-    if (ObjectId.isValid(promptId)) {
-      const prompt = await db.collection("prompts").findOne({ _id: new ObjectId(promptId) }, { projection: { ownerEmail: 1, name: 1 } });
-      if (prompt?.ownerEmail) {
-        await addNotification(db, {
-          recipientEmail: prompt.ownerEmail,
-          type: "comment",
-          actorEmail: authorEmail,
-          actorName: await actorName(db, authorEmail),
-          promptId,
-          promptName: prompt.name,
-          text: trimmed.slice(0, 140),
-        });
-      }
+    const notified = new Set<string>([authorEmail]);
+    const who = await actorName(db, authorEmail);
+    const snippet = trimmed.slice(0, 140);
+    let promptName: string | undefined;
+
+    const notify = async (recipientEmail: string | undefined | null, type: NotificationType) => {
+      if (!recipientEmail || notified.has(recipientEmail)) return;
+      notified.add(recipientEmail);
+      await addNotification(db, { recipientEmail, type, actorEmail: authorEmail, actorName: who, promptId, promptName, text: snippet });
+    };
+
+    const prompt = ObjectId.isValid(promptId)
+      ? await db.collection("prompts").findOne({ _id: new ObjectId(promptId) }, { projection: { ownerEmail: 1, name: 1 } })
+      : null;
+    promptName = prompt?.name;
+
+    // Reply author first (more specific than the prompt owner).
+    if (parent) {
+      const parentRow = await db.collection("comments").findOne({ _id: new ObjectId(parent) }, { projection: { authorEmail: 1 } });
+      await notify(parentRow?.authorEmail, "reply");
+    }
+    await notify(prompt?.ownerEmail, "comment");
+
+    // @mentions → resolve handles to emails and notify.
+    const handles = extractMentions(trimmed);
+    if (handles.length) {
+      const users = await db.collection("users").find({ handle: { $in: handles } }, { projection: { email: 1 } }).toArray();
+      for (const u of users) await notify(u.email, "mention");
     }
   } catch {
     /* notifications are best-effort */
@@ -51,6 +79,7 @@ export async function listComments(db: Db, promptId: string): Promise<Comment[]>
       promptId: r.promptId,
       body: r.body,
       author: { email: r.authorEmail, name: u?.name || r.authorEmail.split("@")[0], image: u?.image ?? null },
+      parentId: r.parentId ?? null,
       createdAt: r.createdAt,
     };
   });
