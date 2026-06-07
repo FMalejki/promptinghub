@@ -43,7 +43,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 
 ### Phase 4 — Discovery & pool
 - ⬜ 11. Seed 20–30 real prompts + `public` flag + seed script
-- ⬜ 12. Tag/model filters, sort (newest/popular)
+- ✅ 12. Model filter + sort (recent/popular/most-copied) — PR #16
 - ⬜ 13. Stars/likes + counts
 - ✅ 14. Copy/usage counter — PR #15
 
@@ -84,4 +84,5 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - Durability: `caffeinate -dimsu` running to stop Mac sleep; keep terminal/Claude session open or local loop can't fire. ALWAYS end a loop turn with ScheduleWakeup so it re-arms.
 - PR #14 merged: edit/delete own prompts — owner-scoped updatePrompt/deletePrompt ({_id, ownerEmail}), PUT/DELETE /api/prompts/[id] (session auth, 404 non-owner), /prompt/[id]/edit multi-file form + delete button, owner-only Edit button now resolves. 94 tests. Deployed.
 - PR #15 merged: copy/usage counter — incrementCopyCount (atomic $inc), copyCount in detail objects, POST /api/prompts/[id]/copy, CLI manifest install counts, detail-view badge + CopyButton onCopy. 98 tests. Verified live (0→POST→1 persisted). NOTE: Vercel build occasionally hangs at UNKNOWN status (one stuck deploy this session) — redeploy fresh in foreground capturing stdout JSON for the URL; alias only a READY deploy.
+- PR #16 merged: discovery — sort=copied (most-copied), ?model= filter (testedModels.modelId), copyCount on list items, "Most copied" browse button. Fixed a real privacy bug: search $or was overwriting the privacy $or (private prompts could leak under a text query) → now combined with $and + regression test. 102 tests. Verified live (sort order correct, model filter 17→2 all-match). NOTE: browse is a "use client" page — UI text isn't in SSR HTML, so curl-grep can't see buttons; verify client UI via Preview MCP or trust tsc + identical-sibling pattern.
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
