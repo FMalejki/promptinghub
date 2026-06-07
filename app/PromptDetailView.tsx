@@ -8,6 +8,8 @@ import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
 import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
+import { pickReadme } from "@/lib/markdown";
+import { Markdown } from "./Markdown";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -88,6 +90,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const filled = useMemo(() => files.map((f) => ({ ...f, content: applyVariables(f.content, values) })), [files, values]);
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
+  const readme = useMemo(() => pickReadme(files), [files]);
   const installRef = prompt.handle && prompt.slug ? `${prompt.handle}/${prompt.slug}` : null;
   const author = prompt.author;
   const canEdit = session?.user?.email === author.email;
@@ -228,6 +231,13 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </label>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* README (rendered markdown), shown above the files when present */}
+      {readme && (
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <Markdown src={readme} />
         </div>
       )}
 
