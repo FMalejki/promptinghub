@@ -67,3 +67,36 @@ export async function updateProfile(db: Db, email: string, patch: { name?: strin
   await db.collection("users").updateOne({ email }, { $set: set });
   return getProfile(db, email);
 }
+
+export type DeleteAccountSummary = { prompts: number; collections: number; comments: number; apiKeys: number };
+
+/**
+ * Permanently delete an account and everything it owns: prompts (+ their version
+ * snapshots), collections, comments, API keys, and the user record. Also pulls
+ * the user out of every other prompt's starredBy / sharedWith. Favorites live on
+ * the user doc and go with it. Returns counts, or null if the account is unknown.
+ */
+export async function deleteAccount(db: Db, email: string): Promise<DeleteAccountSummary | null> {
+  const user = await db.collection("users").findOne({ email });
+  if (!user) return null;
+
+  const ownedPrompts = await db.collection("prompts").find({ ownerEmail: email }, { projection: { _id: 1 } }).toArray();
+  const promptIds = ownedPrompts.map((p) => p._id.toString());
+  if (promptIds.length) {
+    await db.collection("promptVersions").deleteMany({ promptId: { $in: promptIds } });
+  }
+
+  const prompts = (await db.collection("prompts").deleteMany({ ownerEmail: email })).deletedCount || 0;
+  const collections = (await db.collection("collections").deleteMany({ ownerEmail: email })).deletedCount || 0;
+  const comments = (await db.collection("comments").deleteMany({ authorEmail: email })).deletedCount || 0;
+  const apiKeys = (await db.collection("apiKeys").deleteMany({ ownerEmail: email })).deletedCount || 0;
+
+  // Remove this user from other people's prompts (stars + shares).
+  await db.collection("prompts").updateMany(
+    { $or: [{ starredBy: email }, { sharedWith: email }] },
+    { $pull: { starredBy: email, sharedWith: email } } as any,
+  );
+
+  await db.collection("users").deleteOne({ email });
+  return { prompts, collections, comments, apiKeys };
+}
