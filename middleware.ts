@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { frameHeaders } from "@/lib/securityHeaders";
+import { securityHeaders } from "@/lib/securityHeaders";
 
-// Apply the clickjacking framing policy (see lib/securityHeaders) to every
-// document response. /embed/* stays framable cross-origin; everything else is
-// locked to same-origin.
+// Apply the security header policy (see lib/securityHeaders) to every document
+// response: baseline hardening everywhere, plus a framing policy where /embed/*
+// stays framable cross-origin and everything else is locked to same-origin.
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  for (const h of frameHeaders(req.nextUrl.pathname)) res.headers.set(h.name, h.value);
+  for (const h of securityHeaders(req.nextUrl.pathname)) res.headers.set(h.name, h.value);
   return res;
 }
 

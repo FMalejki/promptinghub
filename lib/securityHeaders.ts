@@ -5,8 +5,22 @@
 
 export type HeaderPair = { name: string; value: string };
 
+// Baseline hardening applied to every response (embed included): stop MIME
+// sniffing, trim the Referer sent cross-origin, and deny powerful APIs the app
+// never uses.
+export const BASELINE_HEADERS: HeaderPair[] = [
+  { name: "X-Content-Type-Options", value: "nosniff" },
+  { name: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { name: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
 export function isEmbedPath(pathname: string): boolean {
   return pathname === "/embed" || pathname.startsWith("/embed/");
+}
+
+// The full security header set for a path: baseline hardening + framing policy.
+export function securityHeaders(pathname: string): HeaderPair[] {
+  return [...BASELINE_HEADERS, ...frameHeaders(pathname)];
 }
 
 export function frameHeaders(pathname: string): HeaderPair[] {
