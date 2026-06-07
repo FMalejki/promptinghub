@@ -5,6 +5,8 @@ import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
 import { PromptOfDay } from "../components/PromptOfDay";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
+import { hasActiveFilters } from "@/lib/browseFilters";
+import Link from "next/link";
 
 type Author = { email: string; name: string; image: string | null };
 type Prompt = {
@@ -230,7 +232,32 @@ export default function BrowsePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No prompts found</h3>
-            <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
+            {hasActiveFilters({ q, category, tag, imageOnly }) ? (
+              <>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">Nothing matched your search or filters.</p>
+                <button
+                  onClick={() => {
+                    setQ("");
+                    setCategory(null);
+                    setTag(null);
+                    setImageOnly(false);
+                  }}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">Be the first to share one with the community.</p>
+                <Link
+                  href="/new"
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Create a prompt
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
