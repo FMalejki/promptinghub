@@ -5,7 +5,34 @@ import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
 
 type Row = { id: string; name: string; copyCount: number; stars: number; forkCount: number; isPrivate: boolean };
-type Analytics = { totals: { prompts: number; copies: number; stars: number; forks: number }; perPrompt: Row[] };
+type SeriesPoint = { day: string; count: number };
+type Analytics = { totals: { prompts: number; copies: number; stars: number; forks: number }; perPrompt: Row[]; series: SeriesPoint[] };
+
+function Sparkline({ series }: { series: SeriesPoint[] }) {
+  if (!series || series.length === 0) return null;
+  const w = 600;
+  const h = 80;
+  const max = Math.max(1, ...series.map((p) => p.count));
+  const dx = series.length > 1 ? w / (series.length - 1) : 0;
+  const pts = series.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
+  const total = series.reduce((s, p) => s + p.count, 0);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Copies — last 14 days</h2>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{total} total</span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
+        <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="flex justify-between mt-1 text-[10px] text-gray-400">
+        <span>{series[0]?.day.slice(5)}</span>
+        <span>{series[series.length - 1]?.day.slice(5)}</span>
+      </div>
+    </div>
+  );
+}
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -54,6 +81,8 @@ export default function DashboardPage() {
               <Stat label="Total stars" value={data.totals.stars} />
               <Stat label="Total forks" value={data.totals.forks} />
             </div>
+
+            <Sparkline series={data.series} />
 
             {data.perPrompt.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">

@@ -427,6 +427,12 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
   );
   const doc = (res as { value?: { copyCount?: number } } | null)?.value ?? (res as { copyCount?: number } | null);
   if (!doc || typeof doc.copyCount !== "number") return null;
+  // Log a copy event for over-time analytics (best-effort).
+  try {
+    await db.collection("copyEvents").insertOne({ promptId: id, createdAt: new Date() });
+  } catch {
+    /* analytics is best-effort */
+  }
   return doc.copyCount;
 }
 
