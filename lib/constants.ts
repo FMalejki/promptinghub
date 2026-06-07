@@ -20,6 +20,7 @@ export const PROMPT_CATEGORIES = [
   "Content Creation",
   "Brainstorming",
   "Fun",
+  "Image Generation",
 ] as const;
 
 export type PromptCategory = typeof PROMPT_CATEGORIES[number];

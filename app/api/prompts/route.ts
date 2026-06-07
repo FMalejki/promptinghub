@@ -11,6 +11,7 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q") || undefined;
   const category = url.searchParams.get("category") || undefined;
   const model = url.searchParams.get("model") || undefined;
+  const imageOnly = url.searchParams.get("image") === "1";
   const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied") || "recent";
   const ownerEmail = url.searchParams.get("owner") || undefined;
 
@@ -19,6 +20,7 @@ export async function GET(req: Request) {
     q,
     category,
     model,
+    imageOnly,
     sort,
     ownerEmail,
     includePrivate: !!session?.user?.email,

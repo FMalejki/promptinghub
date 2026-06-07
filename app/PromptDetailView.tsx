@@ -12,6 +12,7 @@ import { pickReadme } from "@/lib/markdown";
 import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
+import { isImagePrompt, imageModelHome } from "@/lib/imageModels";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -106,6 +107,10 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => pickReadme(files), [files]);
   const installRef = prompt.handle && prompt.slug ? `${prompt.handle}/${prompt.slug}` : null;
+  const imageGen = isImagePrompt({ testedModels: prompt.testedModels, category: prompt.category });
+  const imageGenLinks = (prompt.testedModels || [])
+    .map((m) => ({ modelId: m.modelId, href: imageModelHome(m.modelId) }))
+    .filter((l): l is { modelId: string; href: string } => l.href !== null);
   const author = prompt.author;
   const canEdit = session?.user?.email === author.email;
 
@@ -225,6 +230,26 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 {model.version && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Version: {model.version}</div>}
                 {model.notes && <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 italic">{model.notes}</p>}
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Image-gen: quick links to each tested image model's playground */}
+      {imageGen && imageGenLinks.length > 0 && (
+        <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+          <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-300 mb-3">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Image-generation prompt — open a model to run it
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {imageGenLinks.map((l) => (
+              <a key={l.modelId} href={l.href} target="_blank" rel="noopener noreferrer"
+                className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+                Open {getModelName(l.modelId)} ↗
+              </a>
             ))}
           </div>
         </div>
