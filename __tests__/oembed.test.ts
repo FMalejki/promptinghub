@@ -1,7 +1,36 @@
-import { buildOEmbed, embedHtml, oembedDiscoveryUrl } from "../lib/oembed";
+import { buildOEmbed, embedHtml, oembedDiscoveryUrl, parseOEmbedTarget } from "../lib/oembed";
 
 const base = "https://example.com";
 const prompt = { id: "abc123", name: "SEO Title Writer", author: { name: "Ada" } };
+
+describe("parseOEmbedTarget", () => {
+  const id = "6a246476f014ab933b615829";
+
+  it("resolves a /prompt/<id> url to an id target", () => {
+    expect(parseOEmbedTarget(`https://x.com/prompt/${id}`)).toEqual({ kind: "id", id });
+  });
+
+  it("resolves an /embed/<id> url to an id target", () => {
+    expect(parseOEmbedTarget(`https://x.com/embed/${id}?foo=1`)).toEqual({ kind: "id", id });
+  });
+
+  it("resolves a namespaced /p/<handle>/<slug> url to a handle target", () => {
+    expect(parseOEmbedTarget("https://x.com/p/ada/code-reviewer")).toEqual({
+      kind: "handle",
+      handle: "ada",
+      slug: "code-reviewer",
+    });
+  });
+
+  it("prefers the id form when both could match", () => {
+    expect(parseOEmbedTarget(`https://x.com/prompt/${id}`)).toEqual({ kind: "id", id });
+  });
+
+  it("returns null for an unrelated or malformed url", () => {
+    expect(parseOEmbedTarget("https://x.com/browse")).toBeNull();
+    expect(parseOEmbedTarget("https://x.com/prompt/not-an-id")).toBeNull();
+  });
+});
 
 describe("oembedDiscoveryUrl", () => {
   it("builds a /api/oembed discovery url with the target url-encoded and format=json", () => {

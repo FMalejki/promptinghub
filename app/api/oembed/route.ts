@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getPromptDetail } from "@/lib/prompts";
-import { buildOEmbed } from "@/lib/oembed";
+import { getPromptDetail, getPromptDetailByHandleAndSlug } from "@/lib/prompts";
+import { buildOEmbed, parseOEmbedTarget } from "@/lib/oembed";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
-// oEmbed endpoint: ?url=<prompt or embed url>[&maxwidth=&maxheight=].
-// Resolves the prompt id from either /prompt/<id> or /embed/<id>.
+// oEmbed endpoint: ?url=<prompt url>[&maxwidth=&maxheight=].
+// Accepts /prompt/<id>, /embed/<id>, or the canonical /p/<handle>/<slug> form.
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const url = searchParams.get("url");
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
 
-  const m = url.match(/\/(?:prompt|embed)\/([a-f0-9]{24})/i);
-  if (!m) return NextResponse.json({ error: "Unrecognized url" }, { status: 404 });
+  const target = parseOEmbedTarget(url);
+  if (!target) return NextResponse.json({ error: "Unrecognized url" }, { status: 404 });
 
   const num = (k: string) => {
     const v = Number(searchParams.get(k));
@@ -21,7 +21,10 @@ export async function GET(req: Request) {
   };
 
   const db = await getDb();
-  const prompt = await getPromptDetail(db, m[1]);
+  const prompt =
+    target.kind === "id"
+      ? await getPromptDetail(db, target.id)
+      : await getPromptDetailByHandleAndSlug(db, target.handle, target.slug);
   if (!prompt || prompt.isPrivate) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const payload = buildOEmbed(
