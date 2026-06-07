@@ -26,6 +26,56 @@ export async function getUserByHandle(db: Db, handle: string): Promise<(Profile 
   return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle } : null;
 }
 
+export type TopCreator = {
+  handle: string;
+  name: string;
+  image: string | null;
+  verified: boolean;
+  prompts: number;
+  stars: number;
+  followers: number;
+};
+
+// Leaderboard of creators (must have a handle), ranked by followers*3 + stars + prompts.
+export async function topCreators(db: Db, limit = 20): Promise<TopCreator[]> {
+  // Public prompt counts + star sums per owner.
+  const promptAgg = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { isPrivate: { $ne: true } } },
+      { $group: { _id: "$ownerEmail", prompts: { $sum: 1 }, stars: { $sum: { $size: { $ifNull: ["$starredBy", []] } } } } },
+    ])
+    .toArray();
+  if (!promptAgg.length) return [];
+
+  // Follower counts per creator email.
+  const followAgg = await db.collection("follows").aggregate([{ $group: { _id: "$targetEmail", n: { $sum: 1 } } }]).toArray();
+  const followersByEmail = new Map(followAgg.map((f: any) => [f._id as string, f.n as number]));
+
+  const emails = promptAgg.map((p: any) => p._id as string);
+  const users = await db.collection("users").find({ email: { $in: emails } }).toArray();
+  const userByEmail = new Map(users.map((u) => [u.email, u]));
+
+  const creators: TopCreator[] = [];
+  for (const p of promptAgg as any[]) {
+    const u = userByEmail.get(p._id);
+    if (!u?.handle) continue; // only creators with a public handle
+    const followers = followersByEmail.get(p._id) || 0;
+    creators.push({
+      handle: u.handle,
+      name: u.name || (p._id as string).split("@")[0],
+      image: u.image ?? null,
+      verified: isVerifiedHandle(u.handle),
+      prompts: p.prompts,
+      stars: p.stars,
+      followers,
+    });
+  }
+
+  const score = (c: TopCreator) => c.followers * 3 + c.stars + c.prompts;
+  return creators.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name)).slice(0, limit);
+}
+
 // True only when the account's handle is a verified one (used to gate curation).
 export async function isVerifiedEmail(db: Db, email: string): Promise<boolean> {
   const row = await db.collection("users").findOne({ email });
