@@ -45,7 +45,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - ⬜ 11. Seed 20–30 real prompts + `public` flag + seed script
 - ⬜ 12. Tag/model filters, sort (newest/popular)
 - ⬜ 13. Stars/likes + counts
-- ⬜ 14. Copy/usage counter
+- ✅ 14. Copy/usage counter — PR #15
 
 ### Phase 5 — Polish
 - ✅ 15. Landing page explaining the product (replace bare redirect) — PR #6
@@ -83,4 +83,5 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - NEXT: (d) X/Twitter daily ingest (pluggable importer + cron, honest re ToS); (e) check Filip's app/user/[email] already lists a user's prompts (likely yes — skip if so); (f) HF-style feature proposals for Adrian to approve; (g) prep `npm pack` for CLI when Adrian says go. for my injected detail sections (file panels/customize/install are light-only islands); (c) real `promptinghub` CLI package for `npx promptinghub add owner/slug` (Filip: "trzeba package jak gh"); (d) manifest/download endpoint; (e) X/Twitter daily prompt ingestion (pluggable importer + cron; honest about ToS/API-key); (f) fix broken prompt images (some are imgur album links not direct); (g) tags work parked on `ns/10-tags` (maybe drop — Filip uses categories+testedModels); (h) HF-inspired extras to propose to Adrian for approval.
 - Durability: `caffeinate -dimsu` running to stop Mac sleep; keep terminal/Claude session open or local loop can't fire. ALWAYS end a loop turn with ScheduleWakeup so it re-arms.
 - PR #14 merged: edit/delete own prompts — owner-scoped updatePrompt/deletePrompt ({_id, ownerEmail}), PUT/DELETE /api/prompts/[id] (session auth, 404 non-owner), /prompt/[id]/edit multi-file form + delete button, owner-only Edit button now resolves. 94 tests. Deployed.
+- PR #15 merged: copy/usage counter — incrementCopyCount (atomic $inc), copyCount in detail objects, POST /api/prompts/[id]/copy, CLI manifest install counts, detail-view badge + CopyButton onCopy. 98 tests. Verified live (0→POST→1 persisted). NOTE: Vercel build occasionally hangs at UNKNOWN status (one stuck deploy this session) — redeploy fresh in foreground capturing stdout JSON for the URL; alias only a READY deploy.
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
