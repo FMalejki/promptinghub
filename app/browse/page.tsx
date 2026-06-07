@@ -30,6 +30,14 @@ export default function BrowsePage() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setStats)
+      .catch(() => {});
+  }, []);
 
   // Seed the tag filter from ?tag= so /browse?tag=seo deep-links work.
   useEffect(() => {
@@ -77,6 +85,13 @@ export default function BrowsePage() {
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Browse, share, and discover the best prompts for your AI workflows
           </p>
+          {stats && stats.prompts > 0 && (
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{stats.prompts.toLocaleString()}</span> prompts ·{" "}
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{stats.creators.toLocaleString()}</span> creators ·{" "}
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{stats.copies.toLocaleString()}</span> copies
+            </p>
+          )}
           {tag && (
             <div className="mt-4 flex justify-center">
               <button
