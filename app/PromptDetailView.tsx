@@ -21,6 +21,7 @@ import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
 import { promptStats } from "@/lib/promptStats";
+import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -72,6 +73,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
+  const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
+
+  // On load, if the URL carries a #file=… anchor, scroll to that file and flash it.
+  useEffect(() => {
+    const path = parseFileAnchor(window.location.hash);
+    if (!path) return;
+    setAnchoredFile(path);
+    const el = document.getElementById(fileAnchorId(path));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setAnchoredFile(null), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Record a view once per page load (soft signal, best-effort).
   useEffect(() => {
@@ -447,13 +460,32 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
         </div>
         {filled.map((f) => (
-          <div key={f.path} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div
+            key={f.path}
+            id={fileAnchorId(f.path)}
+            className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
+              anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
+            }`}
+          >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
                 <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
               </div>
-              <CopyButton text={f.content} />
+              <div className="flex items-center gap-2 shrink-0">
+                {multi && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
+                    }}
+                    title="Copy a link to this file"
+                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                  >
+                    Link
+                  </button>
+                )}
+                <CopyButton text={f.content} />
+              </div>
             </div>
             <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed">{f.content}</pre>
           </div>
