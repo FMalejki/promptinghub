@@ -65,6 +65,24 @@ describe("listPrompts (public pool)", () => {
     const rows = await listPrompts(db, { category: "Writing" });
     expect(rows.map((r) => r.name).sort()).toEqual(["Polish translator", "Summarize"]);
   });
+
+  it("returns the whole pool when no limit is given (backward compatible)", async () => {
+    expect(await listPrompts(db)).toHaveLength(3);
+  });
+
+  it("applies a limit (newest-first page)", async () => {
+    const rows = await listPrompts(db, { limit: 2 });
+    expect(rows.map((r) => r.name)).toEqual(["Polish translator", "Code review"]);
+  });
+
+  it("applies skip + limit for the next page", async () => {
+    const rows = await listPrompts(db, { limit: 2, skip: 2 });
+    expect(rows.map((r) => r.name)).toEqual(["Summarize"]);
+  });
+
+  it("skip past the end yields an empty page", async () => {
+    expect(await listPrompts(db, { skip: 99 })).toEqual([]);
+  });
 });
 
 describe("listCategories (global)", () => {

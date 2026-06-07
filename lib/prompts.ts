@@ -85,6 +85,10 @@ export type ListOpts = {
   sort?: "recent" | "popular" | "copied" | "trending" | "viewed";
   includePrivate?: boolean;
   userEmail?: string;
+  // Optional pagination. When omitted, the full matching pool is returned
+  // (backward compatible — sitemap/feeds/profile rely on this).
+  limit?: number;
+  skip?: number;
 };
 
 export type NewPromptFile = { path: string; content: string; language?: string };
@@ -176,24 +180,28 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
       ? { viewCount: -1, createdAt: -1 }
       : { createdAt: -1, _id: -1 };
 
-  const rows = await db
-    .collection("prompts")
-    .aggregate([
-      { $match: match },
-      {
-        $addFields: {
-          stars: { $size: { $ifNull: ["$starredBy", []] } },
-          copyCount: { $ifNull: ["$copyCount", 0] },
-          viewCount: { $ifNull: ["$viewCount", 0] },
-          // Trending = copies + stars (recency breaks ties via the $sort below).
-          trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
-        },
+  const pipeline: Record<string, unknown>[] = [
+    { $match: match },
+    {
+      $addFields: {
+        stars: { $size: { $ifNull: ["$starredBy", []] } },
+        copyCount: { $ifNull: ["$copyCount", 0] },
+        viewCount: { $ifNull: ["$viewCount", 0] },
+        // Trending = copies + stars (recency breaks ties via the $sort below).
+        trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
       },
-      { $sort: sortField },
-      { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
-      { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
-    ])
-    .toArray();
+    },
+    { $sort: sortField },
+  ];
+  // Paginate after sorting (before the user lookup, so we only join one page).
+  if (opts.skip && opts.skip > 0) pipeline.push({ $skip: Math.floor(opts.skip) });
+  if (opts.limit && opts.limit > 0) pipeline.push({ $limit: Math.floor(opts.limit) });
+  pipeline.push(
+    { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
+    { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+  );
+
+  const rows = await db.collection("prompts").aggregate(pipeline).toArray();
 
   return rows.map((r: any) => ({
     id: r._id.toString(),

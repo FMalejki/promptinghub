@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { listPrompts, createPrompt } from "@/lib/prompts";
 import { newPromptSchema } from "@/lib/promptInput";
 import { rankBySearch } from "@/lib/search";
+import { parseLimit, parseOffset, nextOffset } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -16,6 +17,8 @@ export async function GET(req: Request) {
   const tag = url.searchParams.get("tag") || undefined;
   const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied" | "viewed") || "recent";
   const ownerEmail = url.searchParams.get("owner") || undefined;
+  const limit = parseLimit(url.searchParams.get("limit"));
+  const offset = parseOffset(url.searchParams.get("offset"));
 
   const db = await getDb();
   const prompts = await listPrompts(db, {
@@ -28,11 +31,16 @@ export async function GET(req: Request) {
     ownerEmail,
     includePrivate: !!session?.user?.email,
     userEmail: session?.user?.email || undefined,
+    // Search re-ranks in-memory below, so it needs the full set — paginate it
+    // after ranking. Everything else paginates at the DB.
+    ...(q ? {} : { limit, skip: offset }),
   });
 
   // When searching, order by relevance (name > tags > description) instead of the default sort.
-  const ranked = q ? rankBySearch(q, prompts) : prompts;
-  return NextResponse.json({ prompts: ranked });
+  let ranked = q ? rankBySearch(q, prompts) : prompts;
+  if (q && limit !== undefined) ranked = ranked.slice(offset, offset + limit);
+
+  return NextResponse.json({ prompts: ranked, nextOffset: nextOffset(ranked.length, limit, offset) });
 }
 
 export async function POST(req: Request) {
