@@ -7,6 +7,7 @@ import { Avatar } from "./Avatar";
 import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
 import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
+import { buildForkInput } from "@/lib/fork";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -36,6 +37,26 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [isStarred, setIsStarred] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
+  const [forking, setForking] = useState(false);
+
+  async function handleFork() {
+    if (!session?.user?.email) {
+      router.push("/login");
+      return;
+    }
+    setForking(true);
+    const res = await fetch("/api/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildForkInput(prompt, values)),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      router.push(`/prompt/${created.id}`);
+    } else {
+      setForking(false);
+    }
+  }
 
   async function toggleStar() {
     if (!session?.user?.email) {
@@ -120,6 +141,19 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </svg>
               <span>{stars}</span>
             </button>
+
+            <button
+              onClick={handleFork}
+              disabled={forking}
+              title={vars.length > 0 ? "Save a copy with your filled-in values" : "Save a copy to your account"}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7a2 2 0 110-4 2 2 0 010 4zm0 0v1a2 2 0 002 2h4a2 2 0 002 2v1m0 0a2 2 0 100 4 2 2 0 000-4z" />
+              </svg>
+              <span>{forking ? "Forking…" : "Fork"}</span>
+            </button>
+
             {canEdit && (
               <Link href={`/prompt/${prompt.id}/edit`} className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition-colors">
                 Edit
