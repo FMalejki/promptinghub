@@ -11,6 +11,7 @@ import { buildForkInput } from "@/lib/fork";
 import { pickReadme } from "@/lib/markdown";
 import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
+import { SaveToCollection } from "./SaveToCollection";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -190,6 +191,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </svg>
               <span>{forking ? "Forking…" : "Fork"}</span>
             </button>
+
+            <SaveToCollection promptId={prompt.id} />
 
             {canEdit && (
               <Link href={`/prompt/${prompt.id}/edit`} className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition-colors">
