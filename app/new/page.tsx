@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES, AI_MODELS } from "@/lib/constants";
+import { PromptQuality } from "../components/PromptQuality";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -423,6 +424,11 @@ export default function NewPromptPage() {
               + Add file
             </button>
           </div>
+
+          {/* Prompt quality (advisory, computed live in the browser) */}
+          <PromptQuality
+            text={[form.description, ...files.map((f) => f.content)].filter(Boolean).join("\n\n")}
+          />
 
           {/* Tested Models */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
