@@ -68,6 +68,71 @@ export async function updateProfile(db: Db, email: string, patch: { name?: strin
   return getProfile(db, email);
 }
 
+export type ExportedPrompt = {
+  name: string;
+  description: string;
+  category: string;
+  body: string;
+  files: unknown;
+  tags: string[];
+  isPrivate: boolean;
+  priceCents: number;
+  copyCount: number;
+  createdAt: Date;
+};
+export type ExportedCollection = { name: string; description: string; slug: string; promptIds: string[]; createdAt: Date };
+export type AccountExport = {
+  email: string;
+  profile: { email: string; name: string; image: string | null; handle: string | null; createdAt: Date | null };
+  prompts: ExportedPrompt[];
+  collections: ExportedCollection[];
+  exportedAt: Date;
+};
+
+/**
+ * A portable, sanitized snapshot of everything an account owns — for a
+ * "download my data" button. Never includes the password hash. Returns null
+ * if the account is unknown.
+ */
+export async function exportAccountData(db: Db, email: string): Promise<AccountExport | null> {
+  const user = await db.collection("users").findOne({ email });
+  if (!user) return null;
+
+  const promptRows = await db.collection("prompts").find({ ownerEmail: email }).sort({ createdAt: 1 }).toArray();
+  const collectionRows = await db.collection("collections").find({ ownerEmail: email }).sort({ createdAt: 1 }).toArray();
+
+  return {
+    email,
+    profile: {
+      email: user.email,
+      name: user.name ?? email.split("@")[0],
+      image: user.image ?? null,
+      handle: user.handle ?? null,
+      createdAt: user.createdAt ?? null,
+    },
+    prompts: promptRows.map((p) => ({
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      body: p.body ?? "",
+      files: p.files ?? null,
+      tags: p.tags ?? [],
+      isPrivate: !!p.isPrivate,
+      priceCents: p.priceCents ?? 0,
+      copyCount: p.copyCount ?? 0,
+      createdAt: p.createdAt,
+    })),
+    collections: collectionRows.map((c) => ({
+      name: c.name,
+      description: c.description ?? "",
+      slug: c.slug,
+      promptIds: c.promptIds ?? [],
+      createdAt: c.createdAt,
+    })),
+    exportedAt: new Date(),
+  };
+}
+
 export type DeleteAccountSummary = { prompts: number; collections: number; comments: number; apiKeys: number };
 
 /**
