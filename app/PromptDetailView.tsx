@@ -17,6 +17,7 @@ import { isVerifiedHandle } from "@/lib/verified";
 import { formatPrice, isPaid } from "@/lib/pricing";
 import { Comments } from "./Comments";
 import { VersionHistory } from "./VersionHistory";
+import { ApiSnippet } from "./ApiSnippet";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -402,6 +403,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         </div>
       )}
+
+      {/* Use via API */}
+      {!prompt.isPrivate && <ApiSnippet promptId={prompt.id} />}
 
       {/* Version history */}
       <VersionHistory
