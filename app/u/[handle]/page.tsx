@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { getCreatorProfile } from "@/lib/users";
+import { creatorJsonLd } from "@/lib/jsonLd";
 import { CreatorClient } from "./CreatorClient";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
 export async function generateMetadata({ params }: { params: { handle: string } }): Promise<Metadata> {
   try {
@@ -21,6 +24,21 @@ export async function generateMetadata({ params }: { params: { handle: string } 
   }
 }
 
-export default function CreatorPage({ params }: { params: { handle: string } }) {
-  return <CreatorClient handle={params.handle} />;
+async function creatorLdJson(handle: string): Promise<string | null> {
+  try {
+    const creator = await getCreatorProfile(await getDb(), handle);
+    return creator ? JSON.stringify(creatorJsonLd(creator, SITE_URL)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function CreatorPage({ params }: { params: { handle: string } }) {
+  const ld = await creatorLdJson(params.handle);
+  return (
+    <>
+      {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld }} />}
+      <CreatorClient handle={params.handle} />
+    </>
+  );
 }
