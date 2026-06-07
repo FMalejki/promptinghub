@@ -50,7 +50,7 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 ### Phase 5 — Polish
 - ✅ 15. Landing page explaining the product (replace bare redirect) — PR #6
 - ⬜ 16. Profile shows a user's prompts
-- ⬜ 17. Edit/delete own prompts
+- ✅ 17. Edit/delete own prompts — PR #14
 - ⬜ 18. Empty/loading/error states, responsive pass
 - ⬜ 19. Repo README + CONTRIBUTING
 - ⬜ 20. Full E2E click-through verification
@@ -82,4 +82,5 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - Verified live (Adrian, 2026-06-07): `npx <path-to-cli> add filipmalejki/...` works through npx itself (downloaded prompt.txt). Bare `npx promptinghub` still needs `npm publish` (npm account). Asked Adrian if he wants publish-prep or keep building.
 - NEXT: (d) X/Twitter daily ingest (pluggable importer + cron, honest re ToS); (e) check Filip's app/user/[email] already lists a user's prompts (likely yes — skip if so); (f) HF-style feature proposals for Adrian to approve; (g) prep `npm pack` for CLI when Adrian says go. for my injected detail sections (file panels/customize/install are light-only islands); (c) real `promptinghub` CLI package for `npx promptinghub add owner/slug` (Filip: "trzeba package jak gh"); (d) manifest/download endpoint; (e) X/Twitter daily prompt ingestion (pluggable importer + cron; honest about ToS/API-key); (f) fix broken prompt images (some are imgur album links not direct); (g) tags work parked on `ns/10-tags` (maybe drop — Filip uses categories+testedModels); (h) HF-inspired extras to propose to Adrian for approval.
 - Durability: `caffeinate -dimsu` running to stop Mac sleep; keep terminal/Claude session open or local loop can't fire. ALWAYS end a loop turn with ScheduleWakeup so it re-arms.
+- PR #14 merged: edit/delete own prompts — owner-scoped updatePrompt/deletePrompt ({_id, ownerEmail}), PUT/DELETE /api/prompts/[id] (session auth, 404 non-owner), /prompt/[id]/edit multi-file form + delete button, owner-only Edit button now resolves. 94 tests. Deployed.
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
