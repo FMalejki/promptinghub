@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
+import { weekOverWeek } from "@/lib/analyticsSummary";
 
 type Row = { id: string; name: string; copyCount: number; stars: number; forkCount: number; isPrivate: boolean };
 type SeriesPoint = { day: string; count: number };
@@ -16,12 +17,33 @@ function Sparkline({ series }: { series: SeriesPoint[] }) {
   const dx = series.length > 1 ? w / (series.length - 1) : 0;
   const pts = series.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
   const total = series.reduce((s, p) => s + p.count, 0);
+  const trend = weekOverWeek(series);
+  const trendColor =
+    trend.direction === "up"
+      ? "text-green-600 dark:text-green-400"
+      : trend.direction === "down"
+      ? "text-red-600 dark:text-red-400"
+      : "text-gray-500 dark:text-gray-400";
+  const trendLabel =
+    trend.deltaPct === null
+      ? trend.recent > 0
+        ? "new this week"
+        : null
+      : `${trend.deltaPct > 0 ? "+" : ""}${trend.deltaPct}% vs last week`;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Copies — last 14 days</h2>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{total} total</span>
+        <div className="flex items-baseline gap-2">
+          {trendLabel && (
+            <span className={`text-xs font-medium ${trendColor}`}>
+              {trend.direction === "up" ? "▲ " : trend.direction === "down" ? "▼ " : ""}
+              {trendLabel}
+            </span>
+          )}
+          <span className="text-xs text-gray-500 dark:text-gray-400">{total} total</span>
+        </div>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
         <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
