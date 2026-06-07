@@ -13,6 +13,24 @@ export type JsonLdPrompt = {
   updatedAt: Date | null;
 };
 
+// schema.org WebSite for the whole site, with a SearchAction so Google can show
+// a sitelinks search box that queries our /browse page directly. Emitted once in
+// the root layout. Pure.
+export function siteJsonLd(baseUrl: string): Record<string, any> {
+  const base = baseUrl.replace(/\/+$/, "");
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "PromptingHub",
+    url: base,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${base}/browse?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
 export function promptJsonLd(p: JsonLdPrompt, baseUrl: string): Record<string, any> {
   const base = baseUrl.replace(/\/+$/, "");
   const published = new Date(p.createdAt).toISOString();

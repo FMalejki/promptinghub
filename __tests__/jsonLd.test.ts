@@ -1,6 +1,29 @@
-import { promptJsonLd } from "../lib/jsonLd";
+import { promptJsonLd, siteJsonLd } from "../lib/jsonLd";
 
 const base = "https://promptinghub.app";
+
+describe("siteJsonLd", () => {
+  it("describes the site as a WebSite with a name and canonical url", () => {
+    const ld = siteJsonLd(base);
+    expect(ld["@context"]).toBe("https://schema.org");
+    expect(ld["@type"]).toBe("WebSite");
+    expect(ld.name).toBe("PromptingHub");
+    expect(ld.url).toBe(base);
+  });
+
+  it("exposes a SearchAction targeting browse with the {search_term_string} template", () => {
+    const ld = siteJsonLd(base);
+    expect(ld.potentialAction["@type"]).toBe("SearchAction");
+    expect(ld.potentialAction.target.urlTemplate).toBe(`${base}/browse?q={search_term_string}`);
+    expect(ld.potentialAction["query-input"]).toBe("required name=search_term_string");
+  });
+
+  it("trims a trailing slash on the base url", () => {
+    const ld = siteJsonLd("https://promptinghub.app/");
+    expect(ld.url).toBe("https://promptinghub.app");
+    expect(ld.potentialAction.target.urlTemplate).toBe("https://promptinghub.app/browse?q={search_term_string}");
+  });
+});
 
 const detail = {
   id: "abc123",

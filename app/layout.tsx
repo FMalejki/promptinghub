@@ -2,6 +2,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { siteJsonLd } from "@/lib/jsonLd";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
@@ -21,6 +22,12 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd(SITE_URL)) }}
+        />
+      </head>
       <body className="bg-gray-50 dark:bg-gray-900 transition-colors">
         <Providers>{children}</Providers>
         <Analytics />
