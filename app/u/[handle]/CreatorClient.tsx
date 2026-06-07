@@ -7,7 +7,16 @@ import { PromptCard } from "../../components/PromptCard";
 import { Avatar } from "../../Avatar";
 import { FollowButton } from "../../FollowButton";
 
-type Creator = { handle: string; name: string; image: string | null; verified: boolean };
+type Creator = {
+  handle: string;
+  name: string;
+  image: string | null;
+  verified: boolean;
+  bio?: string | null;
+  website?: string | null;
+  x?: string | null;
+  github?: string | null;
+};
 type Data = {
   creator: Creator;
   prompts: React.ComponentProps<typeof PromptCard>[];
@@ -59,6 +68,20 @@ export function CreatorClient({ handle }: { handle: string }) {
                   <div className="flex items-center gap-6 mt-3">
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{data.prompts.length}</span> <span className="text-sm text-gray-600 dark:text-gray-400">prompts</span></div>
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{totalStars}</span> <span className="text-sm text-gray-600 dark:text-gray-400">stars</span></div>
+                  </div>
+                  {data.creator.bio && (
+                    <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 max-w-xl">{data.creator.bio}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
+                    {data.creator.website && (
+                      <a href={data.creator.website} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Website</a>
+                    )}
+                    {data.creator.x && (
+                      <a href={`https://x.com/${data.creator.x.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">@{data.creator.x.replace(/^@/, "")} on X</a>
+                    )}
+                    {data.creator.github && (
+                      <a href={`https://github.com/${data.creator.github}`} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">GitHub</a>
+                    )}
                   </div>
                   <div className="mt-4">
                     <FollowButton handle={data.creator.handle} />
