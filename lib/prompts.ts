@@ -57,6 +57,8 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount: number;
   priceCents: number;
+  forkedFrom: { id: string; name: string } | null;
+  forkCount: number;
   createdAt: Date;
 };
 
@@ -85,6 +87,7 @@ export type NewPrompt = {
   isPrivate?: boolean;
   testedModels?: TestedModel[];
   priceCents?: number;
+  forkedFrom?: string;
 };
 
 const LANG_BY_EXT: Record<string, string> = {
@@ -205,6 +208,12 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     : undefined;
   const body = data.body ?? (files ? files.map((f) => f.content).join("\n\n") : "");
   const slug = await uniqueSlug(db, ownerEmail, data.name);
+  // Only record lineage when forkedFrom points at an existing prompt.
+  let forkedFrom: string | null = null;
+  if (data.forkedFrom && ObjectId.isValid(data.forkedFrom)) {
+    const src = await db.collection("prompts").findOne({ _id: new ObjectId(data.forkedFrom) }, { projection: { _id: 1 } });
+    if (src) forkedFrom = data.forkedFrom;
+  }
   const doc: Record<string, unknown> = {
     ownerEmail,
     name: data.name,
@@ -216,6 +225,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     isPrivate: !!data.isPrivate,
     testedModels: data.testedModels || [],
     priceCents: data.priceCents || 0,
+    forkedFrom,
     starredBy: [],
     sharedWith: [],
     createdAt: new Date(),
@@ -313,6 +323,13 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
   if (!row) return null;
   const u = await db.collection("users").findOne({ email: row.ownerEmail });
   const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  // Resolve lineage: the source this was forked from (if it still exists) and how many forks it has.
+  let forkedFrom: { id: string; name: string } | null = null;
+  if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
+    const src = await db.collection("prompts").findOne({ _id: new ObjectId(row.forkedFrom) }, { projection: { name: 1 } });
+    if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
+  }
+  const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -327,6 +344,8 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     priceCents: row.priceCents || 0,
+    forkedFrom,
+    forkCount,
     createdAt: row.createdAt,
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
@@ -393,6 +412,12 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
   const row = await db.collection("prompts").findOne({ ownerEmail: user.email, slug });
   if (!row) return null;
   const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  let forkedFrom: { id: string; name: string } | null = null;
+  if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
+    const src = await db.collection("prompts").findOne({ _id: new ObjectId(row.forkedFrom) }, { projection: { name: 1 } });
+    if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
+  }
+  const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -407,6 +432,8 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     priceCents: row.priceCents || 0,
+    forkedFrom,
+    forkCount,
     createdAt: row.createdAt,
     handle,
     slug,

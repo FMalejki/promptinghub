@@ -122,6 +122,8 @@ describe("getPromptDetail", () => {
       testedModels: [],
       copyCount: 0,
       priceCents: 0,
+      forkedFrom: null,
+      forkCount: 0,
       createdAt: new Date("2026-01-01"),
     });
   });
