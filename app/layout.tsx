@@ -13,6 +13,7 @@ export const metadata = {
     types: {
       "application/rss+xml": [{ url: "/feed.xml", title: "PromptingHub — Trending prompts" }],
       "application/feed+json": [{ url: "/feed.json", title: "PromptingHub — Trending prompts" }],
+      "application/opensearchdescription+xml": [{ url: "/opensearch.xml", title: "PromptingHub" }],
     },
   },
 };
