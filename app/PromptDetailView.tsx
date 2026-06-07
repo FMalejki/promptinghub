@@ -412,6 +412,14 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Use via API */}
       {!prompt.isPrivate && <ApiSnippet promptId={prompt.id} />}
 
+      {!prompt.isPrivate && (
+        <div className="mt-4">
+          <Link href={`/compare?a=${prompt.id}`} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+            ⇄ Compare this prompt with another
+          </Link>
+        </div>
+      )}
+
       {/* Version history */}
       <VersionHistory
         promptId={prompt.id}
