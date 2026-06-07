@@ -1,0 +1,16 @@
+{
+  "name": "promptinghub",
+  "version": "0.1.0",
+  "description": "Install prompts from PromptingHub — npx promptinghub add owner/slug",
+  "bin": {
+    "promptinghub": "index.js"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js"
+  ],
+  "license": "MIT"
+}
