@@ -41,18 +41,33 @@ export default function NotificationsPage() {
       .then((r) => (r.ok ? r.json() : { notifications: [] }))
       .then((d) => setItems(d.notifications || []))
       .catch(() => {})
-      .finally(() => {
-        setState("ok");
-        // Mark all read once viewed.
-        fetch("/api/notifications", { method: "POST" }).catch(() => {});
-      });
+      .finally(() => setState("ok"));
   }, [status]);
+
+  function markOne(id: string) {
+    setItems((xs) => xs.map((x) => (x.id === id ? { ...x, read: true } : x)));
+    fetch(`/api/notifications/${id}`, { method: "POST" }).catch(() => {});
+  }
+
+  function markAll() {
+    setItems((xs) => xs.map((x) => ({ ...x, read: true })));
+    fetch("/api/notifications", { method: "POST" }).catch(() => {});
+  }
+
+  const anyUnread = items.some((n) => !n.read);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Notifications</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+          {state === "ok" && anyUnread && (
+            <button onClick={markAll} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              Mark all read
+            </button>
+          )}
+        </div>
 
         {state === "anon" ? (
           <div className="text-center py-16 text-gray-500 dark:text-gray-400">
@@ -74,7 +89,15 @@ export default function NotificationsPage() {
               );
               return (
                 <li key={n.id}>
-                  {n.promptId ? <Link href={`/prompt/${n.promptId}`}>{inner}</Link> : inner}
+                  {n.promptId ? (
+                    <Link href={`/prompt/${n.promptId}`} onClick={() => markOne(n.id)}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <button onClick={() => markOne(n.id)} className="block w-full text-left">
+                      {inner}
+                    </button>
+                  )}
                 </li>
               );
             })}
