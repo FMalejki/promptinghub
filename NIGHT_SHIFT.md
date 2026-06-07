@@ -49,11 +49,11 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 
 ### Phase 5 — Polish
 - ✅ 15. Landing page explaining the product (replace bare redirect) — PR #6
-- ⬜ 16. Profile shows a user's prompts
+- ✅ 16. Profile shows a user's prompts — Filip (app/user/[email])
 - ✅ 17. Edit/delete own prompts — PR #14
-- ⬜ 18. Empty/loading/error states, responsive pass
-- ⬜ 19. Repo README + CONTRIBUTING
-- ⬜ 20. Full E2E click-through verification
+- ✅ 18. Empty/loading/error states (loading skeleton+empty by Filip; error/retry added) — PR #19
+- 🔄 19. Docs: docs/PROMPT-PACKAGES.md added (PR #19); root README is Filip's; CONTRIBUTING still TODO
+- ⬜ 20. Full E2E click-through verification (lots done ad-hoc via Preview MCP this session)
 
 ## Gotchas
 - Do NOT run `npm run build` while the Preview dev server is running — both share `.next`,
@@ -87,5 +87,5 @@ Deploy cmd: `npx vercel deploy --yes` then `npx vercel alias set <deploy-url> pr
 - PR #16 merged: discovery — sort=copied (most-copied), ?model= filter (testedModels.modelId), copyCount on list items, "Most copied" browse button. Fixed a real privacy bug: search $or was overwriting the privacy $or (private prompts could leak under a text query) → now combined with $and + regression test. 102 tests. Verified live (sort order correct, model filter 17→2 all-match). NOTE: browse is a "use client" page — UI text isn't in SSR HTML, so curl-grep can't see buttons; verify client UI via Preview MCP or trust tsc + identical-sibling pattern.
 - PR #17 merged: prompt import foundation — parsePastedPrompt (text/--- frontmatter → reviewable draft), POST /api/import (auth-gated, preview-only, never publishes), "Import from text" box on /new, pluggable PromptSource + env-gated twitterSource (official API only, no scraping, enabled:false without TWITTER_BEARER_TOKEN). Addresses the X/Twitter daily-ingest ask honestly. 112 tests. Verified live (401 auth-gate, 405 on GET). Daily-cron wiring + curation UI still TODO (needs paid X API token to actually pull).
 - PR #18 merged: README rendering — dependency-free lib/markdown.ts (parseBlocks/parseInline/pickReadme), safe (http(s)-only links, javascript: neutralized, React auto-escape, no dangerouslySetInnerHTML), <Markdown> renderer, detail page shows README.md above files. 121 tests. Deployed (no-regression 200; visual confirm pending a prompt that actually ships a README.md — none seeded yet).
-- Session tally (this run): 5 feature PRs — #14 edit/delete, #15 copy-counter, #16 discovery (+privacy bug fix), #17 import foundation, #18 README rendering. 121 tests.
+- Session tally (this run): 6 feature PRs — #14 edit/delete, #15 copy-counter, #16 discovery (+privacy bug fix), #17 import foundation, #18 README rendering, #19 cards copy-count + browse error/retry + docs/PROMPT-PACKAGES.md. 121 tests. Verified live via Preview MCP (detail dark-mode + copy badge=2; browse copied-sort + card copy badge; error→Retry→17-card recovery).
 - Reminder: each feature on its OWN ns/NN-* branch (don't commit straight to night-shift).
