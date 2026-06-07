@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogImagePath } from "./og";
 
 export type PromptMetaInput = {
   name: string;
@@ -24,7 +25,9 @@ export function promptOgMetadata(input: PromptMetaInput | null): Metadata {
   }
   const title = `${input.name} · PromptingHub`;
   const description = truncate(input.description, 200);
-  const images = input.image ? [{ url: input.image }] : undefined;
+  // Fall back to a generated OG card so every share has an image (resolved to an
+  // absolute URL by Next via metadataBase).
+  const images = [{ url: input.image || ogImagePath(input.name, input.description) }];
 
   return {
     title,
