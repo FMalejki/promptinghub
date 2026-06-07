@@ -22,6 +22,7 @@ type Data = {
   creator: Creator;
   prompts: React.ComponentProps<typeof PromptCard>[];
   pinned?: React.ComponentProps<typeof PromptCard>[];
+  stats?: { joinedAt: string | null; totalViews: number; totalCopies: number };
   collections: { id: string; name: string; count: number }[];
 };
 
@@ -70,7 +71,15 @@ export function CreatorClient({ handle }: { handle: string }) {
                   <div className="flex items-center gap-6 mt-3">
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{data.prompts.length}</span> <span className="text-sm text-gray-600 dark:text-gray-400">prompts</span></div>
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{totalStars}</span> <span className="text-sm text-gray-600 dark:text-gray-400">stars</span></div>
+                    {data.stats && (
+                      <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{data.stats.totalViews}</span> <span className="text-sm text-gray-600 dark:text-gray-400">views</span></div>
+                    )}
                   </div>
+                  {data.stats?.joinedAt && (
+                    <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                      Joined {new Date(data.stats.joinedAt).toLocaleDateString(undefined, { year: "numeric", month: "long" })}
+                    </p>
+                  )}
                   {data.creator.bio && (
                     <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 max-w-xl">{data.creator.bio}</p>
                   )}
