@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "../../components/Navbar";
 import { PromptCard } from "../../components/PromptCard";
 import { Avatar } from "../../Avatar";
+import { FollowButton } from "../../FollowButton";
 
 type Creator = { handle: string; name: string; image: string | null; verified: boolean };
 type Data = {
@@ -58,6 +59,9 @@ export function CreatorClient({ handle }: { handle: string }) {
                   <div className="flex items-center gap-6 mt-3">
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{data.prompts.length}</span> <span className="text-sm text-gray-600 dark:text-gray-400">prompts</span></div>
                     <div><span className="text-2xl font-bold text-gray-900 dark:text-white">{totalStars}</span> <span className="text-sm text-gray-600 dark:text-gray-400">stars</span></div>
+                  </div>
+                  <div className="mt-4">
+                    <FollowButton handle={data.creator.handle} />
                   </div>
                 </div>
               </div>
