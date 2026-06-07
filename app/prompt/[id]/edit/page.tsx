@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../../../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
+import { PromptQuality } from "../../../components/PromptQuality";
 
 type DraftFile = { path: string; content: string };
 
@@ -142,6 +143,9 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
             </div>
             <button type="button" onClick={() => setFiles((c) => c.concat({ path: `file-${c.length + 1}.txt`, content: "" }))} className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline">+ Add file</button>
           </div>
+
+          {/* Prompt quality (advisory, computed live in the browser) */}
+          <PromptQuality text={[meta.description, ...files.map((f) => f.content)].filter(Boolean).join("\n\n")} />
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
