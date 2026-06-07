@@ -104,6 +104,43 @@ export async function listCollectionsByOwner(db: Db, ownerEmail: string): Promis
   return rows.map(toCollection);
 }
 
+export type PublicCollection = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  promptCount: number;
+  owner: { email: string; name: string; handle: string | null };
+  createdAt: Date;
+};
+
+// Public index of collections that actually have prompts, newest first.
+export async function listPublicCollections(db: Db, limit = 50): Promise<PublicCollection[]> {
+  const rows = await db
+    .collection("collections")
+    .find({ promptIds: { $exists: true, $ne: [] } })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .toArray();
+
+  const emails = [...new Set(rows.map((r) => r.ownerEmail))];
+  const users = await db.collection("users").find({ email: { $in: emails } }).toArray();
+  const byEmail = new Map(users.map((u) => [u.email, u]));
+
+  return rows.map((r) => {
+    const u = byEmail.get(r.ownerEmail);
+    return {
+      id: r._id.toString(),
+      name: r.name,
+      slug: r.slug,
+      description: r.description || "",
+      promptCount: (r.promptIds || []).length,
+      owner: { email: r.ownerEmail, name: u?.name || r.ownerEmail.split("@")[0], handle: u?.handle ?? null },
+      createdAt: r.createdAt,
+    };
+  });
+}
+
 // Owner-scoped; stores prompt ids as strings, deduped, append-ordered.
 export async function addPromptToCollection(db: Db, id: string, ownerEmail: string, promptId: string): Promise<boolean> {
   if (!ObjectId.isValid(id) || !ObjectId.isValid(promptId)) return false;
