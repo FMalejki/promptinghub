@@ -54,6 +54,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
   const [counted, setCounted] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
 
   // Record a copy at most once per page view so the counter reflects users, not clicks.
   async function recordCopy() {
@@ -99,6 +100,33 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       router.push(`/prompt/${created.id}`);
     } else {
       setForking(false);
+    }
+  }
+
+  // Owners can pin a prompt to the top of their public profile.
+  useEffect(() => {
+    if (session?.user?.email !== prompt.author.email) return;
+    let active = true;
+    fetch("/api/pins")
+      .then((r) => (r.ok ? r.json() : { pinned: [] }))
+      .then((d) => active && setIsPinned((d.pinned || []).includes(prompt.id)))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.email, prompt.author.email, prompt.id]);
+
+  async function togglePin() {
+    const res = await fetch("/api/pins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ promptId: prompt.id }),
+    });
+    if (res.ok) {
+      const body = await res.json().catch(() => null);
+      setIsPinned(Array.isArray(body?.pinned) ? body.pinned.includes(prompt.id) : !isPinned);
+    } else if (res.status === 400) {
+      alert("You can pin up to 3 prompts. Unpin one first.");
     }
   }
 
@@ -261,6 +289,23 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </button>
 
             <SaveToCollection promptId={prompt.id} />
+
+            {canEdit && !prompt.isPrivate && (
+              <button
+                onClick={togglePin}
+                title={isPinned ? "Unpin from your profile" : "Pin to the top of your profile"}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isPinned
+                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                <svg className="w-5 h-5" fill={isPinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.828 1.172a.5.5 0 00-.707 0L7.05 3.243a2 2 0 01-1.137.566l-2.31.33a.5.5 0 00-.277.853l1.672 1.63a2 2 0 01.575 1.77l-.394 2.3a.5.5 0 00.726.527l2.066-1.086a2 2 0 011.86 0l2.066 1.086a.5.5 0 00.725-.527l-.394-2.3a2 2 0 01.575-1.77l1.672-1.63a.5.5 0 00-.277-.853l-2.31-.33a2 2 0 01-1.137-.566L9.828 1.172z" />
+                </svg>
+                <span>{isPinned ? "Pinned" : "Pin"}</span>
+              </button>
+            )}
 
             {canEdit && (
               <Link href={`/prompt/${prompt.id}/edit`} className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition-colors">

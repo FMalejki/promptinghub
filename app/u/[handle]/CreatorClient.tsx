@@ -20,6 +20,7 @@ type Creator = {
 type Data = {
   creator: Creator;
   prompts: React.ComponentProps<typeof PromptCard>[];
+  pinned?: React.ComponentProps<typeof PromptCard>[];
   collections: { id: string; name: string; count: number }[];
 };
 
@@ -89,6 +90,20 @@ export function CreatorClient({ handle }: { handle: string }) {
                 </div>
               </div>
             </div>
+
+            {data.pinned && data.pinned.length > 0 && (
+              <div className="mb-8">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.828 1.172a.5.5 0 00-.707 0L7.05 3.243a2 2 0 01-1.137.566l-2.31.33a.5.5 0 00-.277.853l1.672 1.63a2 2 0 01.575 1.77l-.394 2.3a.5.5 0 00.726.527l2.066-1.086a2 2 0 011.86 0l2.066 1.086a.5.5 0 00.725-.527l-.394-2.3a2 2 0 01.575-1.77l1.672-1.63a.5.5 0 00-.277-.853l-2.31-.33a2 2 0 01-1.137-.566L9.828 1.172z" /></svg>
+                  Pinned
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {data.pinned.map((p) => (
+                    <PromptCard key={p.id} {...p} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {data.collections.length > 0 && (
               <div className="mb-8">
