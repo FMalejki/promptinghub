@@ -40,6 +40,20 @@ export function embedHtml(baseUrl: string, prompt: EmbedPrompt, width: number, h
   );
 }
 
+// The supported oEmbed URL shapes, resolved from the `?url=` param: either a
+// /prompt|/embed/<id> URL (resolve by id) or a canonical /p/<handle>/<slug> URL.
+export type OEmbedTarget =
+  | { kind: "id"; id: string }
+  | { kind: "handle"; handle: string; slug: string };
+
+export function parseOEmbedTarget(url: string): OEmbedTarget | null {
+  const byId = url.match(/\/(?:prompt|embed)\/([a-f0-9]{24})/i);
+  if (byId) return { kind: "id", id: byId[1] };
+  const ns = url.match(/\/p\/([a-z0-9_-]+)\/([a-z0-9_-]+)/i);
+  if (ns) return { kind: "handle", handle: ns[1], slug: ns[2] };
+  return null;
+}
+
 // The href for a `<link rel="alternate" type="application/json+oembed">` tag, so
 // oEmbed consumers (WordPress, Discord, Slack, …) can auto-discover the embed
 // from a shared prompt URL. `targetUrl` is the page being embedded; it must be a
