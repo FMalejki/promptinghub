@@ -31,6 +31,28 @@ export function siteJsonLd(baseUrl: string): Record<string, any> {
   };
 }
 
+// schema.org ItemList for the /collections listing page — gives search engines
+// a structured, ordered list of the public collections with their canonical
+// URLs. Pure; trailing-slash-safe; valid for an empty list.
+export function collectionsItemListJsonLd(
+  collections: { id: string; name: string }[],
+  baseUrl: string,
+): Record<string, any> {
+  const base = baseUrl.replace(/\/+$/, "");
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Collections · PromptingHub",
+    numberOfItems: collections.length,
+    itemListElement: collections.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${base}/collections/${c.id}`,
+      name: c.name,
+    })),
+  };
+}
+
 export function promptJsonLd(p: JsonLdPrompt, baseUrl: string): Record<string, any> {
   const base = baseUrl.replace(/\/+$/, "");
   const published = new Date(p.createdAt).toISOString();
