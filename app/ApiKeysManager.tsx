@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { COPY_FEEDBACK_MS, copyLabel } from "@/lib/clipboard";
 
 type KeyInfo = { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null };
 
@@ -8,6 +9,7 @@ export function ApiKeysManager() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [fresh, setFresh] = useState<string | null>(null); // raw key shown once
+  const [copied, setCopied] = useState(false);
 
   function load() {
     fetch("/api/keys")
@@ -56,7 +58,20 @@ export function ApiKeysManager() {
           <p className="text-xs text-green-800 dark:text-green-300 mb-1">Copy your key now — it won’t be shown again:</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 px-2 py-1 text-xs font-mono bg-white dark:bg-gray-900 rounded border border-green-200 dark:border-green-800 text-gray-900 dark:text-gray-100 break-all">{fresh}</code>
-            <button onClick={() => navigator.clipboard.writeText(fresh)} className="px-2 py-1 text-xs bg-green-600 text-white rounded">Copy</button>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(fresh);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+                } catch {
+                  /* clipboard unavailable */
+                }
+              }}
+              className="px-2 py-1 text-xs bg-green-600 text-white rounded"
+            >
+              {copyLabel(copied, "Copy")}
+            </button>
             <button onClick={() => setFresh(null)} className="px-2 py-1 text-xs text-gray-500">Done</button>
           </div>
         </div>
