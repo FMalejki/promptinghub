@@ -200,6 +200,20 @@ export default function SettingsPage() {
         {/* API Keys */}
         <ApiKeysManager />
 
+        {/* Your data */}
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Your data</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Download a JSON copy of your profile, prompts and collections.
+          </p>
+          <a
+            href="/api/account/export"
+            className="inline-block px-4 py-2 bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+          >
+            Export my data
+          </a>
+        </div>
+
         {/* Danger Zone */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 p-6">
           <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
