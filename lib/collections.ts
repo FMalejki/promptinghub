@@ -77,6 +77,27 @@ export async function getCollectionDetail(db: Db, id: string): Promise<Collectio
   return { ...c, prompts };
 }
 
+export type CollectionExport = {
+  name: string;
+  description: string;
+  prompts: { name: string; description: string; files: { path: string; content: string }[] }[];
+};
+
+// A portable JSON bundle of a collection: each prompt with its files, in saved order.
+export async function getCollectionExport(db: Db, id: string): Promise<CollectionExport | null> {
+  const c = await getCollection(db, id);
+  if (!c) return null;
+  const details = await Promise.all(c.promptIds.map((pid) => getPromptDetail(db, pid)));
+  const prompts = details
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .map((p) => ({
+      name: p.name,
+      description: p.description,
+      files: p.files.map((f) => ({ path: f.path, content: f.content })),
+    }));
+  return { name: c.name, description: c.description, prompts };
+}
+
 export async function listCollectionsByOwner(db: Db, ownerEmail: string): Promise<Collection[]> {
   const rows = await db.collection("collections").find({ ownerEmail }).sort({ createdAt: -1 }).toArray();
   return rows.map(toCollection);
