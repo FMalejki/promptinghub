@@ -116,6 +116,11 @@ describe("getPromptDetail", () => {
       body: "b1",
       files: [{ path: "prompt.txt", content: "b1", language: "text" }],
       author: { email: "alice@x.com", name: "Alice", image: "http://img/a.png" },
+      image: null,
+      stars: 0,
+      isPrivate: false,
+      testedModels: [],
+      createdAt: new Date("2026-01-01"),
     });
   });
 
