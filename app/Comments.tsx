@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "./Avatar";
 import { renderMentions } from "@/lib/mentions";
+import { sortRoots, type SortMode } from "@/lib/commentSort";
 
 type Author = { email: string; name: string; image: string | null };
 type Comment = {
@@ -45,6 +46,7 @@ export function Comments({ promptId }: { promptId: string }) {
   const [replyBody, setReplyBody] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
+  const [sort, setSort] = useState<SortMode>("newest");
 
   function load() {
     fetch(`/api/prompts/${promptId}/comments`)
@@ -119,7 +121,7 @@ export function Comments({ promptId }: { promptId: string }) {
   }
 
   // Group replies under their parent; the list arrives newest-first.
-  const roots = comments.filter((c) => !c.parentId);
+  const roots = sortRoots(comments.filter((c) => !c.parentId), sort);
   const repliesByParent = new Map<string, Comment[]>();
   for (const c of comments) {
     if (!c.parentId) continue;
@@ -236,9 +238,28 @@ export function Comments({ promptId }: { promptId: string }) {
 
   return (
     <div className="mt-12">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Comments {comments.length > 0 && <span className="text-gray-400">({comments.length})</span>}
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Comments {comments.length > 0 && <span className="text-gray-400">({comments.length})</span>}
+        </h2>
+        {roots.length > 1 && (
+          <div className="flex items-center gap-1 text-xs">
+            {(["newest", "top"] as SortMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setSort(m)}
+                className={`px-2.5 py-1 rounded-md font-medium capitalize ${
+                  sort === m
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={post} className="mb-6">
         <textarea
