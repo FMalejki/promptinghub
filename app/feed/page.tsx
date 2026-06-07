@@ -34,6 +34,8 @@ export default function FeedPage() {
         <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your feed</h1>
           {state !== "anon" && (
+            <div className="flex items-center gap-3">
+            <Link href="/following" className="text-sm text-gray-500 dark:text-gray-400 hover:underline">Manage following</Link>
             <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden text-sm">
               {(["creators", "tags"] as const).map((s) => (
                 <button
@@ -48,6 +50,7 @@ export default function FeedPage() {
                   {s === "creators" ? "Creators" : "Tags"}
                 </button>
               ))}
+            </div>
             </div>
           )}
         </div>
