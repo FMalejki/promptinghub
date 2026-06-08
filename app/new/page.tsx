@@ -8,6 +8,7 @@ import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
 import { PromptQuality } from "../components/PromptQuality";
+import { CoverImageField } from "../components/CoverImageField";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -374,16 +375,12 @@ export default function NewPromptPage() {
               )}
             </div>
 
-            <div>
-              <label className={label}>Cover Image URL (optional)</label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className={input}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
+            <CoverImageField
+              value={form.image}
+              onChange={(v) => setForm({ ...form, image: v })}
+              inputClassName={input}
+              labelClassName={label}
+            />
 
             <div>
               <label className={label}>Price (USD) — 0 = free</label>
