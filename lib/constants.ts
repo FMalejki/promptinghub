@@ -68,17 +68,22 @@ function hashSeed(seed: string): number {
 export function getPlaceholderImage(seed: string): string {
   const h = hashSeed(seed);
   const hue = h % 360;
-  const hue2 = (hue + 40) % 360;
-  // A soft diagonal gradient with a faint sparkle glyph, sized 4:3 to match cards.
+  const hue2 = (hue + 25) % 360;
+  // A muted diagonal gradient with a simple "lines of text" glyph — reads as a
+  // text/prompt document, not decoration. 4:3 to match the cards.
+  const c = "rgba(255,255,255,0.55)";
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
-    `<stop offset="0%" stop-color="hsl(${hue},70%,62%)"/>` +
-    `<stop offset="100%" stop-color="hsl(${hue2},68%,48%)"/>` +
+    `<stop offset="0%" stop-color="hsl(${hue},45%,55%)"/>` +
+    `<stop offset="100%" stop-color="hsl(${hue2},42%,42%)"/>` +
     `</linearGradient></defs>` +
     `<rect width="400" height="300" fill="url(#g)"/>` +
-    `<path d="M200 120l9 28h29l-23 17 9 28-24-17-24 17 9-28-23-17h29z" fill="rgba(255,255,255,0.55)"/>` +
-    `</svg>`;
+    `<g fill="${c}">` +
+    `<rect x="140" y="120" width="120" height="13" rx="6.5"/>` +
+    `<rect x="140" y="146" width="84" height="13" rx="6.5"/>` +
+    `<rect x="140" y="172" width="104" height="13" rx="6.5"/>` +
+    `</g></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
