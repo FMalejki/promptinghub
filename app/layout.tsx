@@ -9,7 +9,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "PromptingHub",
+  title: { default: "PromptingHub", template: "%s · PromptingHub" },
   description: "Discover and share AI prompts",
   alternates: {
     types: {
