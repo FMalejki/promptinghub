@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
@@ -301,25 +302,36 @@ export function Comments({ promptId }: { promptId: string }) {
         )}
       </div>
 
-      <form onSubmit={post} className="mb-6">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          placeholder={session?.user?.email ? "Share how you used this prompt… use @handle to mention" : "Sign in to comment"}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="mt-2 flex justify-end">
-          <button
-            type="submit"
-            disabled={posting || !body.trim()}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {posting ? "Posting…" : "Post comment"}
-          </button>
+      {session?.user?.email ? (
+        <form onSubmit={post} className="mb-6">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Share how you used this prompt… use @handle to mention"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={posting || !body.trim()}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {posting ? "Posting…" : "Post comment"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="mb-6 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-6 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <Link href="/login" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+              Sign in
+            </Link>{" "}
+            to join the conversation and share how you used this prompt.
+          </p>
         </div>
-      </form>
+      )}
 
       {roots.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No comments yet — be the first.</p>
