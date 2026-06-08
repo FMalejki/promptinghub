@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
@@ -68,7 +68,21 @@ function Stat({ label, value }: { label: string; value: number }) {
 export default function DashboardPage() {
   const { status } = useSession();
   const [data, setData] = useState<Analytics | null>(null);
-  const [state, setState] = useState<"loading" | "ok" | "anon">("loading");
+  const [state, setState] = useState<"loading" | "ok" | "anon" | "error">("loading");
+
+  const load = useCallback(() => {
+    setState("loading");
+    fetch("/api/analytics")
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        setData(d);
+        setState("ok");
+      })
+      .catch(() => setState("error"));
+  }, []);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -76,12 +90,8 @@ export default function DashboardPage() {
       setState("anon");
       return;
     }
-    fetch("/api/analytics")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setData(d))
-      .catch(() => {})
-      .finally(() => setState("ok"));
-  }, [status]);
+    load();
+  }, [status, load]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -93,7 +103,21 @@ export default function DashboardPage() {
           <div className="text-center py-16 text-gray-500 dark:text-gray-400">
             <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Sign in</Link> to see your prompt stats.
           </div>
-        ) : !data ? (
+        ) : state === "error" ? (
+          <div className="text-center py-16">
+            <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Couldn&apos;t load your stats</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Something went wrong. Check your connection and try again.</p>
+            <button
+              onClick={load}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : state === "loading" || !data ? (
           <div className="text-gray-500 dark:text-gray-400">Loading…</div>
         ) : (
           <>
