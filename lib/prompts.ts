@@ -68,6 +68,8 @@ export type PromptDetail = {
   forkCount: number;
   createdAt: Date;
   updatedAt: Date | null;
+  // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
+  isStarred: boolean;
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
@@ -472,7 +474,7 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
     : null;
 }
 
-export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail | null> {
+export async function getPromptDetail(db: Db, id: string, viewerEmail?: string | null): Promise<PromptDetail | null> {
   if (!ObjectId.isValid(id)) return null;
   const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
   if (!row) return null;
@@ -505,6 +507,7 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     forkCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
+    isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
@@ -673,7 +676,7 @@ export async function getRelatedByTags(db: Db, id: string, limit = 4): Promise<P
   }));
 }
 
-export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string): Promise<NamespacedPromptDetail | null> {
+export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string, viewerEmail?: string | null): Promise<NamespacedPromptDetail | null> {
   const user = await db.collection("users").findOne({ handle });
   if (!user) return null;
   const row = await db.collection("prompts").findOne({ ownerEmail: user.email, slug });
@@ -705,6 +708,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     forkCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
+    isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
     handle,
     slug,
   };
