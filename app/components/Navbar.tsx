@@ -6,16 +6,18 @@ import { useTheme } from "../ThemeProvider";
 import { Avatar } from "../Avatar";
 import { NotificationBell } from "./NotificationBell";
 
-const NAV_LINKS: { href: string; label: string; authOnly?: boolean }[] = [
-  { href: "/browse", label: "Browse" },
-  { href: "/templates", label: "Templates" },
-  { href: "/feed", label: "Feed", authOnly: true },
-  { href: "/dashboard", label: "Dashboard", authOnly: true },
-  { href: "/trending", label: "Trending" },
-  { href: "/categories", label: "Categories" },
-  { href: "/tags", label: "Tags" },
-  { href: "/collections", label: "Collections" },
-  { href: "/creators", label: "Creators" },
+type NavLink = { href: string; label: string; authOnly?: boolean; group: "primary" | "explore" };
+
+const NAV_LINKS: NavLink[] = [
+  { href: "/browse", label: "Browse", group: "primary" },
+  { href: "/templates", label: "Templates", group: "primary" },
+  { href: "/feed", label: "Feed", authOnly: true, group: "primary" },
+  { href: "/dashboard", label: "Dashboard", authOnly: true, group: "primary" },
+  { href: "/trending", label: "Trending", group: "primary" },
+  { href: "/categories", label: "Categories", group: "explore" },
+  { href: "/tags", label: "Tags", group: "explore" },
+  { href: "/collections", label: "Collections", group: "explore" },
+  { href: "/creators", label: "Creators", group: "explore" },
 ];
 
 export function Navbar() {
@@ -23,8 +25,11 @@ export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const authed = status === "authenticated";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
 
   const links = NAV_LINKS.filter((l) => !l.authOnly || authed);
+  const primaryLinks = links.filter((l) => l.group === "primary");
+  const exploreLinks = links.filter((l) => l.group === "explore");
   const linkClass =
     "px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors";
 
@@ -40,11 +45,49 @@ export function Navbar() {
 
           {/* Primary nav (desktop) */}
           <div className="hidden sm:flex items-center gap-1 ml-6">
-            {links.map((l) => (
+            {primaryLinks.map((l) => (
               <Link key={l.href} href={l.href} className={linkClass}>
                 {l.label}
               </Link>
             ))}
+
+            {/* Explore dropdown — secondary destinations, collapsed to de-clutter. */}
+            <div className="relative">
+              <button
+                onClick={() => setExploreOpen((o) => !o)}
+                className={`${linkClass} flex items-center gap-1`}
+                aria-haspopup="true"
+                aria-expanded={exploreOpen}
+              >
+                Explore
+                <svg className={`w-3.5 h-3.5 transition-transform ${exploreOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {exploreOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <button
+                    aria-hidden
+                    tabIndex={-1}
+                    onClick={() => setExploreOpen(false)}
+                    className="fixed inset-0 z-40 cursor-default"
+                  />
+                  <div className="absolute right-0 mt-1 w-44 z-50 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1">
+                    {exploreLinks.map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        onClick={() => setExploreOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Spacer */}
