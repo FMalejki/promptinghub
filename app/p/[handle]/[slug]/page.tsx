@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: { handle: string; s
     if (!detail || detail.isPrivate) return promptOgMetadata(null);
     // Discovery points at the /prompt/<id> form — the only shape /api/oembed resolves.
     return promptOgMetadata(
-      { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) },
+      { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id, detail.category) },
       {
         oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`),
         canonical: canonicalPromptUrl(SITE_URL, detail),

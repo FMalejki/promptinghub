@@ -84,13 +84,78 @@ function hashSeed(seed: string): number {
   return h;
 }
 
-export function getPlaceholderImage(seed: string): string {
+// Group categories into visual "buckets" — each gets its own colour family and
+// glyph so a grid of placeholders reads as varied/intentional, not monotonous.
+type Bucket = "code" | "writing" | "image" | "social" | "learning" | "fun" | "default";
+
+const CATEGORY_BUCKET: Record<string, Bucket> = {
+  Coding: "code", "Code Review": "code", Debugging: "code", "Data Analysis": "code",
+  Writing: "writing", "Content Creation": "writing", Summarization: "writing",
+  Translation: "writing", Email: "writing", SEO: "writing", Research: "writing",
+  "Image Generation": "image", Creative: "image",
+  "Social Media": "social", Marketing: "social", Business: "social",
+  Learning: "learning", Education: "learning",
+  Fun: "fun", Brainstorming: "fun", Productivity: "fun",
+};
+
+const BUCKET_HUE: Record<Bucket, number> = {
+  code: 210, writing: 265, image: 330, social: 20, learning: 150, fun: 45, default: 235,
+};
+
+function bucketGlyph(bucket: Bucket, c: string): string {
+  switch (bucket) {
+    case "code":
+      return (
+        `<g fill="none" stroke="${c}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">` +
+        `<polyline points="178,124 150,150 178,176"/>` +
+        `<polyline points="222,124 250,150 222,176"/>` +
+        `<line x1="212" y1="118" x2="188" y2="182"/></g>`
+      );
+    case "image":
+      return (
+        `<rect x="148" y="112" width="104" height="80" rx="10" fill="none" stroke="${c}" stroke-width="10"/>` +
+        `<circle cx="176" cy="140" r="9" fill="${c}"/>` +
+        `<path d="M156 188 L188 156 L208 176 L226 160 L246 188 Z" fill="${c}"/>`
+      );
+    case "social":
+      return (
+        `<path d="M152 116 h96 a14 14 0 0 1 14 14 v40 a14 14 0 0 1 -14 14 h-50 l-26 22 v-22 h-20 a14 14 0 0 1 -14 -14 v-40 a14 14 0 0 1 14 -14 z" fill="${c}"/>`
+      );
+    case "learning":
+      return (
+        `<g fill="none" stroke="${c}" stroke-width="9" stroke-linejoin="round">` +
+        `<path d="M200 124 C182 114 156 114 144 122 L144 178 C156 170 182 170 200 180"/>` +
+        `<path d="M200 124 C218 114 244 114 256 122 L256 178 C244 170 218 170 200 180"/></g>`
+      );
+    case "fun":
+      return (
+        `<g fill="none" stroke="${c}" stroke-width="9" stroke-linecap="round">` +
+        `<circle cx="200" cy="142" r="26"/>` +
+        `<line x1="190" y1="174" x2="210" y2="174"/>` +
+        `<line x1="193" y1="184" x2="207" y2="184"/></g>`
+      );
+    case "writing":
+    case "default":
+    default:
+      return (
+        `<g fill="${c}">` +
+        `<rect x="140" y="120" width="120" height="13" rx="6.5"/>` +
+        `<rect x="140" y="146" width="84" height="13" rx="6.5"/>` +
+        `<rect x="140" y="172" width="104" height="13" rx="6.5"/></g>`
+      );
+  }
+}
+
+// Deterministic, self-contained placeholder. The colour family + glyph come from
+// the prompt's category (so /browse looks varied), and the seed adds per-prompt
+// variation within that family. Always an inline SVG data URI — can never 404.
+export function getPlaceholderImage(seed: string, category?: string): string {
   const h = hashSeed(seed);
-  const hue = h % 360;
-  const hue2 = (hue + 25) % 360;
-  // A muted diagonal gradient with a simple "lines of text" glyph — reads as a
-  // text/prompt document, not decoration. 4:3 to match the cards.
-  const c = "rgba(255,255,255,0.55)";
+  const bucket: Bucket = (category && CATEGORY_BUCKET[category]) || "default";
+  const base = BUCKET_HUE[bucket];
+  const hue = (base + ((h % 50) - 25) + 360) % 360;
+  const hue2 = (hue + 28) % 360;
+  const c = "rgba(255,255,255,0.6)";
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
@@ -98,17 +163,14 @@ export function getPlaceholderImage(seed: string): string {
     `<stop offset="100%" stop-color="hsl(${hue2},42%,42%)"/>` +
     `</linearGradient></defs>` +
     `<rect width="400" height="300" fill="url(#g)"/>` +
-    `<g fill="${c}">` +
-    `<rect x="140" y="120" width="120" height="13" rx="6.5"/>` +
-    `<rect x="140" y="146" width="84" height="13" rx="6.5"/>` +
-    `<rect x="140" y="172" width="104" height="13" rx="6.5"/>` +
-    `</g></svg>`;
+    bucketGlyph(bucket, c) +
+    `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 // Resolve a prompt's banner image, falling back to a deterministic placeholder.
-export function promptImageSrc(image: string | null | undefined, seed: string): string {
-  return image && image.trim() ? image : getPlaceholderImage(seed);
+export function promptImageSrc(image: string | null | undefined, seed: string, category?: string): string {
+  return image && image.trim() ? image : getPlaceholderImage(seed, category);
 }
 
 export function getModelName(modelId: string): string {

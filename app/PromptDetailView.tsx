@@ -72,7 +72,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     fetch(`/api/prompts/${prompt.id}/copy`, { method: "POST" }).catch(() => {});
   }
   const [values, setValues] = useState<Record<string, string>>({});
-  const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
+  const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id, prompt.category));
   const [forking, setForking] = useState(false);
   const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
@@ -198,7 +198,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           src={imgSrc}
           alt={prompt.name}
           className="w-full h-64 object-cover"
-          onError={() => setImgSrc(getPlaceholderImage(prompt.id))}
+          onError={() => setImgSrc(getPlaceholderImage(prompt.id, prompt.category))}
         />
       </div>
 

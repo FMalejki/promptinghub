@@ -26,7 +26,7 @@ type PromptCardProps = {
 };
 
 export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
-  const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id));
+  const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
 
@@ -41,7 +41,7 @@ export function PromptCard({ id, name, description, category, author, image, sta
           src={imgSrc}
           alt={name}
           loading="lazy"
-          onError={() => setImgSrc(getPlaceholderImage(id))}
+          onError={() => setImgSrc(getPlaceholderImage(id, category))}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
         />
         {isPrivate && (
