@@ -11,22 +11,37 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({ error: "Failed" }));
-      setErr(error);
-      return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Failed" }));
+        setErr(error || "Couldn't create your account. Please try again.");
+        return;
+      }
+      const r = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
+      if (r?.error) {
+        // Account was created but auto sign-in failed — send them to log in.
+        setErr("Account created. Please sign in.");
+        window.location.href = "/login";
+        return;
+      }
+      // Don't dead-end if NextAuth omits the url.
+      window.location.href = r?.url ?? "/browse";
+    } catch {
+      setErr("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    const r = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
-    if (r?.url) window.location.href = r.url;
   }
 
   return (
@@ -43,7 +58,12 @@ export default function RegisterPage() {
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} className={inputClass} required />
           {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-          <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-2.5 transition-colors">Create account</button>
+          <button
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg py-2.5 transition-colors"
+          >
+            {loading ? "Creating account…" : "Create account"}
+          </button>
         </form>
         <p className="mt-6 text-sm text-gray-500 dark:text-gray-400 text-center">
           Have an account?{" "}

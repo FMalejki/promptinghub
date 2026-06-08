@@ -10,13 +10,25 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    const res = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
-    if (res?.error) setErr("Invalid email or password");
-    else if (res?.url) window.location.href = res.url;
+    setLoading(true);
+    try {
+      const res = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
+      if (res?.error) {
+        setErr("Invalid email or password");
+        return;
+      }
+      // On success NextAuth returns a url; if it's ever missing, don't dead-end.
+      window.location.href = res?.url ?? "/browse";
+    } catch {
+      setErr("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -32,14 +44,20 @@ export default function LoginPage() {
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} required />
           {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-          <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-2.5 transition-colors">Sign in</button>
+          <button
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg py-2.5 transition-colors"
+          >
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
         </form>
         <div className="my-4 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
           <span className="flex-1 border-t border-gray-200 dark:border-gray-700" /> or <span className="flex-1 border-t border-gray-200 dark:border-gray-700" />
         </div>
         <button
-          onClick={() => signIn("google", { callbackUrl: "/browse" })}
-          className="w-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg py-2.5 transition-colors"
+          onClick={() => { setLoading(true); signIn("google", { callbackUrl: "/browse" }); }}
+          disabled={loading}
+          className="w-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg py-2.5 transition-colors"
         >
           Continue with Google
         </button>
