@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "../../../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { PromptQuality } from "../../../components/PromptQuality";
+import { CoverImageField } from "../../../components/CoverImageField";
 
 type DraftFile = { path: string; content: string };
 
@@ -114,10 +115,12 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
               <input className={input} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="cold-email, seo, gpt-4" maxLength={400} />
               <p className="mt-1 text-xs text-gray-400">Comma-separated, up to 10.</p>
             </div>
-            <div>
-              <label className={label}>Cover Image URL (optional)</label>
-              <input className={input} value={meta.image} onChange={(e) => setMeta({ ...meta, image: e.target.value })} placeholder="https://…" />
-            </div>
+            <CoverImageField
+              value={meta.image}
+              onChange={(v) => setMeta({ ...meta, image: v })}
+              inputClassName={input}
+              labelClassName={label}
+            />
             <div>
               <label className={label}>Price (USD) — 0 = free</label>
               <input className={input} type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
