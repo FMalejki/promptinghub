@@ -3,3 +3,7 @@
 @tailwind utilities;
 
 html, body { @apply bg-gray-50 text-gray-900 antialiased; }
+/* Dark mode: also paint the <html> element, so the overscroll / rubber-band area
+   behind <body> doesn't flash the light background when scrolling. */
+html.dark, html.dark body { @apply bg-gray-900 text-gray-100; }
+html.dark { color-scheme: dark; }
