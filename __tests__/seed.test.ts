@@ -33,7 +33,8 @@ describe("dataset integrity", () => {
     const valid = new Set<string>(PROMPT_CATEGORIES as readonly string[]);
     for (const p of AWESOME_PROMPTS) {
       expect(valid.has(p.category)).toBe(true);
-      expect(p.body.trim().length).toBeGreaterThan(20);
+      const hasContent = (p.body?.trim().length ?? 0) > 20 || (p.files?.some((f) => f.content.trim().length > 0) ?? false);
+      expect(hasContent).toBe(true);
       expect(p.tags.length).toBeGreaterThan(0);
     }
   });
@@ -67,6 +68,35 @@ describe("seedDatabase", () => {
     expect(cols.length).toBe(SEED_COLLECTIONS.length);
     const dev = cols.find((c) => c.name === "Developer toolkit");
     expect(dev?.promptCount).toBe(5);
+  });
+
+  it("supports multi-file prompts, testedModels, and per-prompt authors", async () => {
+    await seedDatabase(
+      db,
+      [
+        {
+          name: "Multi agent",
+          description: "A big multi-file agent prompt",
+          category: "Coding",
+          tags: ["agent"],
+          files: [
+            { path: "system.md", content: "You are an agent." },
+            { path: "examples.md", content: "Example: do the thing." },
+          ],
+          testedModels: ["gemini-2.0-flash", "gpt-4o"],
+          authorEmail: "indie@x.com",
+          authorName: "Indie Dev",
+        },
+      ],
+      owner,
+    );
+    const doc = await db.collection("prompts").findOne({ name: "Multi agent" });
+    expect(doc?.ownerEmail).toBe("indie@x.com");
+    expect(doc?.files).toHaveLength(2);
+    expect(doc?.testedModels).toEqual([{ modelId: "gemini-2.0-flash" }, { modelId: "gpt-4o" }]);
+    // the per-prompt author got a real user doc
+    const author = await db.collection("users").findOne({ email: "indie@x.com" });
+    expect(author?.name).toBe("Indie Dev");
   });
 
   it("is idempotent — re-running skips everything, no duplicates", async () => {

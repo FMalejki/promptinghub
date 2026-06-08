@@ -13,8 +13,17 @@ export type SeedPrompt = {
   description: string;
   category: string;
   tags: string[];
-  body: string;
+  // Provide body (single-file) OR files[] (multi-file). At least one is required.
+  body?: string;
+  files?: { path: string; content: string }[];
+  // Model ids this prompt was tested on, e.g. ["gemini-2.0-flash", "gpt-4o"].
+  testedModels?: string[];
+  sourceUrl?: string;
   sourceAuthor?: string;
+  // Optional per-prompt author (creates/uses that PromptingHub account) so a seed
+  // batch can be spread across multiple believable authors, not just the runner.
+  authorEmail?: string;
+  authorName?: string;
 };
 
 export const SEED_SOURCE = {
@@ -79,20 +88,37 @@ export async function seedDatabase(
   let promptsCreated = 0;
   let promptsSkipped = 0;
   const idByName = new Map<string, string>();
+  const ensuredUsers = new Set<string>([ownerEmail]);
 
   for (const sp of dataset) {
-    const existing = await db.collection("prompts").findOne({ ownerEmail, name: sp.name });
+    if (!sp.body && !(sp.files && sp.files.length)) {
+      promptsSkipped++;
+      continue; // a prompt needs a body or at least one file
+    }
+    // Author this prompt under its own account when given, else the runner.
+    const author = sp.authorEmail || ownerEmail;
+    if (!ensuredUsers.has(author)) {
+      await db.collection("users").updateOne(
+        { email: author },
+        { $setOnInsert: { email: author, name: sp.authorName || author.split("@")[0], image: null, createdAt: new Date() } },
+        { upsert: true },
+      );
+      ensuredUsers.add(author);
+    }
+
+    const existing = await db.collection("prompts").findOne({ ownerEmail: author, name: sp.name });
     if (existing) {
       promptsSkipped++;
       idByName.set(sp.name, existing._id.toString());
       continue;
     }
-    const created = await createPrompt(db, ownerEmail, {
+    const created = await createPrompt(db, author, {
       name: sp.name,
       description: sp.description,
       category: sp.category,
-      body: sp.body,
+      ...(sp.files && sp.files.length ? { files: sp.files } : { body: sp.body }),
       tags: sp.tags,
+      testedModels: (sp.testedModels ?? []).map((modelId) => ({ modelId })),
     });
     // Stamp attribution (CC0 doesn't require it, but we keep it as good practice).
     await db.collection("prompts").updateOne(
@@ -100,7 +126,7 @@ export async function seedDatabase(
       {
         $set: {
           source: SEED_SOURCE.name,
-          sourceUrl: SEED_SOURCE.url,
+          sourceUrl: sp.sourceUrl ?? SEED_SOURCE.url,
           sourceLicense: SEED_SOURCE.license,
           sourceAuthor: sp.sourceAuthor ?? null,
           seeded: true,
