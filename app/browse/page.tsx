@@ -36,6 +36,7 @@ export default function BrowsePage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
+  const [catCounts, setCatCounts] = useState<Record<string, number>>({});
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Press "/" anywhere (outside a field) to jump to the search box.
@@ -55,6 +56,10 @@ export default function BrowsePage() {
     fetch("/api/stats")
       .then((r) => (r.ok ? r.json() : null))
       .then(setStats)
+      .catch(() => {});
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : { counts: {} }))
+      .then((d) => setCatCounts(d.counts || {}))
       .catch(() => {});
   }, []);
 
@@ -259,30 +264,49 @@ export default function BrowsePage() {
             >
               All
             </button>
-            {PROMPT_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(category === cat ? null : cat)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  category === cat
-                    ? "bg-blue-600 text-white"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+            {PROMPT_CATEGORIES
+              // Hide categories with no public prompts so a pill never dead-ends on
+              // "No prompts found" — but always keep the currently-selected one.
+              // Before counts load, show all (avoids an empty flash).
+              .filter((cat) => Object.keys(catCounts).length === 0 || (catCounts[cat] || 0) > 0 || category === cat)
+              .map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(category === cat ? null : cat)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    category === cat
+                      ? "bg-blue-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {cat}
+                  {catCounts[cat] ? <span className="ml-1.5 opacity-60 tabular-nums">{catCounts[cat]}</span> : null}
+                </button>
+              ))}
           </div>
         </div>
 
-        {/* Results count */}
-        {loaded && !error && (
-          <div className="mb-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {prompts.length} {prompts.length === 1 ? "prompt" : "prompts"} found
-            </p>
-          </div>
-        )}
+        {/* Results count — show the true total when we know it (no-filter or
+            category-only), otherwise an honest "N shown" with a + when more exist. */}
+        {loaded && !error && (() => {
+          const hasQ = q.trim().length > 0;
+          const onlyCategory = !!category && !hasQ && !tag && !imageOnly;
+          const noFilters = !category && !hasQ && !tag && !imageOnly;
+          const knownTotal = onlyCategory
+            ? catCounts[category as string] ?? null
+            : noFilters
+            ? stats?.prompts ?? null
+            : null;
+          const label =
+            knownTotal != null
+              ? `${knownTotal} ${knownTotal === 1 ? "prompt" : "prompts"}`
+              : `${prompts.length}${nextCursor != null ? "+" : ""} shown`;
+          return (
+            <div className="mb-6 text-center">
+              <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+            </div>
+          );
+        })()}
 
         {/* Error state with retry */}
         {loaded && error ? (
