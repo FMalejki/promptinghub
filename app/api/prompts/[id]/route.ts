@@ -39,7 +39,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const ok = await updatePrompt(await getDb(), params.id, email, { ...parsed.data, image: parsed.data.image || undefined });
+  const { message, ...data } = parsed.data;
+  const ok = await updatePrompt(await getDb(), params.id, email, { ...data, image: data.image || undefined }, { message });
   if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

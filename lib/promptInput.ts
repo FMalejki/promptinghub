@@ -25,6 +25,8 @@ export const newPromptSchema = z
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
     forkedFrom: z.string().max(64).optional(),
+    // Optional "commit message" describing an edit (used on update, ignored on create).
+    message: z.string().max(200).optional(),
   })
   .refine((d) => Boolean(d.body && d.body.trim().length) || Boolean(d.files && d.files.length), {
     message: "Provide a prompt body or at least one file",
