@@ -22,7 +22,10 @@ export async function GET(req: Request) {
 
   const db = await getDb();
   const prompts = await listPrompts(db, {
-    q,
+    // When searching, DON'T narrow by `q` at the DB (a substring regex misses
+    // typos/fuzzy) — fetch the candidate pool and let rankBySearch filter+rank
+    // it in memory below. Other filters (category/tag/…) still apply.
+    q: undefined,
     category,
     model,
     imageOnly,
@@ -31,8 +34,7 @@ export async function GET(req: Request) {
     ownerEmail,
     includePrivate: !!session?.user?.email,
     userEmail: session?.user?.email || undefined,
-    // Search re-ranks in-memory below, so it needs the full set — paginate it
-    // after ranking. Everything else paginates at the DB.
+    // Search paginates after ranking; everything else paginates at the DB.
     ...(q ? {} : { limit, skip: offset }),
   });
 
