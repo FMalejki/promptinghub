@@ -25,25 +25,44 @@ export const PROMPT_CATEGORIES = [
 
 export type PromptCategory = typeof PROMPT_CATEGORIES[number];
 
-// Modele AI dostępne do wyboru
+// Curated, current model catalogue — the offline-safe fallback. The live list is
+// pulled from OpenRouter at runtime and merged on top (see lib/models.ts +
+// /api/models); this stays in our stable id scheme so getModelName and
+// image-model recognition keep working even when the network list is unavailable.
+// Keep this trimmed to widely-used current models; the long tail comes from live.
 export const AI_MODELS = [
-  { id: "gpt-4", name: "GPT-4", provider: "OpenAI" },
+  // OpenAI
+  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI" },
+  { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "OpenAI" },
+  { id: "gpt-4.1", name: "GPT-4.1", provider: "OpenAI" },
+  { id: "o1", name: "o1", provider: "OpenAI" },
+  { id: "o3-mini", name: "o3-mini", provider: "OpenAI" },
   { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "OpenAI" },
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "OpenAI" },
+  // Anthropic
+  { id: "claude-3.7-sonnet", name: "Claude 3.7 Sonnet", provider: "Anthropic" },
+  { id: "claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic" },
+  { id: "claude-3.5-haiku", name: "Claude 3.5 Haiku", provider: "Anthropic" },
   { id: "claude-3-opus", name: "Claude 3 Opus", provider: "Anthropic" },
-  { id: "claude-3-sonnet", name: "Claude 3 Sonnet", provider: "Anthropic" },
-  { id: "claude-3-haiku", name: "Claude 3 Haiku", provider: "Anthropic" },
-  { id: "claude-2", name: "Claude 2", provider: "Anthropic" },
-  { id: "gemini-pro", name: "Gemini Pro", provider: "Google" },
-  { id: "gemini-ultra", name: "Gemini Ultra", provider: "Google" },
-  { id: "llama-2-70b", name: "Llama 2 70B", provider: "Meta" },
-  { id: "llama-2-13b", name: "Llama 2 13B", provider: "Meta" },
+  // Google
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "Google" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "Google" },
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "Google" },
+  // Meta
+  { id: "llama-3.3-70b", name: "Llama 3.3 70B", provider: "Meta" },
+  { id: "llama-3.1-405b", name: "Llama 3.1 405B", provider: "Meta" },
+  // Mistral / xAI / DeepSeek / Qwen
   { id: "mistral-large", name: "Mistral Large", provider: "Mistral AI" },
-  { id: "mistral-medium", name: "Mistral Medium", provider: "Mistral AI" },
-  { id: "codex", name: "Codex", provider: "OpenAI" },
+  { id: "grok-3", name: "Grok 3", provider: "xAI" },
+  { id: "grok-2", name: "Grok 2", provider: "xAI" },
+  { id: "deepseek-r1", name: "DeepSeek R1", provider: "DeepSeek" },
+  { id: "deepseek-v3", name: "DeepSeek V3", provider: "DeepSeek" },
+  { id: "qwen-2.5-72b", name: "Qwen 2.5 72B", provider: "Qwen" },
+  // Image generation
+  { id: "gpt-image-1", name: "GPT Image 1", provider: "OpenAI" },
   { id: "dall-e-3", name: "DALL-E 3", provider: "OpenAI" },
-  { id: "stable-diffusion", name: "Stable Diffusion", provider: "Stability AI" },
   { id: "midjourney", name: "Midjourney", provider: "Midjourney" },
+  { id: "stable-diffusion", name: "Stable Diffusion", provider: "Stability AI" },
+  { id: "flux", name: "FLUX", provider: "Black Forest Labs" },
   { id: "other", name: "Other", provider: "Custom" },
 ] as const;
 
@@ -94,7 +113,11 @@ export function promptImageSrc(image: string | null | undefined, seed: string): 
 
 export function getModelName(modelId: string): string {
   const model = AI_MODELS.find(m => m.id === modelId);
-  return model ? model.name : modelId;
+  if (model) return model.name;
+  // Unknown id (e.g. a live OpenRouter id like "x-ai/grok-3" we didn't curate):
+  // show a readable label — strip the vendor prefix, de-slug the rest.
+  const tail = modelId.includes("/") ? modelId.split("/").slice(1).join("/") : modelId;
+  return tail || modelId;
 }
 
 export function getModelProvider(modelId: string): string {

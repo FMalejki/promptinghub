@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { AI_MODELS, getModelName } from "@/lib/constants";
+import { getModelName } from "@/lib/constants";
+import { useModels } from "@/lib/useModels";
 
 type Vote = "works" | "broken" | "mixed";
 type ModelSummary = { modelId: string; works: number; broken: number; mixed: number; youVoted: Vote | null };
@@ -44,8 +45,9 @@ export function ModelAttestations({ promptId }: { promptId: string }) {
     }
   }
 
+  const catalogue = useModels();
   const listed = useMemo(() => new Set(models.map((m) => m.modelId)), [models]);
-  const addable = AI_MODELS.filter((m) => m.id !== "other" && !listed.has(m.id));
+  const addable = catalogue.filter((m) => m.id !== "other" && !listed.has(m.id));
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

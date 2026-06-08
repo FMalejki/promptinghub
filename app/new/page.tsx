@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
-import { PROMPT_CATEGORIES, AI_MODELS } from "@/lib/constants";
+import { PROMPT_CATEGORIES } from "@/lib/constants";
+import { useModels } from "@/lib/useModels";
 import { PromptQuality } from "../components/PromptQuality";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -39,6 +40,7 @@ export default function NewPromptPage() {
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
+  const AI_MODELS = useModels();
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
   const [modelVersions, setModelVersions] = useState<Record<string, string>>({});
   const [modelNotes, setModelNotes] = useState<Record<string, string>>({});
