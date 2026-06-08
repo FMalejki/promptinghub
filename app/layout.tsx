@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Providers } from "./providers";
+import { Footer } from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { siteJsonLd } from "@/lib/jsonLd";
@@ -29,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-gray-50 dark:bg-gray-900 transition-colors">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <Footer />
+        </Providers>
         <Analytics />
         <SpeedInsights />
       </body>
