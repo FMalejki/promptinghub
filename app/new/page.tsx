@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
+import { getTemplate } from "@/lib/templates";
 import { PromptQuality } from "../components/PromptQuality";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -30,6 +31,19 @@ export default function NewPromptPage() {
       .then((r) => (r.ok ? r.json() : { tags: [] }))
       .then((d) => setTagSuggestions((d.tags || []).map((t: { tag: string }) => t.tag)))
       .catch(() => {});
+  }, []);
+
+  // Prefill from a starter template (/new?template=<id>), applied once on mount.
+  const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("template");
+    if (!id) return;
+    const t = getTemplate(id);
+    if (!t) return;
+    setForm((f) => ({ ...f, name: t.promptName, description: t.description, category: t.category }));
+    setTags(t.tags.join(", "));
+    setFiles([{ path: "prompt.txt", content: t.body }]);
+    setAppliedTemplate(t.title);
   }, []);
 
   function addTag(tag: string) {
@@ -202,8 +216,23 @@ export default function NewPromptPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create New Prompt</h1>
-          <p className="text-gray-600 dark:text-gray-400">Share your prompt with the community</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create New Prompt</h1>
+              <p className="text-gray-600 dark:text-gray-400">Share your prompt with the community</p>
+            </div>
+            <a
+              href="/templates"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+            >
+              ✨ Start from a template
+            </a>
+          </div>
+          {appliedTemplate && (
+            <div className="mt-4 flex items-center gap-2 text-sm rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 py-2 text-blue-800 dark:text-blue-300">
+              <span>✨ Started from the “{appliedTemplate}” template — replace the {"{{placeholders}}"} with your details.</span>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
