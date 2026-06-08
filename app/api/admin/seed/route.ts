@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { seedDatabase, SEED_SOURCE, type SeedPrompt } from "@/lib/seed";
 import { AWESOME_PROMPTS } from "@/scripts/seed-data/awesome-prompts";
 import { PRO_PROMPTS } from "@/scripts/seed-data/pro-prompts";
+import { COMMUNITY_PROMPTS } from "@/scripts/seed-data/community-prompts";
 
 // Token-guarded admin endpoint to populate prod with the curated CC0 seed set.
 // The server has the (sensitive, un-pullable) MONGODB_URI, so this lets an
@@ -34,12 +35,14 @@ export async function POST(req: NextRequest) {
 
   let ownerEmail = "curated@promptinghub.app";
   let ownerName = "PromptingHub Curated";
-  let which: "awesome" | "pro" | "all" = "awesome";
+  const DATASETS = ["awesome", "pro", "community", "all"] as const;
+  type Which = (typeof DATASETS)[number];
+  let which: Which = "awesome";
   try {
     const body = await req.json();
     if (body && typeof body.owner === "string" && body.owner.includes("@")) ownerEmail = body.owner;
     if (body && typeof body.ownerName === "string" && body.ownerName.trim()) ownerName = body.ownerName.trim();
-    if (body && (body.dataset === "pro" || body.dataset === "all" || body.dataset === "awesome")) which = body.dataset;
+    if (body && DATASETS.includes(body.dataset)) which = body.dataset;
   } catch {
     /* no body — use defaults */
   }
@@ -57,11 +60,11 @@ export async function POST(req: NextRequest) {
     }
     // Original "pro" set — no default attribution (they're original compositions).
     if (which === "pro" || which === "all") {
-      results.pro = await seedDatabase(db, PRO_PROMPTS, {
-        ownerEmail,
-        ownerName,
-        defaultSource: null,
-      });
+      results.pro = await seedDatabase(db, PRO_PROMPTS, { ownerEmail, ownerName, defaultSource: null });
+    }
+    // "community" set — per-prompt "inspired by" attribution, no default.
+    if (which === "community" || which === "all") {
+      results.community = await seedDatabase(db, COMMUNITY_PROMPTS, { ownerEmail, ownerName, defaultSource: null });
     }
     return NextResponse.json({ ok: true, dataset: which, results });
   } catch (e) {

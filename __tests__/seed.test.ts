@@ -3,6 +3,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { seedDatabase, SEED_SOURCE, SEED_COLLECTIONS } from "../lib/seed";
 import { AWESOME_PROMPTS } from "../scripts/seed-data/awesome-prompts";
 import { PRO_PROMPTS } from "../scripts/seed-data/pro-prompts";
+import { COMMUNITY_PROMPTS } from "../scripts/seed-data/community-prompts";
 import { listPublicCollections } from "../lib/collections";
 import { PROMPT_CATEGORIES, AI_MODELS } from "../lib/constants";
 
@@ -87,6 +88,27 @@ describe("PRO_PROMPTS dataset integrity", () => {
   it("author emails are unique-per-person (a handful of believable creators)", () => {
     const authors = new Set(PRO_PROMPTS.map((p) => p.authorEmail));
     expect(authors.size).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("COMMUNITY_PROMPTS dataset integrity", () => {
+  const validCategories = new Set<string>(PROMPT_CATEGORIES as readonly string[]);
+  const validModelIds = new Set<string>(AI_MODELS.map((m) => m.id));
+
+  it("every community prompt is valid, attributed, and authored", () => {
+    expect(COMMUNITY_PROMPTS.length).toBeGreaterThanOrEqual(6);
+    for (const p of COMMUNITY_PROMPTS) {
+      expect(validCategories.has(p.category)).toBe(true);
+      expect(p.tags.length).toBeGreaterThan(0);
+      const hasContent =
+        (p.body?.trim().length ?? 0) > 40 || (p.files?.some((f) => f.content.trim().length > 40) ?? false);
+      expect(hasContent).toBe(true);
+      // honest attribution: every community prompt cites an inspired-by source + URL
+      expect((p.source ?? "").length).toBeGreaterThan(0);
+      expect((p.sourceUrl ?? "").startsWith("http")).toBe(true);
+      expect(p.authorEmail && p.authorEmail.includes("@")).toBeTruthy();
+      for (const id of p.testedModels ?? []) expect(validModelIds.has(id)).toBe(true);
+    }
   });
 });
 
