@@ -24,6 +24,7 @@ import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
 import { buildLlmLinks } from "@/lib/llmLinks";
+import { PlaygroundPanel } from "./PlaygroundPanel";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { email: string; name: string; image: string | null };
@@ -537,6 +538,11 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed">{f.content}</pre>
           </div>
         ))}
+      </div>
+
+      {/* Playground — run the (filled) prompt against a model, if configured */}
+      <div className="mt-6">
+        <PlaygroundPanel text={allText} />
       </div>
 
       {/* Related prompts (same category) */}
