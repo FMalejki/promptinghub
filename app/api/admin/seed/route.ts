@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { seedDatabase } from "@/lib/seed";
+import { seedDatabase, SEED_SOURCE, type SeedPrompt } from "@/lib/seed";
 import { AWESOME_PROMPTS } from "@/scripts/seed-data/awesome-prompts";
+import { PRO_PROMPTS } from "@/scripts/seed-data/pro-prompts";
 
 // Token-guarded admin endpoint to populate prod with the curated CC0 seed set.
 // The server has the (sensitive, un-pullable) MONGODB_URI, so this lets an
@@ -33,18 +34,36 @@ export async function POST(req: NextRequest) {
 
   let ownerEmail = "curated@promptinghub.app";
   let ownerName = "PromptingHub Curated";
+  let which: "awesome" | "pro" | "all" = "awesome";
   try {
     const body = await req.json();
     if (body && typeof body.owner === "string" && body.owner.includes("@")) ownerEmail = body.owner;
     if (body && typeof body.ownerName === "string" && body.ownerName.trim()) ownerName = body.ownerName.trim();
+    if (body && (body.dataset === "pro" || body.dataset === "all" || body.dataset === "awesome")) which = body.dataset;
   } catch {
     /* no body — use defaults */
   }
 
   try {
     const db = await getDb();
-    const result = await seedDatabase(db, AWESOME_PROMPTS, { ownerEmail, ownerName });
-    return NextResponse.json({ ok: true, result });
+    const results: Record<string, unknown> = {};
+    // CC0 awesome set (carries the awesome-chatgpt-prompts attribution).
+    if (which === "awesome" || which === "all") {
+      results.awesome = await seedDatabase(db, AWESOME_PROMPTS as SeedPrompt[], {
+        ownerEmail,
+        ownerName,
+        defaultSource: SEED_SOURCE,
+      });
+    }
+    // Original "pro" set — no default attribution (they're original compositions).
+    if (which === "pro" || which === "all") {
+      results.pro = await seedDatabase(db, PRO_PROMPTS, {
+        ownerEmail,
+        ownerName,
+        defaultSource: null,
+      });
+    }
+    return NextResponse.json({ ok: true, dataset: which, results });
   } catch (e) {
     return NextResponse.json({ error: "Seed failed", detail: String(e) }, { status: 500 });
   }
