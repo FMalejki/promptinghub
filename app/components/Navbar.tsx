@@ -3,6 +3,7 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useTheme } from "../ThemeProvider";
 import { Avatar } from "../Avatar";
+import { NotificationBell } from "./NotificationBell";
 
 export function Navbar() {
   const { status, data } = useSession();
@@ -18,6 +19,18 @@ export function Navbar() {
             <img src="/static/image.png" alt="PromptingHub Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-semibold text-gray-900 dark:text-white">PromptingHub</span>
           </Link>
+
+          {/* Primary nav */}
+          <div className="hidden sm:flex items-center gap-1 ml-6">
+            <Link href="/browse" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Browse</Link>
+            {authed && <Link href="/feed" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Feed</Link>}
+            {authed && <Link href="/dashboard" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Dashboard</Link>}
+            <Link href="/trending" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Trending</Link>
+            <Link href="/categories" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Categories</Link>
+            <Link href="/tags" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Tags</Link>
+            <Link href="/collections" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Collections</Link>
+            <Link href="/creators" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Creators</Link>
+          </div>
 
           {/* Spacer */}
           <div className="flex-1"></div>
@@ -46,9 +59,9 @@ export function Navbar() {
                 {/* Add Prompt Button */}
                 <Link
                   href="/new"
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="hidden sm:flex shrink-0 items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   New Prompt
@@ -56,6 +69,7 @@ export function Navbar() {
 
                 {/* User menu */}
                 <div className="flex items-center gap-3">
+                  <NotificationBell />
                   <Link href="/favorites" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Favorites">
                     <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />

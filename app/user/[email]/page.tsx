@@ -34,6 +34,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "public" | "private">("all");
+  const [collections, setCollections] = useState<{ id: string; name: string; promptIds: string[] }[]>([]);
 
   const isOwnProfile = session?.user?.email === decodeURIComponent(params.email);
 
@@ -51,8 +52,14 @@ export default function UserProfilePage({ params }: { params: { email: string } 
       
       const data = await res.json();
       const userPrompts = data.prompts || [];
-      
+
       setPrompts(userPrompts);
+
+      // Load the user's collections (best-effort)
+      fetch(`/api/collections?owner=${encodeURIComponent(email)}`)
+        .then((r) => (r.ok ? r.json() : { collections: [] }))
+        .then((d) => setCollections(d.collections || []))
+        .catch(() => {});
       
       // Calculate stats
       const totalStars = userPrompts.reduce((sum: number, p: Prompt) => sum + p.stars, 0);
@@ -156,6 +163,28 @@ export default function UserProfilePage({ params }: { params: { email: string } 
             </div>
           </div>
         </div>
+
+        {/* Collections */}
+        {collections.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Collections</h2>
+            <div className="flex flex-wrap gap-3">
+              {collections.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/collections/${c.id}`}
+                  className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                >
+                  <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{c.name}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{c.promptIds.length}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         {isOwnProfile && (

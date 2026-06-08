@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
+import { ApiKeysManager } from "../ApiKeysManager";
 import { Avatar } from "../Avatar";
 
 export default function SettingsPage() {
@@ -11,10 +12,40 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: "",
     image: "",
+    bio: "",
+    website: "",
+    x: "",
+    github: "",
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteAccount() {
+    const email = session?.user?.email;
+    if (!email || confirmText !== email) {
+      setDeleteError("Type your email exactly to confirm.");
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await fetch("/api/account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: email }),
+    });
+    if (res.ok) {
+      await signOut({ redirect: false });
+      router.push("/");
+    } else {
+      setDeleting(false);
+      setDeleteError("Could not delete your account. Please try again.");
+    }
+  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -24,10 +55,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      setForm({
-        name: session.user.name || "",
-        image: session.user.image || "",
-      });
+      // Seed name/image from the session, then hydrate bio/links from the profile API.
+      setForm((f) => ({ ...f, name: session.user?.name || "", image: session.user?.image || "" }));
+      fetch("/api/profile")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (p) setForm((f) => ({ ...f, bio: p.bio || "", website: p.website || "", x: p.x || "", github: p.github || "" }));
+        })
+        .catch(() => {});
     }
   }, [status, session]);
 
@@ -46,6 +81,10 @@ export default function SettingsPage() {
         body: JSON.stringify({
           name: form.name,
           image: form.image || null,
+          bio: form.bio,
+          website: form.website,
+          x: form.x,
+          github: form.github,
         }),
       });
 
@@ -127,6 +166,33 @@ export default function SettingsPage() {
             </div>
 
             <div>
+              <label className={label}>Bio</label>
+              <textarea
+                value={form.bio}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                className={input}
+                rows={3}
+                maxLength={280}
+                placeholder="A sentence or two about you and the prompts you share."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={label}>Website</label>
+                <input type="text" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className={input} placeholder="https://you.dev" />
+              </div>
+              <div>
+                <label className={label}>X / Twitter</label>
+                <input type="text" value={form.x} onChange={(e) => setForm({ ...form, x: e.target.value })} className={input} placeholder="handle" />
+              </div>
+              <div>
+                <label className={label}>GitHub</label>
+                <input type="text" value={form.github} onChange={(e) => setForm({ ...form, github: e.target.value })} className={input} placeholder="username" />
+              </div>
+            </div>
+
+            <div>
               <label className={label}>Email</label>
               <input
                 type="email"
@@ -170,19 +236,76 @@ export default function SettingsPage() {
           </form>
         </div>
 
+        {/* API Keys */}
+        <ApiKeysManager />
+
+        {/* Your data */}
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Your data</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Download a JSON copy of your profile, prompts and collections.
+          </p>
+          <a
+            href="/api/account/export"
+            className="inline-block px-4 py-2 bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+          >
+            Export my data
+          </a>
+        </div>
+
         {/* Danger Zone */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 p-6">
           <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Once you delete your account, there is no going back. Please be certain.
+            Once you delete your account, there is no going back. This permanently removes your
+            prompts, collections, comments and API keys. Please be certain.
           </p>
-          <button
-            type="button"
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
-            onClick={() => alert("Account deletion not implemented yet")}
-          >
-            Delete Account
-          </button>
+          {!confirmOpen ? (
+            <button
+              type="button"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
+              onClick={() => setConfirmOpen(true)}
+            >
+              Delete Account
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-sm text-gray-700 dark:text-gray-300">
+                Type <span className="font-mono font-semibold">{session?.user?.email}</span> to confirm:
+              </label>
+              <input
+                type="email"
+                autoComplete="off"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                placeholder={session?.user?.email || "your email"}
+              />
+              {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    setConfirmText("");
+                    setDeleteError(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting || confirmText !== session?.user?.email}
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+                >
+                  {deleting ? "Deleting…" : "Permanently delete my account"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

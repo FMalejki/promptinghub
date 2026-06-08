@@ -28,23 +28,23 @@ export default function RegisterPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white border border-gray-200 rounded p-8">
-        <h1 className="text-xl font-medium text-gray-900 mb-1">Create account</h1>
-        <p className="text-sm text-gray-500 mb-6">Use email and a password (min 8 chars).</p>
+      <div className="w-full max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-8">
+        <h1 className="text-xl font-medium text-gray-900 dark:text-white mb-1">Create account</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Use email and a password (min 8 chars).</p>
         <form onSubmit={onSubmit} className="space-y-3">
           <input
             type="text"
             placeholder="Account name (optional)"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
           />
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
             required
           />
           <input
@@ -53,15 +53,15 @@ export default function RegisterPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
             required
           />
-          {err && <p className="text-xs text-red-600">{err}</p>}
-          <button className="w-full bg-gray-800 hover:bg-gray-900 text-white text-sm rounded py-2">Register</button>
+          {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
+          <button className="w-full bg-gray-800 hover:bg-gray-900 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-sm rounded py-2">Register</button>
         </form>
-        <p className="mt-6 text-xs text-gray-500 text-center">
+        <p className="mt-6 text-xs text-gray-500 dark:text-gray-400 text-center">
           Have an account?{" "}
-          <Link href="/login" className="text-gray-800 underline">Sign in</Link>
+          <Link href="/login" className="text-gray-800 dark:text-gray-200 underline">Sign in</Link>
         </p>
       </div>
     </main>

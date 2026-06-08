@@ -1,52 +1,55 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { listPrompts, createPrompt } from "@/lib/prompts";
+import { newPromptSchema } from "@/lib/promptInput";
+import { rankBySearch } from "@/lib/search";
+import { parseLimit, parseOffset, nextOffset } from "@/lib/pagination";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const url = new URL(req.url);
   const q = url.searchParams.get("q") || undefined;
   const category = url.searchParams.get("category") || undefined;
-  const sort = (url.searchParams.get("sort") as "recent" | "popular") || "recent";
+  const model = url.searchParams.get("model") || undefined;
+  const imageOnly = url.searchParams.get("image") === "1";
+  const tag = url.searchParams.get("tag") || undefined;
+  const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied" | "viewed") || "recent";
   const ownerEmail = url.searchParams.get("owner") || undefined;
-  
+  const limit = parseLimit(url.searchParams.get("limit"));
+  const offset = parseOffset(url.searchParams.get("offset"));
+
   const db = await getDb();
   const prompts = await listPrompts(db, {
-    q,
+    // When searching, DON'T narrow by `q` at the DB (a substring regex misses
+    // typos/fuzzy) — fetch the candidate pool and let rankBySearch filter+rank
+    // it in memory below. Other filters (category/tag/…) still apply.
+    q: undefined,
     category,
+    model,
+    imageOnly,
+    tag,
     sort,
     ownerEmail,
     includePrivate: !!session?.user?.email,
     userEmail: session?.user?.email || undefined,
+    // Search paginates after ranking; everything else paginates at the DB.
+    ...(q ? {} : { limit, skip: offset }),
   });
-  
-  return NextResponse.json({ prompts });
+
+  // When searching, order by relevance (name > tags > description) instead of the default sort.
+  let ranked = q ? rankBySearch(q, prompts) : prompts;
+  if (q && limit !== undefined) ranked = ranked.slice(offset, offset + limit);
+
+  return NextResponse.json({ prompts: ranked, nextOffset: nextOffset(ranked.length, limit, offset) });
 }
-
-const testedModelSchema = z.object({
-  modelId: z.string().min(1),
-  version: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const schema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().min(1).max(300),
-  category: z.string().min(1).max(40),
-  body: z.string().min(1).max(5000),
-  image: z.string().url().optional().or(z.literal("")),
-  isPrivate: z.boolean().optional(),
-  testedModels: z.array(testedModelSchema).optional(),
-});
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const created = await createPrompt(await getDb(), email, {
     ...parsed.data,

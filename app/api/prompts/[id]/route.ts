@@ -2,16 +2,17 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getPrompt } from "@/lib/prompts";
-import { getProfile } from "@/lib/users";
+import { getPrompt, getPromptDetail, updatePrompt, deletePrompt } from "@/lib/prompts";
+import { newPromptSchema } from "@/lib/promptInput";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const db = await getDb();
-  const prompt = await getPrompt(db, params.id);
 
+  // Fetch with body/owner info to enforce privacy gate.
+  const prompt = await getPrompt(db, params.id);
   if (!prompt) {
-    return NextResponse.json({ error: "Prompt not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Check if user has access to private prompt
@@ -26,13 +27,29 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
   }
 
-  // Get author info
-  const author = await getProfile(db, prompt.ownerEmail);
-
-  return NextResponse.json({
-    prompt,
-    author: author || { email: prompt.ownerEmail, name: prompt.ownerEmail.split("@")[0], image: null },
-  });
+  // Return the rich detail object (files, image, stars, testedModels, author, handle/slug).
+  const detail = await getPromptDetail(db, params.id);
+  if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(detail);
 }
 
-// Made with Bob
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  const { message, ...data } = parsed.data;
+  const ok = await updatePrompt(await getDb(), params.id, email, { ...data, image: data.image || undefined }, { message });
+  if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ok = await deletePrompt(await getDb(), params.id, email);
+  if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
