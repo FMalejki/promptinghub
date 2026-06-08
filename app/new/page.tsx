@@ -41,6 +41,7 @@ export default function NewPromptPage() {
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
   const AI_MODELS = useModels();
+  const [modelQuery, setModelQuery] = useState("");
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
   const [modelVersions, setModelVersions] = useState<Record<string, string>>({});
   const [modelNotes, setModelNotes] = useState<Record<string, string>>({});
@@ -439,8 +440,34 @@ export default function NewPromptPage() {
               Select the AI models you've tested this prompt with (optional)
             </p>
 
-            <div className="space-y-3">
-              {AI_MODELS.map((model) => (
+            {(() => {
+              const q = modelQuery.trim().toLowerCase();
+              const visibleModels = q
+                ? AI_MODELS.filter(
+                    (m) =>
+                      m.name.toLowerCase().includes(q) ||
+                      m.provider.toLowerCase().includes(q) ||
+                      m.id.toLowerCase().includes(q),
+                  )
+                : (() => {
+                    // Default to a manageable common set (the live catalogue can be
+                    // 300+ models); always keep anything already selected visible.
+                    const top = AI_MODELS.slice(0, 24);
+                    const ids = new Set(top.map((t) => t.id));
+                    const selectedExtra = AI_MODELS.filter((m) => selectedModels.has(m.id) && !ids.has(m.id));
+                    return [...top, ...selectedExtra];
+                  })();
+              return (
+                <>
+                  <input
+                    type="text"
+                    value={modelQuery}
+                    onChange={(e) => setModelQuery(e.target.value)}
+                    placeholder={`Search ${AI_MODELS.length} models…`}
+                    className="w-full mb-3 px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                  />
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+              {visibleModels.map((model) => (
                 <div key={model.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <input
@@ -478,7 +505,13 @@ export default function NewPromptPage() {
                   </div>
                 </div>
               ))}
-            </div>
+                  </div>
+                  {q && visibleModels.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No models match “{modelQuery}”.</p>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Error */}
