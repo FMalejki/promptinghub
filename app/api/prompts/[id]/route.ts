@@ -28,7 +28,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
 
   // Return the rich detail object (files, image, stars, testedModels, author, handle/slug).
-  const detail = await getPromptDetail(db, params.id);
+  // Pass the viewer's email so isStarred reflects their own star state.
+  const detail = await getPromptDetail(db, params.id, session?.user?.email);
   if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(detail);
 }

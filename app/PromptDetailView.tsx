@@ -51,6 +51,7 @@ export type PromptDetail = {
   forkCount?: number;
   createdAt: string;
   updatedAt?: string | null;
+  isStarred?: boolean;
   handle?: string;
   slug?: string;
 };
@@ -61,7 +62,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [stars, setStars] = useState(prompt.stars);
   const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
   const [counted, setCounted] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
+  const [isStarred, setIsStarred] = useState(prompt.isStarred ?? false);
   const [isPinned, setIsPinned] = useState(false);
 
   // Record a copy at most once per page view so the counter reflects users, not clicks.
