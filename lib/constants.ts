@@ -55,18 +55,31 @@ export type TestedModel = {
   notes?: string;
 };
 
-// Placeholder images dla promptów bez własnego obrazka
-export const PLACEHOLDER_IMAGES = [
-  "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=300&fit=crop",
-  "https://images.unsplash.com/photo-1676277791608-ac54525aa94d?w=400&h=300&fit=crop",
-  "https://images.unsplash.com/photo-1675557009875-37f2f8e5e2e4?w=400&h=300&fit=crop",
-  "https://images.unsplash.com/photo-1677756119517-756a188d2d94?w=400&h=300&fit=crop",
-  "https://images.unsplash.com/photo-1676299081847-824916de030a?w=400&h=300&fit=crop",
-];
+// Deterministic, self-contained placeholder for prompts without their own image.
+// Previously these were external Unsplash URLs — but those 404'd / got blocked,
+// and the <img onError> fallback pointed at *another* Unsplash URL, so a broken
+// card stayed broken. An inline SVG data URI can never fail to load.
+function hashSeed(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return h;
+}
 
 export function getPlaceholderImage(seed: string): string {
-  const hash = seed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return PLACEHOLDER_IMAGES[hash % PLACEHOLDER_IMAGES.length];
+  const h = hashSeed(seed);
+  const hue = h % 360;
+  const hue2 = (hue + 40) % 360;
+  // A soft diagonal gradient with a faint sparkle glyph, sized 4:3 to match cards.
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0%" stop-color="hsl(${hue},70%,62%)"/>` +
+    `<stop offset="100%" stop-color="hsl(${hue2},68%,48%)"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="400" height="300" fill="url(#g)"/>` +
+    `<path d="M200 120l9 28h29l-23 17 9 28-24-17-24 17 9-28-23-17h29z" fill="rgba(255,255,255,0.55)"/>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 // Resolve a prompt's banner image, falling back to a deterministic placeholder.
