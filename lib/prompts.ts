@@ -392,7 +392,13 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
 }
 
 // Owner-scoped update. Returns true only when the prompt exists AND belongs to ownerEmail.
-export async function updatePrompt(db: Db, id: string, ownerEmail: string, data: Partial<NewPrompt>): Promise<boolean> {
+export async function updatePrompt(
+  db: Db,
+  id: string,
+  ownerEmail: string,
+  data: Partial<NewPrompt>,
+  opts?: { message?: string },
+): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
   const set: Record<string, unknown> = {};
   if (data.name !== undefined) set.name = data.name;
@@ -418,12 +424,16 @@ export async function updatePrompt(db: Db, id: string, ownerEmail: string, data:
   const contentChanged = set.name !== undefined || set.body !== undefined || set.files !== undefined;
   if (contentChanged) {
     const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;
+    // The "commit message" describes the edit being applied now; the snapshot
+    // captures the prior content that this edit replaces.
+    const message = (opts?.message ?? "").trim().slice(0, 200);
     await db.collection("promptVersions").insertOne({
       promptId: id,
       version,
       name: current.name,
       body: current.body ?? "",
       files: current.files ?? null,
+      message,
       createdAt: new Date(),
     });
   }

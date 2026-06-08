@@ -15,6 +15,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
   const [price, setPrice] = useState("0");
   const [tags, setTags] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
+  const [changeNote, setChangeNote] = useState("");
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +62,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     const res = await fetch(`/api/prompts/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles }),
+      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles, message: changeNote.trim() || undefined }),
     });
     setSaving(false);
     if (res.ok) router.push(`/prompt/${params.id}`);
@@ -146,6 +147,19 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
 
           {/* Prompt quality (advisory, computed live in the browser) */}
           <PromptQuality text={[meta.description, ...files.map((f) => f.content)].filter(Boolean).join("\n\n")} />
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <label className={label} htmlFor="change-note">Describe your changes (optional)</label>
+            <input
+              id="change-note"
+              className={input}
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              placeholder="e.g. Tightened the system prompt, added a few-shot example"
+              maxLength={200}
+            />
+            <p className="mt-1 text-xs text-gray-400">Saved as a “commit” in this prompt’s change history.</p>
+          </div>
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

@@ -1,7 +1,7 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { createPrompt, updatePrompt } from "../lib/prompts";
-import { listVersions } from "../lib/versions";
+import { listVersions, restoreVersion } from "../lib/versions";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -51,5 +51,36 @@ describe("prompt versioning", () => {
     await updatePrompt(db, id, "a@x.com", { files: [{ path: "a.md", content: "new" }] });
     const [v] = await listVersions(db, id);
     expect(v.files?.[0]).toMatchObject({ path: "a.md", content: "old" });
+  });
+});
+
+describe("commit messages on versions", () => {
+  it("stores the change message ('commit') and returns it newest-first", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Writing", body: "v1" });
+    await updatePrompt(db, id, "a@x.com", { body: "v2" }, { message: "tighten wording" });
+    const [v] = await listVersions(db, id);
+    expect(v.message).toBe("tighten wording");
+  });
+
+  it("defaults the message to an empty string when none is given", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Writing", body: "v1" });
+    await updatePrompt(db, id, "a@x.com", { body: "v2" });
+    const [v] = await listVersions(db, id);
+    expect(v.message).toBe("");
+  });
+
+  it("trims and caps the message at 200 chars", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Writing", body: "v1" });
+    await updatePrompt(db, id, "a@x.com", { body: "v2" }, { message: "  " + "x".repeat(250) + "  " });
+    const [v] = await listVersions(db, id);
+    expect(v.message).toHaveLength(200);
+  });
+
+  it("labels a restore as its own commit", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Writing", body: "v1" });
+    await updatePrompt(db, id, "a@x.com", { body: "v2" });
+    await restoreVersion(db, id, "a@x.com", 1);
+    const versions = await listVersions(db, id);
+    expect(versions[0].message).toMatch(/Restored v1/);
   });
 });

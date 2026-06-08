@@ -6,15 +6,18 @@ export type PromptVersion = {
   name: string;
   body: string;
   files: PromptFile[] | null;
+  message: string;
   createdAt: Date;
 };
 
 // Snapshot a prompt's current (about-to-be-replaced) state. Called by updatePrompt
-// before applying an edit, so each version captures the PRIOR content.
+// before applying an edit, so each version captures the PRIOR content. The
+// optional message is the "commit message" describing the edit being applied.
 export async function snapshotVersion(
   db: Db,
   promptId: string,
-  prior: { name: string; body?: string; files?: PromptFile[] | null }
+  prior: { name: string; body?: string; files?: PromptFile[] | null },
+  message?: string
 ): Promise<void> {
   const version = (await db.collection("promptVersions").countDocuments({ promptId })) + 1;
   await db.collection("promptVersions").insertOne({
@@ -23,6 +26,7 @@ export async function snapshotVersion(
     name: prior.name,
     body: prior.body ?? "",
     files: prior.files ?? null,
+    message: (message ?? "").trim().slice(0, 200),
     createdAt: new Date(),
   });
 }
@@ -35,6 +39,7 @@ export async function listVersions(db: Db, promptId: string): Promise<PromptVers
     name: r.name,
     body: r.body ?? "",
     files: r.files ? normalizeFiles({ files: r.files }) : null,
+    message: r.message ?? "",
     createdAt: r.createdAt,
   }));
 }
@@ -45,9 +50,10 @@ export async function listVersions(db: Db, promptId: string): Promise<PromptVers
 export async function restoreVersion(db: Db, promptId: string, ownerEmail: string, version: number): Promise<boolean> {
   const row = await db.collection("promptVersions").findOne({ promptId, version });
   if (!row) return false;
+  const message = `Restored v${version}`;
   if (row.files) {
     const files = normalizeFiles({ files: row.files });
-    return updatePrompt(db, promptId, ownerEmail, { name: row.name, files });
+    return updatePrompt(db, promptId, ownerEmail, { name: row.name, files }, { message });
   }
-  return updatePrompt(db, promptId, ownerEmail, { name: row.name, body: row.body ?? "" });
+  return updatePrompt(db, promptId, ownerEmail, { name: row.name, body: row.body ?? "" }, { message });
 }

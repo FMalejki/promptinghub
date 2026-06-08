@@ -7,6 +7,7 @@ type Version = {
   name: string;
   body: string;
   files: { path: string; content: string }[] | null;
+  message: string;
   createdAt: string;
 };
 
@@ -52,20 +53,25 @@ export function VersionHistory({
   return (
     <div className="mt-8">
       <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-        Version history <span className="text-gray-400">({versions.length} previous)</span>
+        Change history <span className="text-gray-400">({versions.length} {versions.length === 1 ? "commit" : "commits"})</span>
       </h2>
       <ul className="space-y-2">
         {versions.map((v) => (
           <li key={v.version} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <button
               onClick={() => setOpen(open === v.version ? null : v.version)}
-              className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-900 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full flex items-center justify-between gap-3 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
             >
-              <span className="text-gray-700 dark:text-gray-300">
-                <span className="font-mono text-xs text-gray-400 mr-2">v{v.version}</span>
-                {v.name}
+              <span className="flex items-center gap-2 min-w-0">
+                <svg className="w-3.5 h-3.5 shrink-0 text-gray-400" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                  <path d="M8 1a4 4 0 0 0-3.874 3H1v2h3.126A4 4 0 0 0 8 9a4 4 0 0 0 3.874-3H15V4h-3.126A4 4 0 0 0 8 1Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" />
+                </svg>
+                <span className="font-mono text-xs text-gray-400 shrink-0">v{v.version}</span>
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {v.message || <span className="italic text-gray-400">Edited “{v.name}”</span>}
+                </span>
               </span>
-              <span className="text-xs text-gray-400">{new Date(v.createdAt).toLocaleString()}</span>
+              <span className="text-xs text-gray-400 shrink-0">{new Date(v.createdAt).toLocaleString()}</span>
             </button>
             {open === v.version && (
               <div className="p-4 space-y-3 bg-white dark:bg-gray-800">
