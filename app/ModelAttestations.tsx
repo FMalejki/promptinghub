@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AI_MODELS, getModelName } from "@/lib/constants";
 
-type Vote = "works" | "broken";
-type ModelSummary = { modelId: string; works: number; broken: number; youVoted: Vote | null };
+type Vote = "works" | "broken" | "mixed";
+type ModelSummary = { modelId: string; works: number; broken: number; mixed: number; youVoted: Vote | null };
 
 // Community attestations: confirm/deny a prompt works on a model, and add models
 // the author didn't list. Optimistic-ish: re-fetches the authoritative summary
@@ -77,6 +77,18 @@ export function ModelAttestations({ promptId }: { promptId: string }) {
                   }`}
                 >
                   ✓ Works {m.works > 0 && <span className="tabular-nums">{m.works}</span>}
+                </button>
+                <button
+                  onClick={() => vote(m.modelId, "mixed", m.youVoted)}
+                  disabled={!authed || busy === m.modelId}
+                  title="Works partially / inconsistently"
+                  className={`px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 ${
+                    m.youVoted === "mixed"
+                      ? "bg-amber-500 border-amber-500 text-white"
+                      : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                  }`}
+                >
+                  ~ Mixed {m.mixed > 0 && <span className="tabular-nums">{m.mixed}</span>}
                 </button>
                 <button
                   onClick={() => vote(m.modelId, "broken", m.youVoted)}
