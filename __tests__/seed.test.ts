@@ -2,8 +2,9 @@ import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { seedDatabase, SEED_SOURCE, SEED_COLLECTIONS } from "../lib/seed";
 import { AWESOME_PROMPTS } from "../scripts/seed-data/awesome-prompts";
+import { PRO_PROMPTS } from "../scripts/seed-data/pro-prompts";
 import { listPublicCollections } from "../lib/collections";
-import { PROMPT_CATEGORIES } from "../lib/constants";
+import { PROMPT_CATEGORIES, AI_MODELS } from "../lib/constants";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -44,6 +45,60 @@ describe("dataset integrity", () => {
     for (const c of SEED_COLLECTIONS) {
       for (const n of c.prompts) expect(names.has(n)).toBe(true);
     }
+  });
+});
+
+describe("PRO_PROMPTS dataset integrity", () => {
+  const validCategories = new Set<string>(PROMPT_CATEGORIES as readonly string[]);
+  const validModelIds = new Set<string>(AI_MODELS.map((m) => m.id));
+
+  it("every pro prompt has a valid category, tags, content, and a named author", () => {
+    expect(PRO_PROMPTS.length).toBeGreaterThanOrEqual(12);
+    for (const p of PRO_PROMPTS) {
+      expect(validCategories.has(p.category)).toBe(true);
+      expect(p.tags.length).toBeGreaterThan(0);
+      expect(p.name.length).toBeGreaterThan(0);
+      expect(p.description.trim().length).toBeGreaterThan(20);
+      const hasContent =
+        (p.body?.trim().length ?? 0) > 40 || (p.files?.some((f) => f.content.trim().length > 40) ?? false);
+      expect(hasContent).toBe(true);
+      // realistic per-prompt author so the platform reads like real users
+      expect(p.authorEmail && p.authorEmail.includes("@")).toBeTruthy();
+      expect((p.authorName ?? "").length).toBeGreaterThan(0);
+    }
+  });
+
+  it("multi-file prompts have non-empty file paths + content", () => {
+    for (const p of PRO_PROMPTS) {
+      if (!p.files) continue;
+      for (const f of p.files) {
+        expect(f.path.trim().length).toBeGreaterThan(0);
+        expect(f.content.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("testedModels only reference known model ids", () => {
+    for (const p of PRO_PROMPTS) {
+      for (const id of p.testedModels ?? []) expect(validModelIds.has(id)).toBe(true);
+    }
+  });
+
+  it("author emails are unique-per-person (a handful of believable creators)", () => {
+    const authors = new Set(PRO_PROMPTS.map((p) => p.authorEmail));
+    expect(authors.size).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("seedDatabase attribution", () => {
+  it("pro set with defaultSource:null is NOT attributed to the CC0 batch", async () => {
+    await seedDatabase(db, PRO_PROMPTS, { ...owner, defaultSource: null });
+    const doc = await db.collection("prompts").findOne({ name: PRO_PROMPTS[0].name });
+    expect(doc?.seeded).toBe(true);
+    expect(doc?.source).not.toBe(SEED_SOURCE.name); // no false CC0 attribution
+    expect(doc?.source ?? null).toBeNull();
+    // authored under its own creator account
+    expect(doc?.ownerEmail).toBe(PRO_PROMPTS[0].authorEmail);
   });
 });
 

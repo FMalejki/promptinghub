@@ -18,7 +18,10 @@ export type SeedPrompt = {
   files?: { path: string; content: string }[];
   // Model ids this prompt was tested on, e.g. ["gemini-2.0-flash", "gpt-4o"].
   testedModels?: string[];
+  // Per-prompt attribution. Overrides the dataset-level default source.
+  source?: string;
   sourceUrl?: string;
+  sourceLicense?: string;
   sourceAuthor?: string;
   // Optional per-prompt author (creates/uses that PromptingHub account) so a seed
   // batch can be spread across multiple believable authors, not just the runner.
@@ -72,10 +75,18 @@ export type SeedResult = {
 export async function seedDatabase(
   db: Db,
   dataset: SeedPrompt[],
-  opts: { ownerEmail: string; ownerName?: string },
+  opts: {
+    ownerEmail: string;
+    ownerName?: string;
+    // Attribution applied to prompts that don't carry their own `source`.
+    // Defaults to the CC0 awesome-chatgpt-prompts batch. Pass `null` for an
+    // original/community dataset so prompts aren't falsely attributed.
+    defaultSource?: { name: string; url: string; license: string } | null;
+  },
 ): Promise<SeedResult> {
   const ownerEmail = opts.ownerEmail;
   const ownerName = opts.ownerName || ownerEmail.split("@")[0];
+  const defaultSource = opts.defaultSource === undefined ? SEED_SOURCE : opts.defaultSource;
 
   // Ensure a user doc exists so the prompts/collections have a named owner
   // (listPublicCollections looks the owner up in `users`).
@@ -120,14 +131,15 @@ export async function seedDatabase(
       tags: sp.tags,
       testedModels: (sp.testedModels ?? []).map((modelId) => ({ modelId })),
     });
-    // Stamp attribution (CC0 doesn't require it, but we keep it as good practice).
+    // Stamp attribution. Per-prompt `source` wins; otherwise the dataset default
+    // (CC0 batch, or null for an original/community set).
     await db.collection("prompts").updateOne(
       { _id: new ObjectId(created.id) },
       {
         $set: {
-          source: SEED_SOURCE.name,
-          sourceUrl: sp.sourceUrl ?? SEED_SOURCE.url,
-          sourceLicense: SEED_SOURCE.license,
+          source: sp.source ?? defaultSource?.name ?? null,
+          sourceUrl: sp.sourceUrl ?? (sp.source ? null : defaultSource?.url ?? null),
+          sourceLicense: sp.sourceLicense ?? (sp.source ? null : defaultSource?.license ?? null),
           sourceAuthor: sp.sourceAuthor ?? null,
           seeded: true,
         },
