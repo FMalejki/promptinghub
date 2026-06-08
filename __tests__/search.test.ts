@@ -29,3 +29,35 @@ describe("rankBySearch", () => {
     expect(ranked.map((p) => p.id)).toEqual(["A"]);
   });
 });
+
+describe("scorePromptMatch — relevance refinements", () => {
+  const exact = { id: "E", name: "Email", description: "", tags: [] };
+  const contains = { id: "C2", name: "Email writer pro", description: "", tags: [] };
+
+  it("ranks an exact name match above a name that merely contains the query", () => {
+    expect(scorePromptMatch("email", exact)).toBeGreaterThan(scorePromptMatch("email", contains));
+  });
+
+  it("gives a prefix bonus when the name starts with the query", () => {
+    const starts = { id: "S", name: "Regex builder", description: "", tags: [] };
+    const mid = { id: "M", name: "Build a regex", description: "", tags: [] };
+    expect(scorePromptMatch("regex", starts)).toBeGreaterThan(scorePromptMatch("regex", mid));
+  });
+
+  it("rewards a whole-word token over a mere substring", () => {
+    const word = { id: "W", name: "cat facts", description: "", tags: [] };
+    const sub = { id: "U", name: "category sorter", description: "", tags: [] };
+    expect(scorePromptMatch("cat", word)).toBeGreaterThan(scorePromptMatch("cat", sub));
+  });
+
+  it("tolerates a single-character typo (fuzzy) for longer tokens", () => {
+    const p = { id: "F", name: "Email writer", description: "", tags: [] };
+    expect(scorePromptMatch("emial", p)).toBeGreaterThan(0); // transposition
+    expect(scorePromptMatch("emai", p)).toBeGreaterThan(0); // deletion (also prefix)
+  });
+
+  it("does not fuzzy-match very short tokens (avoids noise)", () => {
+    const p = { id: "G", name: "cat", description: "", tags: [] };
+    expect(scorePromptMatch("dog", p)).toBe(0);
+  });
+});
