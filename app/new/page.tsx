@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
@@ -109,13 +110,33 @@ export default function NewPromptPage() {
     }
   }
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
-
-  if (status !== "authenticated") return null;
+  // Don't flash a blank page while the session resolves, and don't hard-redirect
+  // unauthenticated visitors — show a Navbar + a clear sign-in CTA instead.
+  if (status !== "authenticated") {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navbar />
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          {status === "loading" ? (
+            <p className="text-center text-gray-400">Loading…</p>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Sign in to create a prompt</h1>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">You need an account to publish prompts to PromptingHub. It's free.</p>
+              <div className="flex items-center justify-center gap-3">
+                <Link href="/login?callbackUrl=/new" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">Sign in</Link>
+                <Link href="/register" className="px-5 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Create account</Link>
+              </div>
+              <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                Meanwhile, <Link href="/templates" className="text-blue-600 dark:text-blue-400 hover:underline">browse prompt templates</Link> or{" "}
+                <Link href="/browse" className="text-blue-600 dark:text-blue-400 hover:underline">explore the community</Link>.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
 
   function toggleModel(modelId: string) {
     const newSelected = new Set(selectedModels);
