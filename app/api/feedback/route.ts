@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { isVerifiedEmail } from "@/lib/users";
 import { submitFeedback, listFeedback } from "@/lib/feedback";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 const schema = z.object({
   message: z.string().min(1).max(2000),
@@ -16,9 +17,12 @@ const schema = z.object({
 // Submit product feedback. Open to anyone; signed-in users are attributed by email.
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
+  const db = await getDb();
+  // Throttle feedback: 8 per IP per 10 minutes (anti spam — it's unauthenticated).
+  const rl = await rateLimit(db, `feedback:${clientIp(req)}`, 8, 10 * 60_000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many submissions. Please try again later." }, { status: 429 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const db = await getDb();
   const res = await submitFeedback(db, {
     message: parsed.data.message,
     category: parsed.data.category,
