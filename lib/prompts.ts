@@ -869,6 +869,41 @@ export async function getFavorites(db: Db, userEmail: string): Promise<string[]>
   return user?.favorites || [];
 }
 
+/**
+ * Locked prompts that have been explicitly shared with `email` (the owner sees
+ * their own under their dashboard, not here). Returns safe card fields only —
+ * NEVER the decrypted body/files or the sharedWith allowlist.
+ */
+export async function listSharedWithMe(db: Db, email: string): Promise<Prompt[]> {
+  if (!email) return [];
+  const rows = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { sharedWith: email, locked: true } },
+      { $addFields: { stars: { $size: { $ifNull: ["$starredBy", []] } } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
+      { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+    ])
+    .toArray();
+  return rows.map((r: any) => ({
+    id: r._id.toString(),
+    name: r.name,
+    description: r.description,
+    category: r.category,
+    image: r.image ?? null,
+    stars: r.stars || 0,
+    isPrivate: r.isPrivate || false,
+    testedModels: r.testedModels || [],
+    copyCount: r.copyCount || 0,
+    priceCents: r.priceCents || 0,
+    tags: r.tags || [],
+    createdAt: r.createdAt,
+    locked: true,
+    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+  }));
+}
+
 export async function sharePrompt(db: Db, promptId: string, ownerEmail: string, shareWithEmail: string): Promise<boolean> {
   if (!ObjectId.isValid(promptId)) return false;
   const prompt = await db.collection("prompts").findOne({ _id: new ObjectId(promptId) });

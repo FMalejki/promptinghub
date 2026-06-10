@@ -2,7 +2,7 @@ process.env.PROMPT_ENC_KEY = "0".repeat(64);
 
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { createPrompt, getPromptDetail, updatePrompt, normalizeEmails, listPrompts } from "../lib/prompts";
+import { createPrompt, getPromptDetail, updatePrompt, normalizeEmails, listPrompts, listSharedWithMe } from "../lib/prompts";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -120,6 +120,37 @@ describe("locked prompts", () => {
     const row = rows.find((r) => r.name === "Secret Sauce");
     expect(row?.locked).toBe(true);
     expect(JSON.stringify(row)).not.toContain("TOP SECRET INSTRUCTIONS");
+  });
+
+  it("listSharedWithMe returns locked prompts shared with the viewer, as safe cards", async () => {
+    // shared+locked → included
+    await makeLocked({ name: "Shared One", sharedWith: [STRANGER] });
+    // locked but NOT shared with STRANGER → excluded
+    await makeLocked({ name: "Not Shared" });
+    // shared with STRANGER but NOT locked → excluded (only locked prompts are "shared")
+    await createPrompt(db, OWNER, {
+      name: "Public Shared",
+      description: "d",
+      category: "Coding",
+      body: "plain",
+    });
+    await db.collection("prompts").updateOne({ name: "Public Shared" }, { $set: { sharedWith: [STRANGER] } });
+
+    const mine = await listSharedWithMe(db, STRANGER);
+    expect(mine.map((p) => p.name)).toEqual(["Shared One"]);
+    const card = mine[0] as Record<string, unknown>;
+    expect(card.locked).toBe(true);
+    // card carries no decrypted content and no allowlist
+    expect(JSON.stringify(card)).not.toContain("TOP SECRET INSTRUCTIONS");
+    expect(card).not.toHaveProperty("sharedWith");
+    expect(card).not.toHaveProperty("body");
+    expect(card).not.toHaveProperty("enc");
+  });
+
+  it("listSharedWithMe is empty for a user with nothing shared", async () => {
+    await makeLocked({ sharedWith: [STRANGER] });
+    expect(await listSharedWithMe(db, "nobody@z.com")).toEqual([]);
+    expect(await listSharedWithMe(db, "")).toEqual([]);
   });
 
   it("normalizeEmails dedupes, lowercases, trims and drops invalid", () => {
