@@ -8,7 +8,7 @@ import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
 import { applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
-import { pickReadme } from "@/lib/markdown";
+import { resolveReadme } from "@/lib/markdown";
 import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
@@ -49,6 +49,7 @@ export type PromptDetail = {
   tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
   forkCount?: number;
+  readme?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
@@ -219,7 +220,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const filled = useMemo(() => files.map((f) => ({ ...f, content: applyVariables(f.content, values) })), [files, values]);
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
-  const readme = useMemo(() => pickReadme(files), [files]);
+  const readme = useMemo(() => resolveReadme(prompt.readme, files), [prompt.readme, files]);
   // Active tab for multi-file prompts (falls back to the first file).
   const activeIdx = activeFileIndex(filled.map((f) => f.path), activeFile);
   const stats = useMemo(() => promptStats(allText), [allText]);

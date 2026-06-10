@@ -25,6 +25,8 @@ export const newPromptSchema = z
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
     forkedFrom: z.string().max(64).optional(),
+    // Optional author-written README (markdown), shown above the files.
+    readme: z.string().max(20000).optional(),
     // Emails allowed to read a PRIVATE prompt (array, or a comma/newline string
     // from the share textarea). Normalized server-side in lib/prompts.
     sharedWith: z.union([z.string().max(4000), z.array(z.string().max(200)).max(200)]).optional(),
