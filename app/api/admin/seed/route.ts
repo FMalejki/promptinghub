@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { verifyBearerToken } from "@/lib/bearerAuth";
 import { getDb } from "@/lib/db";
 import { seedDatabase, SEED_SOURCE, type SeedPrompt } from "@/lib/seed";
 import { AWESOME_PROMPTS } from "@/scripts/seed-data/awesome-prompts";
@@ -14,15 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function authorized(req: NextRequest): boolean {
-  const expected = process.env.SEED_ADMIN_TOKEN;
-  if (!expected) return false; // endpoint is off unless a token is configured
-  const header = req.headers.get("authorization") || "";
-  const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (!provided) return false;
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return verifyBearerToken(req.headers.get("authorization"), process.env.SEED_ADMIN_TOKEN);
 }
 
 export async function POST(req: NextRequest) {
