@@ -2,7 +2,7 @@ process.env.PROMPT_ENC_KEY = "0".repeat(64);
 
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { createPrompt, getPromptDetail, updatePrompt } from "../lib/prompts";
+import { createPrompt, getPromptDetail, updatePrompt, normalizeEmails } from "../lib/prompts";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -25,13 +25,14 @@ beforeEach(async () => {
 const OWNER = "owner@x.com";
 const STRANGER = "someone@y.com";
 
-async function makeLocked() {
+async function makeLocked(extra: Record<string, unknown> = {}) {
   return createPrompt(db, OWNER, {
     name: "Secret Sauce",
     description: "hidden",
     category: "Coding",
     files: [{ path: "system.md", content: "TOP SECRET INSTRUCTIONS" }],
     locked: true,
+    ...extra,
   });
 }
 
@@ -71,6 +72,42 @@ describe("locked prompts", () => {
     const shared = await getPromptDetail(db, id, STRANGER);
     expect(shared?.lockedForViewer).toBe(false);
     expect(shared?.files[0].content).toBe("TOP SECRET INSTRUCTIONS");
+  });
+
+  it("shares via createPrompt sharedWith (real create path, not a direct DB write)", async () => {
+    const { id } = await makeLocked({ sharedWith: [`  ${STRANGER.toUpperCase()} `, STRANGER, "not-an-email"] });
+    // normalized + deduped + lowercased, invalid dropped
+    const raw = await db.collection("prompts").findOne({ name: "Secret Sauce" });
+    expect(raw?.sharedWith).toEqual([STRANGER]);
+    // the listed user decrypts; an unlisted stranger stays redacted
+    expect((await getPromptDetail(db, id, STRANGER))?.files[0].content).toBe("TOP SECRET INSTRUCTIONS");
+    const other = await getPromptDetail(db, id, "nobody@z.com");
+    expect(other?.lockedForViewer).toBe(true);
+    expect(other?.files).toHaveLength(0);
+  });
+
+  it("updatePrompt can grant then revoke share access without exposing plaintext", async () => {
+    const { id } = await makeLocked();
+    expect((await getPromptDetail(db, id, STRANGER))?.lockedForViewer).toBe(true);
+    // grant
+    await updatePrompt(db, id, OWNER, { sharedWith: [STRANGER] });
+    expect((await getPromptDetail(db, id, STRANGER))?.files[0].content).toBe("TOP SECRET INSTRUCTIONS");
+    // still ciphertext at rest
+    const raw = await db.collection("prompts").findOne({ name: "Secret Sauce" });
+    expect(raw?.body).toBe("");
+    expect(JSON.stringify(raw)).not.toContain("TOP SECRET INSTRUCTIONS");
+    // revoke
+    await updatePrompt(db, id, OWNER, { sharedWith: [] });
+    const after = await getPromptDetail(db, id, STRANGER);
+    expect(after?.lockedForViewer).toBe(true);
+    expect(after?.files).toHaveLength(0);
+  });
+
+  it("normalizeEmails dedupes, lowercases, trims and drops invalid", () => {
+    expect(normalizeEmails(["  A@B.com ", "a@b.com", "x", "c@d.io"])).toEqual(["a@b.com", "c@d.io"]);
+    expect(normalizeEmails("a@b.com, c@d.io\n a@b.com")).toEqual(["a@b.com", "c@d.io"]);
+    expect(normalizeEmails(undefined)).toEqual([]);
+    expect(normalizeEmails("")).toEqual([]);
   });
 
   it("locking a previously-public prompt purges plaintext version history", async () => {
