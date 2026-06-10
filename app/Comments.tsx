@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "./Avatar";
+import { MentionTextarea } from "./components/MentionTextarea";
 import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
@@ -196,9 +197,9 @@ export function Comments({ promptId }: { promptId: string }) {
           </div>
           {editing === c.id ? (
             <div className="mt-1">
-              <textarea
+              <MentionTextarea
                 value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
+                onChange={setEditBody}
                 rows={2}
                 maxLength={2000}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -248,12 +249,12 @@ export function Comments({ promptId }: { promptId: string }) {
           </div>
           {replyTo === c.id && (
             <div className="mt-2">
-              <textarea
+              <MentionTextarea
                 value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
+                onChange={setReplyBody}
                 rows={2}
                 maxLength={2000}
-                placeholder="Write a reply… use @handle to mention"
+                placeholder="Write a reply… type @ to mention someone"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="mt-1 flex justify-end">
@@ -306,12 +307,12 @@ export function Comments({ promptId }: { promptId: string }) {
 
       {session?.user?.email ? (
         <form onSubmit={post} className="mb-6">
-          <textarea
+          <MentionTextarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={setBody}
             rows={3}
             maxLength={2000}
-            placeholder="Share how you used this prompt… use @handle to mention"
+            placeholder="Share how you used this prompt… type @ to mention someone"
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <div className="mt-2 flex justify-end">
