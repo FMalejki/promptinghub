@@ -20,6 +20,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection("prompts").deleteMany({});
   await db.collection("promptVersions").deleteMany({});
+  await db.collection("notifications").deleteMany({});
 });
 
 const OWNER = "owner@x.com";
@@ -151,6 +152,28 @@ describe("locked prompts", () => {
     await makeLocked({ sharedWith: [STRANGER] });
     expect(await listSharedWithMe(db, "nobody@z.com")).toEqual([]);
     expect(await listSharedWithMe(db, "")).toEqual([]);
+  });
+
+  it("notifies a user when newly added to a locked prompt's share list", async () => {
+    const { id } = await makeLocked();
+    await updatePrompt(db, id, OWNER, { sharedWith: [STRANGER] });
+    const notifs = await db.collection("notifications").find({ recipientEmail: STRANGER, type: "share" }).toArray();
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].actorEmail).toBe(OWNER);
+    expect(notifs[0].promptId).toBe(id);
+    expect(notifs[0].promptName).toBe("Secret Sauce");
+    // re-saving the same list does NOT create a duplicate
+    await updatePrompt(db, id, OWNER, { sharedWith: [STRANGER] });
+    expect(await db.collection("notifications").countDocuments({ recipientEmail: STRANGER, type: "share" })).toBe(1);
+    // the owner is never notified
+    expect(await db.collection("notifications").countDocuments({ recipientEmail: OWNER, type: "share" })).toBe(0);
+  });
+
+  it("notifies users shared with at creation time", async () => {
+    await makeLocked({ name: "Born Shared", sharedWith: [STRANGER, OWNER] });
+    expect(await db.collection("notifications").countDocuments({ recipientEmail: STRANGER, type: "share" })).toBe(1);
+    // owner present in the list is skipped (no self-notify)
+    expect(await db.collection("notifications").countDocuments({ recipientEmail: OWNER, type: "share" })).toBe(0);
   });
 
   it("normalizeEmails dedupes, lowercases, trims and drops invalid", () => {
