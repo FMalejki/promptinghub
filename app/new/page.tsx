@@ -22,6 +22,7 @@ export default function NewPromptPage() {
     category: "",
     image: "",
     isPrivate: false,
+    locked: false,
   });
   const [price, setPrice] = useState("0");
   const [tags, setTags] = useState("");
@@ -477,6 +478,19 @@ export default function NewPromptPage() {
               />
               <label htmlFor="isPrivate" className="text-sm text-gray-700 dark:text-gray-300">
                 Make this prompt private (only you can see it)
+              </label>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="locked"
+                checked={form.locked}
+                onChange={(e) => setForm({ ...form, locked: e.target.checked })}
+                className="w-4 h-4 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+              />
+              <label htmlFor="locked" className="text-sm text-gray-700 dark:text-gray-300">
+                🔒 Lock contents (encrypt at rest — only you and people you share with can read the prompt body; it still appears in listings)
               </label>
             </div>
           </div>
