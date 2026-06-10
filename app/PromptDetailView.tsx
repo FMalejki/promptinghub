@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
-import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
+import { applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
 import { pickReadme } from "@/lib/markdown";
 import { Markdown } from "./Markdown";
@@ -55,6 +55,31 @@ export type PromptDetail = {
   handle?: string;
   slug?: string;
 };
+
+// Render prompt text with {{variables}} resolved to their values, and any
+// UNFILLED variable shown as a highlighted chip instead of a confusing blank.
+function PromptText({ content, values }: { content: string; values: Record<string, string> }) {
+  const tokens = tokenizeTemplate(content);
+  return (
+    <>
+      {tokens.map((t, i) => {
+        if (t.type === "text") return <span key={i}>{t.text}</span>;
+        const v = values[t.name];
+        const resolved = v !== undefined && v !== "" ? v : t.default;
+        if (resolved) return <span key={i}>{resolved}</span>;
+        return (
+          <span
+            key={i}
+            title={`Unfilled variable — set "${t.name}" in Customize above`}
+            className="inline rounded border border-amber-300/70 dark:border-amber-700/60 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1 py-0.5 text-xs font-medium align-baseline"
+          >
+            {`{{${t.name}}}`}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const { data: session } = useSession();
@@ -509,7 +534,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
           </div>
         </div>
-        {filled.map((f) => (
+        {filled.map((f, i) => (
           <div
             key={f.path}
             id={fileAnchorId(f.path)}
@@ -537,7 +562,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 <CopyButton text={f.content} />
               </div>
             </div>
-            <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed">{f.content}</pre>
+            <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[i].content} values={values} /></pre>
           </div>
         ))}
       </div>

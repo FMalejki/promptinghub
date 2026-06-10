@@ -1,4 +1,28 @@
-import { extractVariables, applyVariables, extractVariablesFromFiles } from "../lib/template";
+import { extractVariables, applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "../lib/template";
+
+describe("tokenizeTemplate", () => {
+  it("splits literal text and variables in order", () => {
+    expect(tokenizeTemplate("Hi {{name}}, do {{task:thing}}!")).toEqual([
+      { type: "text", text: "Hi " },
+      { type: "var", name: "name", default: "" },
+      { type: "text", text: ", do " },
+      { type: "var", name: "task", default: "thing" },
+      { type: "text", text: "!" },
+    ]);
+  });
+
+  it("handles text with no variables", () => {
+    expect(tokenizeTemplate("plain text")).toEqual([{ type: "text", text: "plain text" }]);
+  });
+
+  it("handles a variable at the very start and end", () => {
+    expect(tokenizeTemplate("{{a}}x{{b}}")).toEqual([
+      { type: "var", name: "a", default: "" },
+      { type: "text", text: "x" },
+      { type: "var", name: "b", default: "" },
+    ]);
+  });
+});
 
 describe("extractVariables", () => {
   it("finds a bare variable", () => {

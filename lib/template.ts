@@ -27,6 +27,26 @@ export function applyVariables(text: string, values: Record<string, string>): st
   });
 }
 
+export type TemplateToken =
+  | { type: "text"; text: string }
+  | { type: "var"; name: string; default: string };
+
+// Split text into literal segments and {{variable}} tokens, preserving order.
+// Lets the UI render unfilled variables as highlighted chips instead of blanks.
+export function tokenizeTemplate(text: string): TemplateToken[] {
+  const out: TemplateToken[] = [];
+  const re = new RegExp(VAR_RE.source, "g");
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const idx = m.index ?? 0;
+    if (idx > last) out.push({ type: "text", text: text.slice(last, idx) });
+    out.push({ type: "var", name: m[1], default: (m[2] ?? "").trim() });
+    last = idx + m[0].length;
+  }
+  if (last < text.length) out.push({ type: "text", text: text.slice(last) });
+  return out;
+}
+
 export function extractVariablesFromFiles(files: { content: string }[]): TemplateVar[] {
   const order: string[] = [];
   const defaults = new Map<string, string>();
