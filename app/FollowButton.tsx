@@ -48,6 +48,8 @@ export function FollowButton({ handle }: { handle: string }) {
       <button
         onClick={toggle}
         disabled={busy || !loaded}
+        aria-pressed={following}
+        aria-label={following ? "Unfollow this creator" : "Follow this creator"}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
           following
             ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
