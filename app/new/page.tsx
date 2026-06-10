@@ -65,6 +65,10 @@ export default function NewPromptPage() {
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [ghUrl, setGhUrl] = useState("");
+  const [ghToken, setGhToken] = useState("");
+  const [ghImporting, setGhImporting] = useState(false);
+  const [ghNote, setGhNote] = useState<string | null>(null);
 
   // Debounced check for existing prompts with a similar name (duplicate warning).
   useEffect(() => {
@@ -108,6 +112,38 @@ export default function NewPromptPage() {
       setImportText("");
     } finally {
       setImporting(false);
+    }
+  }
+
+  // Import a whole public GitHub repo as a multi-file prompt ("infra as a prompt").
+  async function applyGithubImport() {
+    if (!ghUrl.trim()) return;
+    setGhImporting(true);
+    setError(null);
+    setGhNote(null);
+    try {
+      const res = await fetch("/api/import/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: ghUrl.trim(), token: ghToken.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "GitHub import failed.");
+        return;
+      }
+      const d = data.draft;
+      setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category }));
+      if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
+      if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
+      const n = d.notes || {};
+      setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
+      setGhUrl("");
+      setGhToken("");
+    } catch {
+      setError("GitHub import failed.");
+    } finally {
+      setGhImporting(false);
     }
   }
 
@@ -284,6 +320,41 @@ export default function NewPromptPage() {
             >
               {importing ? "Parsing…" : "Fill form from text"}
             </button>
+          </details>
+
+          {/* Import a whole public GitHub repo as a multi-file prompt */}
+          <details className="bg-gray-900 dark:bg-gray-950 rounded-xl border border-gray-700 p-6">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-100 flex items-center gap-2">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+              Import from GitHub — paste a public repo URL
+            </summary>
+            <p className="mt-3 text-xs text-gray-400">
+              Pulls the repo&apos;s text/source files into a multi-file prompt (skips binaries &amp; build dirs; up to 40 files / 1.5 MB). Review before publishing.
+            </p>
+            <input
+              type="text"
+              value={ghUrl}
+              onChange={(e) => setGhUrl(e.target.value)}
+              placeholder="https://github.com/owner/repo  (or owner/repo, or .../tree/branch/path)"
+              className={`${input} mt-3 font-mono text-sm`}
+            />
+            <input
+              type="password"
+              value={ghToken}
+              onChange={(e) => setGhToken(e.target.value)}
+              placeholder="Optional GitHub token (private repos / higher rate limit)"
+              className={`${input} mt-2 font-mono text-sm`}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={applyGithubImport}
+              disabled={ghImporting || !ghUrl.trim()}
+              className="mt-3 px-4 py-2 bg-gray-100 hover:bg-white text-gray-900 disabled:opacity-50 text-sm font-medium rounded-lg transition-colors"
+            >
+              {ghImporting ? "Importing…" : "Import repo"}
+            </button>
+            {ghNote && <p className="mt-3 text-xs text-green-400">{ghNote}</p>}
           </details>
 
           {/* Basic Info */}
