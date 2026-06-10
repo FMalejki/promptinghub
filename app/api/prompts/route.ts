@@ -14,6 +14,7 @@ export async function GET(req: Request) {
   const category = url.searchParams.get("category") || undefined;
   const model = url.searchParams.get("model") || undefined;
   const imageOnly = url.searchParams.get("image") === "1";
+  const skillsOnly = url.searchParams.get("skill") === "1";
   const tag = url.searchParams.get("tag") || undefined;
   const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied" | "viewed") || "recent";
   const ownerEmail = url.searchParams.get("owner") || undefined;
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
     category,
     model,
     imageOnly,
+    skillsOnly,
     tag,
     sort,
     ownerEmail,

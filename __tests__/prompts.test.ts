@@ -146,6 +146,7 @@ describe("getPromptDetail", () => {
       forkCount: 0,
       readme: null,
       attachments: [],
+      isSkill: false,
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
       isStarred: false,
@@ -168,6 +169,17 @@ describe("getPromptDetail", () => {
     const { id } = await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const detail = await getPromptDetail(db, id);
     expect(detail?.author).toEqual({ name: "ghost", image: null, handle: null });
+  });
+
+  it("marks a prompt as a skill and filters by skillsOnly", async () => {
+    const skill = await createPrompt(db, "owner@x.com", { name: "Refactorer", description: "d", category: "Coding", body: "x", isSkill: true });
+    await createPrompt(db, "owner@x.com", { name: "Plain", description: "d", category: "Coding", body: "x" });
+    const all = await listPrompts(db, { category: "Coding" });
+    const skills = await listPrompts(db, { category: "Coding", skillsOnly: true });
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(skills.map((p) => p.id)).toEqual([skill.id]);
+    expect(skills[0].isSkill).toBe(true);
+    expect((await getPromptDetail(db, skill.id))?.isSkill).toBe(true);
   });
 
   it("stores and returns an explicit README (trimmed; null when blank)", async () => {

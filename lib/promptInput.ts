@@ -21,6 +21,8 @@ export const newPromptSchema = z
     files: z.array(fileSchema).max(50).optional(),
     image: z.string().url().or(z.literal("")).optional(),
     isPrivate: z.boolean().optional(),
+    // Author flag: this prompt is a reusable "skill".
+    isSkill: z.boolean().optional(),
     testedModels: z.array(testedModelSchema).max(50).optional(),
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
