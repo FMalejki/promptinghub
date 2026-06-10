@@ -5,7 +5,7 @@ import { topTags, trendingTags } from "@/lib/prompts";
 import { Navbar } from "../components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Tags · PromptingHub",
+  title: "Tags",
   description: "Browse prompts by tag on PromptingHub.",
 };
 

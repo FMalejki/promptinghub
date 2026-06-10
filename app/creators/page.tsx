@@ -6,7 +6,7 @@ import { Navbar } from "../components/Navbar";
 import { Avatar } from "../Avatar";
 
 export const metadata: Metadata = {
-  title: "Top creators · PromptingHub",
+  title: "Top creators",
   description: "The most followed and starred prompt creators on PromptingHub.",
 };
 

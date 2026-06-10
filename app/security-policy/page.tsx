@@ -1,7 +1,7 @@
 import { Navbar } from "../components/Navbar";
 
 export const metadata = {
-  title: "Security Policy · PromptingHub",
+  title: "Security Policy",
   description: "How to responsibly report a security vulnerability in PromptingHub.",
 };
 
