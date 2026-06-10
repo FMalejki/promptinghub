@@ -70,7 +70,7 @@ describe("verifyCredentials", () => {
 describe("profiles", () => {
   it("getProfile returns email, name, image", async () => {
     await createUser(db, "a@b.com", "secret123", "Ada");
-    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Ada", image: null, bio: null, website: null, x: null, github: null });
+    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Ada", image: null, bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 
   it("getProfile returns null for unknown user", async () => {
@@ -80,12 +80,12 @@ describe("profiles", () => {
   it("updateProfile changes name and image", async () => {
     await createUser(db, "a@b.com", "secret123");
     const updated = await updateProfile(db, "a@b.com", { name: "New Name", image: "http://img/x.png" });
-    expect(updated).toEqual({ email: "a@b.com", name: "New Name", image: "http://img/x.png", bio: null, website: null, x: null, github: null });
+    expect(updated).toEqual({ email: "a@b.com", name: "New Name", image: "http://img/x.png", bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 
   it("updateProfile applies a partial update", async () => {
     await createUser(db, "a@b.com", "secret123", "Keep");
     await updateProfile(db, "a@b.com", { image: "http://img/y.png" });
-    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Keep", image: "http://img/y.png", bio: null, website: null, x: null, github: null });
+    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Keep", image: "http://img/y.png", bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 });

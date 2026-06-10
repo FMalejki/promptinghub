@@ -20,6 +20,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState<string[]>([]);
+  const [notifSaving, setNotifSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -60,7 +62,10 @@ export default function SettingsPage() {
       fetch("/api/profile")
         .then((r) => (r.ok ? r.json() : null))
         .then((p) => {
-          if (p) setForm((f) => ({ ...f, bio: p.bio || "", website: p.website || "", x: p.x || "", github: p.github || "" }));
+          if (p) {
+            setForm((f) => ({ ...f, bio: p.bio || "", website: p.website || "", x: p.x || "", github: p.github || "" }));
+            setMuted(Array.isArray(p.mutedNotificationTypes) ? p.mutedNotificationTypes : []);
+          }
         })
         .catch(() => {});
     }
@@ -105,6 +110,35 @@ export default function SettingsPage() {
       setSaving(false);
     }
   }
+
+  async function toggleNotif(type: string, enabled: boolean) {
+    // enabled = deliver this type; unchecked = mute it.
+    const next = enabled ? muted.filter((t) => t !== type) : Array.from(new Set([...muted, type]));
+    setMuted(next);
+    setNotifSaving(true);
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mutedNotificationTypes: next }),
+      });
+    } catch {
+      /* revert on failure */
+      setMuted(muted);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  const NOTIF_OPTIONS: { type: string; label: string }[] = [
+    { type: "follow", label: "New followers" },
+    { type: "comment", label: "Comments on your prompts" },
+    { type: "reply", label: "Replies to your comments" },
+    { type: "mention", label: "Mentions of you" },
+    { type: "fork", label: "Forks of your prompts" },
+    { type: "share", label: "Prompts shared with you" },
+    { type: "collection", label: "Updates to collections you follow" },
+  ];
 
   const input = "w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400";
   const label = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2";
@@ -238,6 +272,30 @@ export default function SettingsPage() {
 
         {/* API Keys */}
         <ApiKeysManager />
+
+        {/* Notifications */}
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notifications</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Choose which activity sends you a notification{notifSaving ? " — saving…" : ""}.
+          </p>
+          <div className="space-y-3">
+            {NOTIF_OPTIONS.map((o) => {
+              const enabled = !muted.includes(o.type);
+              return (
+                <label key={o.type} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(e) => toggleNotif(o.type, e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{o.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Your data */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
