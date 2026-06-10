@@ -36,7 +36,6 @@ export async function GET(req: Request) {
     stars: r.stars || 0,
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
-    locked: r.locked || false,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
 

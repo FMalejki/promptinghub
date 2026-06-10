@@ -25,9 +25,7 @@ export const newPromptSchema = z
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
     forkedFrom: z.string().max(64).optional(),
-    // Encrypt contents at rest + gate them to owner/shared viewers.
-    locked: z.boolean().optional(),
-    // Emails allowed to read a locked prompt (array, or a comma/newline string
+    // Emails allowed to read a PRIVATE prompt (array, or a comma/newline string
     // from the share textarea). Normalized server-side in lib/prompts.
     sharedWith: z.union([z.string().max(4000), z.array(z.string().max(200)).max(200)]).optional(),
     // Optional "commit message" describing an edit (used on update, ignored on create).

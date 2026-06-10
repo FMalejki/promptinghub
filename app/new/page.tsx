@@ -21,7 +21,6 @@ export default function NewPromptPage() {
     category: "",
     image: "",
     isPrivate: false,
-    locked: false,
   });
   const [price, setPrice] = useState("0");
   const [shareWith, setShareWith] = useState("");
@@ -242,7 +241,7 @@ export default function NewPromptPage() {
       testedModels: models.length > 0 ? models : undefined,
       priceCents: Math.round((parseFloat(price) || 0) * 100),
       tags: tags.trim() ? tags : undefined,
-      sharedWith: form.locked && shareWith.trim() ? shareWith : undefined,
+      sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
     };
 
     try {
@@ -482,20 +481,7 @@ export default function NewPromptPage() {
               </label>
             </div>
 
-            <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                id="locked"
-                checked={form.locked}
-                onChange={(e) => setForm({ ...form, locked: e.target.checked })}
-                className="w-4 h-4 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
-              />
-              <label htmlFor="locked" className="text-sm text-gray-700 dark:text-gray-300">
-                🔒 Lock contents (encrypt at rest — only you and people you share with can read the prompt body; it still appears in listings)
-              </label>
-            </div>
-
-            {form.locked && (
+            {form.isPrivate && (
               <div className="mt-3 pl-6">
                 <label htmlFor="shareWith" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Share with (emails)
@@ -506,10 +492,10 @@ export default function NewPromptPage() {
                   onChange={(e) => setShareWith(e.target.value)}
                   rows={2}
                   placeholder="alice@example.com, bob@example.com"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Comma- or newline-separated. These people (plus you) can read the locked contents. Leave empty to keep it owner-only.
+                  Comma- or newline-separated. These people (plus you) can view this private prompt. Leave empty to keep it just yours.
                 </p>
               </div>
             )}

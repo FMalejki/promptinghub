@@ -85,7 +85,7 @@ export default function SharedClient() {
               Nothing shared with you yet
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              When someone shares a locked prompt with your email, it shows up here.
+              When someone shares a private prompt with your email, it shows up here.
             </p>
             <Link
               href="/browse"

@@ -11,7 +11,7 @@ type DraftFile = { path: string; content: string };
 export default function EditPromptPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false, locked: false });
+  const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false });
   const [price, setPrice] = useState("0");
   const [shareWith, setShareWith] = useState("");
   const [tags, setTags] = useState("");
@@ -26,7 +26,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     fetch(`/api/prompts/${params.id}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p) => {
-        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate, locked: !!p.locked });
+        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate });
         setPrice(((p.priceCents || 0) / 100).toString());
         setShareWith((p.sharedWith || []).join(", "));
         setTags((p.tags || []).join(", "));
@@ -64,7 +64,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     const res = await fetch(`/api/prompts/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles, sharedWith: meta.locked ? shareWith : "", message: changeNote.trim() || undefined }),
+      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles, sharedWith: meta.isPrivate ? shareWith : "", message: changeNote.trim() || undefined }),
     });
     setSaving(false);
     if (res.ok) router.push(`/prompt/${params.id}`);
@@ -131,13 +131,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
               <input type="checkbox" id="priv" checked={meta.isPrivate} onChange={(e) => setMeta({ ...meta, isPrivate: e.target.checked })} className="w-4 h-4" />
               <label htmlFor="priv" className="text-sm text-gray-700 dark:text-gray-300">Private (only you can see it)</label>
             </div>
-            <div className="flex items-start gap-2">
-              <input type="checkbox" id="locked" checked={meta.locked} onChange={(e) => setMeta({ ...meta, locked: e.target.checked })} className="w-4 h-4 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
-              <label htmlFor="locked" className="text-sm text-gray-700 dark:text-gray-300">
-                🔒 Lock contents (encrypt at rest — only you and people you share with can read the prompt body; it still appears in listings)
-              </label>
-            </div>
-            {meta.locked && (
+            {meta.isPrivate && (
               <div className="pl-6">
                 <label className={label} htmlFor="shareWith">Share with (emails)</label>
                 <textarea
@@ -148,7 +142,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
                   placeholder="alice@example.com, bob@example.com"
                   className={input}
                 />
-                <p className="mt-1 text-xs text-gray-400">Comma- or newline-separated. These people (plus you) can read the locked contents. Leave empty to keep it owner-only.</p>
+                <p className="mt-1 text-xs text-gray-400">Comma- or newline-separated. These people (plus you) can view this private prompt. Leave empty to keep it just yours.</p>
               </div>
             )}
           </div>

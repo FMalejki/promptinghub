@@ -7,10 +7,10 @@ import { promptToMarkdown, markdownFilename } from "@/lib/promptMarkdown";
 // Prompt content for piping, e.g. `curl .../api/prompts/<id>/raw | pbcopy`.
 // ?format=md returns a readable Markdown doc; default is plain text.
 // ?format=md&download=1 forces a file download (Content-Disposition).
-// Public, unlocked prompts only (private/locked → 404, no content leak).
+// Public prompts only (private → 404, no content leak).
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const detail = await getPromptDetail(await getDb(), params.id);
-  if (!detail || detail.isPrivate || detail.locked) {
+  if (!detail || detail.isPrivate) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
