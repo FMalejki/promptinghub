@@ -28,7 +28,7 @@ import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type PromptFile = { path: string; content: string; language: string };
 
 export type PromptDetail = {
@@ -52,6 +52,7 @@ export type PromptDetail = {
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
+  isOwner?: boolean;
   handle?: string;
   slug?: string;
 };
@@ -162,7 +163,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   // Owners can pin a prompt to the top of their public profile.
   useEffect(() => {
-    if (session?.user?.email !== prompt.author.email) return;
+    if (!prompt.isOwner) return;
     let active = true;
     fetch("/api/pins")
       .then((r) => (r.ok ? r.json() : { pinned: [] }))
@@ -171,7 +172,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     return () => {
       active = false;
     };
-  }, [session?.user?.email, prompt.author.email, prompt.id]);
+  }, [prompt.isOwner, prompt.id]);
 
   async function togglePin() {
     const res = await fetch("/api/pins", {
@@ -214,7 +215,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     .map((m) => ({ modelId: m.modelId, href: imageModelHome(m.modelId) }))
     .filter((l): l is { modelId: string; href: string } => l.href !== null);
   const author = prompt.author;
-  const canEdit = session?.user?.email === author.email;
+  const canEdit = !!prompt.isOwner;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -281,7 +282,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </div>
             )}
 
-            <Link href={prompt.handle ? `/u/${prompt.handle}` : `/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link href={prompt.handle || author.handle ? `/u/${prompt.handle || author.handle}` : "#"} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Avatar name={author.name} image={author.image} size={32} />
               <div>
                 <div className="flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-white">

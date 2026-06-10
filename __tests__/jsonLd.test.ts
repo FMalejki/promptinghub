@@ -105,6 +105,6 @@ describe("promptJsonLd", () => {
 
   it("uses the email local-part when the author has no name", () => {
     const ld = promptJsonLd({ ...detail, author: { email: "carol@x.com", name: "", image: null } } as any, base);
-    expect(ld.author.name).toBe("carol");
+    expect(ld.author.name).toBe("Anonymous");
   });
 });

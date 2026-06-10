@@ -5,7 +5,7 @@ import { normalizeTags } from "./tags";
 import { promptToText } from "./promptText";
 import { estimateTokens } from "./promptStats";
 
-export type Author = { email: string; name: string; image: string | null };
+export type Author = { name: string; image: string | null; handle: string | null };
 
 export type TestedModel = {
   modelId: string;
@@ -70,6 +70,9 @@ export type PromptDetail = {
   updatedAt: Date | null;
   // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
   isStarred: boolean;
+  // Server-computed: is the viewer the owner? Replaces client-side email comparison
+  // (we no longer expose author.email).
+  isOwner: boolean;
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
@@ -279,7 +282,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     tags: r.tags || [],
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -568,7 +571,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     category: row.category,
     body: gate.body,
     files,
-    author: { email: row.ownerEmail, name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null },
+    author: { name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null, handle: u?.handle ?? null },
     image: row.image ?? null,
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
@@ -582,6 +585,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     // Owner-only: surface the share allowlist so the edit page can manage it.
     // Never sent to non-owners (would leak who a prompt is shared with).
     ...(viewerEmail && viewerEmail === row.ownerEmail ? { sharedWith: (row.sharedWith as string[]) || [] } : {}),
@@ -663,7 +667,7 @@ export async function getRelatedPrompts(db: Db, id: string, limit = 4): Promise<
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -702,7 +706,7 @@ export async function listMoreByAuthor(db: Db, id: string, limit = 4): Promise<P
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -749,7 +753,7 @@ export async function getRelatedByTags(db: Db, id: string, limit = 4): Promise<P
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -773,7 +777,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     category: row.category,
     body: gate.body,
     files,
-    author: { email: row.ownerEmail, name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null },
+    author: { name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null, handle: user.handle ?? null },
     image: row.image ?? null,
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
@@ -787,6 +791,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     handle,
     slug,
   };
@@ -870,7 +875,7 @@ export async function listSharedWithMe(db: Db, email: string): Promise<Prompt[]>
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 

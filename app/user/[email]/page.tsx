@@ -6,7 +6,7 @@ import { Navbar } from "../../components/Navbar";
 import { PromptCard } from "../../components/PromptCard";
 import { Avatar } from "../../Avatar";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Prompt = {
   id: string;

@@ -6,7 +6,7 @@ export type JsonLdPrompt = {
   id: string;
   name: string;
   description: string;
-  author: { email: string; name: string };
+  author: { name: string };
   tags: string[];
   copyCount: number;
   createdAt: Date;
@@ -56,7 +56,7 @@ export function collectionsItemListJsonLd(
 export function promptJsonLd(p: JsonLdPrompt, baseUrl: string): Record<string, any> {
   const base = baseUrl.replace(/\/+$/, "");
   const published = new Date(p.createdAt).toISOString();
-  const authorName = p.author.name?.trim() || p.author.email.split("@")[0];
+  const authorName = p.author.name?.trim() || "Anonymous";
   const keywords = (p.tags || []).filter((t) => t && t.trim()).join(", ");
 
   const ld: Record<string, any> = {

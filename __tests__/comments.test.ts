@@ -30,7 +30,7 @@ describe("comments", () => {
     const list = await listComments(db, "prompt1");
     expect(list).toHaveLength(1);
     expect(list[0].body).toBe("Great prompt!");
-    expect(list[0].author).toEqual({ email: "a@x.com", name: "Adi", image: "http://img/a.png" });
+    expect(list[0].author).toEqual({ name: "Adi", image: "http://img/a.png", handle: null });
   });
 
   it("trims and rejects empty/whitespace comments", async () => {
@@ -55,7 +55,7 @@ describe("comments", () => {
   it("falls back to an email-derived name when no user row exists", async () => {
     await addComment(db, "p1", "ghost@x.com", "hi");
     const list = await listComments(db, "p1");
-    expect(list[0].author).toEqual({ email: "ghost@x.com", name: "ghost", image: null });
+    expect(list[0].author).toEqual({ name: "ghost", image: null, handle: null });
   });
 
   it("returns false deleting a malformed id", async () => {

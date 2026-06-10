@@ -2,7 +2,7 @@ import { Db, ObjectId } from "mongodb";
 import { addNotification, actorName, NotificationType } from "./notifications";
 import { extractMentions } from "./mentions";
 
-export type Author = { email: string; name: string; image: string | null };
+export type Author = { name: string; image: string | null; handle: string | null };
 export type Comment = {
   id: string;
   promptId: string;
@@ -11,6 +11,9 @@ export type Comment = {
   parentId: string | null;
   edited: boolean;
   createdAt: Date;
+  // Server-computed: did the viewer write this comment? Replaces client-side email
+  // comparison (we no longer expose author.email).
+  mine: boolean;
 };
 
 // Authors may edit their own comment for a short window after posting.
@@ -72,7 +75,7 @@ export async function addComment(
 }
 
 // Comments for a prompt, newest-first, with author profile resolved.
-export async function listComments(db: Db, promptId: string): Promise<Comment[]> {
+export async function listComments(db: Db, promptId: string, viewerEmail?: string | null): Promise<Comment[]> {
   const rows = await db.collection("comments").find({ promptId }).sort({ createdAt: -1, _id: -1 }).toArray();
   const emails = [...new Set(rows.map((r) => r.authorEmail))];
   const users = await db.collection("users").find({ email: { $in: emails } }).toArray();
@@ -83,10 +86,11 @@ export async function listComments(db: Db, promptId: string): Promise<Comment[]>
       id: r._id.toString(),
       promptId: r.promptId,
       body: r.body,
-      author: { email: r.authorEmail, name: u?.name || r.authorEmail.split("@")[0], image: u?.image ?? null },
+      author: { name: u?.name || r.authorEmail.split("@")[0], image: u?.image ?? null, handle: u?.handle ?? null },
       parentId: r.parentId ?? null,
       edited: !!r.editedAt,
       createdAt: r.createdAt,
+      mine: !!viewerEmail && r.authorEmail === viewerEmail,
     };
   });
 }

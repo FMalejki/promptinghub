@@ -88,7 +88,7 @@ export async function followingFeed(db: Db, followerEmail: string, limit = 50): 
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 

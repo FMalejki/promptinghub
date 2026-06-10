@@ -9,7 +9,7 @@ import { hasActiveFilters } from "@/lib/browseFilters";
 import { isSearchFocusTrigger } from "@/lib/shortcuts";
 import Link from "next/link";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type Prompt = {
   id: string;
   name: string;
