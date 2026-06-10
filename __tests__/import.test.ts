@@ -1,4 +1,27 @@
-import { parsePastedPrompt } from "../lib/import";
+import { parsePastedPrompt, looksLikeSkill } from "../lib/import";
+
+describe("looksLikeSkill", () => {
+  it("flags a SKILL.md file (strongest signal)", () => {
+    expect(looksLikeSkill({ files: [{ path: "prompt.txt" }, { path: "SKILL.md" }] })).toBe(true);
+    expect(looksLikeSkill({ files: [{ path: "skills/my/skill.md" }] })).toBe(true);
+  });
+  it("flags pasted frontmatter carrying both name and description", () => {
+    expect(looksLikeSkill({ text: "---\nname: pdf-filler\ndescription: fills PDFs\n---\nbody here" })).toBe(true);
+  });
+  it("flags an explicit '# Skill' heading", () => {
+    expect(looksLikeSkill({ text: "# Skill: Commit writer\n\nDo the thing." })).toBe(true);
+  });
+  it("does NOT flag an ordinary prompt or partial frontmatter", () => {
+    expect(looksLikeSkill({ text: "Act as a helpful assistant and summarize." })).toBe(false);
+    expect(looksLikeSkill({ text: "---\nname: only-name\n---\nbody" })).toBe(false);
+    expect(looksLikeSkill({ files: [{ path: "prompt.txt" }, { path: "README.md" }] })).toBe(false);
+    expect(looksLikeSkill({})).toBe(false);
+  });
+  it("parsePastedPrompt sets isSkill on a SKILL.md-style paste only", () => {
+    expect(parsePastedPrompt("---\nname: x\ndescription: y\n---\nbody")?.isSkill).toBe(true);
+    expect(parsePastedPrompt("just a normal prompt")?.isSkill).toBeUndefined();
+  });
+});
 
 describe("parsePastedPrompt", () => {
   it("returns null for empty / whitespace input", () => {
