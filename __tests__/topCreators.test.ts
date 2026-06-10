@@ -46,6 +46,8 @@ describe("topCreators", () => {
 
   it("excludes creators without a handle and respects the limit", async () => {
     await createUser(db, "nohandle@x.com", "pw", "NoHandle");
+    // Simulate a legacy account that predates auto-handle assignment.
+    await db.collection("users").updateOne({ email: "nohandle@x.com" }, { $unset: { handle: "" } });
     await createPrompt(db, "nohandle@x.com", { name: "X", description: "d", category: "Writing", body: "x" });
     expect(await topCreators(db, 10)).toEqual([]);
   });
