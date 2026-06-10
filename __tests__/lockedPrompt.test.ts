@@ -2,7 +2,7 @@ process.env.PROMPT_ENC_KEY = "0".repeat(64);
 
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { createPrompt, getPromptDetail, updatePrompt, normalizeEmails } from "../lib/prompts";
+import { createPrompt, getPromptDetail, updatePrompt, normalizeEmails, listPrompts } from "../lib/prompts";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -112,6 +112,14 @@ describe("locked prompts", () => {
     expect(asStranger.sharedWith).toBeUndefined();
     const asAnon = (await getPromptDetail(db, id, null)) as { sharedWith?: string[] };
     expect(asAnon.sharedWith).toBeUndefined();
+  });
+
+  it("listings expose the locked flag (for the card badge) without leaking content", async () => {
+    await makeLocked();
+    const rows = await listPrompts(db);
+    const row = rows.find((r) => r.name === "Secret Sauce");
+    expect(row?.locked).toBe(true);
+    expect(JSON.stringify(row)).not.toContain("TOP SECRET INSTRUCTIONS");
   });
 
   it("normalizeEmails dedupes, lowercases, trims and drops invalid", () => {
