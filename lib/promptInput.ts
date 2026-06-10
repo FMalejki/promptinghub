@@ -27,6 +27,11 @@ export const newPromptSchema = z
     forkedFrom: z.string().max(64).optional(),
     // Optional author-written README (markdown), shown above the files.
     readme: z.string().max(20000).optional(),
+    // Optional multimodal attachments (by URL): images, video, audio, pdf, docs.
+    attachments: z
+      .array(z.object({ url: z.string().max(2000), name: z.string().max(200).optional() }))
+      .max(20)
+      .optional(),
     // Emails allowed to read a PRIVATE prompt (array, or a comma/newline string
     // from the share textarea). Normalized server-side in lib/prompts.
     sharedWith: z.union([z.string().max(4000), z.array(z.string().max(200)).max(200)]).optional(),

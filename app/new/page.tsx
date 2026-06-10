@@ -8,6 +8,7 @@ import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
 import { CoverImageField } from "../components/CoverImageField";
+import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -24,6 +25,7 @@ export default function NewPromptPage() {
   });
   const [price, setPrice] = useState("0");
   const [readme, setReadme] = useState("");
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   const [shareWith, setShareWith] = useState("");
   const [tags, setTags] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
@@ -243,6 +245,7 @@ export default function NewPromptPage() {
       priceCents: Math.round((parseFloat(price) || 0) * 100),
       tags: tags.trim() ? tags : undefined,
       readme: readme.trim() ? readme : undefined,
+      attachments: attachments.filter((a) => a.url.trim()).length ? attachments.filter((a) => a.url.trim()) : undefined,
       sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
     };
 
@@ -461,6 +464,8 @@ export default function NewPromptPage() {
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, code, links).</p>
             </div>
+
+            <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
 
             <CoverImageField
               value={form.image}
