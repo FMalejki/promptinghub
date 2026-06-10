@@ -68,6 +68,23 @@ export async function searchUsersForMention(db: Db, q: string, limit = 6): Promi
   return rows.map((r: any) => ({ handle: r.handle as string, name: (r.name as string) || (r.handle as string), image: r.image ?? null }));
 }
 
+// Exact-handle lookup for the @mention confirmation indicator: given the handles
+// parsed out of a draft comment, return the ones that map to a real user (so the
+// composer can show "✓ @handle will be notified"). Handles are matched
+// case-insensitively; input is capped to keep the $in bounded.
+export async function getUsersByHandles(db: Db, handles: string[]): Promise<MentionSuggestion[]> {
+  const wanted = Array.from(new Set((handles || []).map((h) => (h || "").trim().toLowerCase()).filter(Boolean))).slice(0, 20);
+  if (wanted.length === 0) return [];
+  const rows = await db
+    .collection("users")
+    .find(
+      { handle: { $in: wanted } },
+      { projection: { handle: 1, name: 1, image: 1, _id: 0 } },
+    )
+    .toArray();
+  return rows.map((r: any) => ({ handle: r.handle as string, name: (r.name as string) || (r.handle as string), image: r.image ?? null }));
+}
+
 export type TopCreator = {
   handle: string;
   name: string;

@@ -1,4 +1,4 @@
-import { extractMentions, renderMentions } from "../lib/mentions";
+import { extractMentions, renderMentions, classifyMentions } from "../lib/mentions";
 
 describe("extractMentions", () => {
   it("pulls unique @handles out of a comment body", () => {
@@ -29,6 +29,34 @@ describe("extractMentions", () => {
   it("caps the number of mentions to avoid notification spam", () => {
     const body = Array.from({ length: 20 }, (_, i) => `@user${i}`).join(" ");
     expect(extractMentions(body).length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("classifyMentions", () => {
+  it("splits draft mentions into confirmed (real users) and unknown", () => {
+    const { confirmed, unknown } = classifyMentions("hi @alice and @nobody", ["alice"]);
+    expect(confirmed).toEqual(["alice"]);
+    expect(unknown).toEqual(["nobody"]);
+  });
+
+  it("is case-insensitive against the known set", () => {
+    const { confirmed, unknown } = classifyMentions("yo @Alice", ["ALICE"]);
+    expect(confirmed).toEqual(["alice"]);
+    expect(unknown).toEqual([]);
+  });
+
+  it("treats everything as unknown when no handles resolve", () => {
+    const { confirmed, unknown } = classifyMentions("@a @b @c", []);
+    expect(confirmed).toEqual([]);
+    expect(unknown).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns empty lists for a body with no mentions", () => {
+    expect(classifyMentions("plain text", ["alice"])).toEqual({ confirmed: [], unknown: [] });
+  });
+
+  it("ignores emails (no false positive on domain text)", () => {
+    expect(classifyMentions("reach me at bob@x.com", ["x"])).toEqual({ confirmed: [], unknown: [] });
   });
 });
 
