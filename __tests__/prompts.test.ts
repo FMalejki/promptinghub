@@ -144,6 +144,7 @@ describe("getPromptDetail", () => {
       tags: [],
       forkedFrom: null,
       forkCount: 0,
+      readme: null,
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
       isStarred: false,
@@ -166,6 +167,13 @@ describe("getPromptDetail", () => {
     const { id } = await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const detail = await getPromptDetail(db, id);
     expect(detail?.author).toEqual({ name: "ghost", image: null, handle: null });
+  });
+
+  it("stores and returns an explicit README (trimmed; null when blank)", async () => {
+    const withReadme = await createPrompt(db, "owner@x.com", { name: "Doc", description: "d", category: "Misc", body: "x", readme: "  # Hello\nuse me  " });
+    const blank = await createPrompt(db, "owner@x.com", { name: "NoDoc", description: "d", category: "Misc", body: "x", readme: "   " });
+    expect((await getPromptDetail(db, withReadme.id))?.readme).toBe("# Hello\nuse me");
+    expect((await getPromptDetail(db, blank.id))?.readme).toBeNull();
   });
 
   it("returns null for unknown id", async () => {

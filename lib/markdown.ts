@@ -21,6 +21,17 @@ export function pickReadme(files: { path: string; content: string }[]): string |
   return readme.content;
 }
 
+// The README shown on a prompt's detail page. Prefer the author's explicit
+// `readme` field (first-class, written in the form); fall back to a README.md
+// found among the uploaded files. Returns null when neither has content.
+export function resolveReadme(
+  explicit: string | null | undefined,
+  files: { path: string; content: string }[],
+): string | null {
+  if (explicit && explicit.trim()) return explicit;
+  return pickReadme(files);
+}
+
 export function parseBlocks(src: string): Block[] {
   const lines = src.replace(/\r\n/g, "\n").split("\n");
   const blocks: Block[] = [];

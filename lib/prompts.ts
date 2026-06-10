@@ -68,6 +68,8 @@ export type PromptDetail = {
   tags: string[];
   forkedFrom: { id: string; name: string } | null;
   forkCount: number;
+  // Author-written README markdown (first-class), or null.
+  readme: string | null;
   createdAt: Date;
   updatedAt: Date | null;
   // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
@@ -116,6 +118,9 @@ export type NewPrompt = {
   priceCents?: number;
   tags?: string[] | string;
   forkedFrom?: string;
+  // Optional author-written README (markdown), shown above the files on the
+  // detail page. First-class — takes precedence over a README.md file.
+  readme?: string;
   // Emails allowed to read a PRIVATE prompt (besides the owner). Accepts an
   // array or a comma/whitespace-separated string (from the share textarea).
   sharedWith?: string[] | string;
@@ -429,6 +434,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     starredBy: [],
     sharedWith: normalizeEmails(data.sharedWith),
     collaborators: normalizeEmails(data.collaborators),
+    readme: (data.readme || "").trim() || null,
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -497,6 +503,7 @@ export async function updatePrompt(
   if (data.image !== undefined) set.image = data.image || null;
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
+  if (data.readme !== undefined) set.readme = (data.readme || "").trim() || null;
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
@@ -612,6 +619,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     tags: row.tags || [],
     forkedFrom,
     forkCount,
+    readme: row.readme ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
@@ -822,6 +830,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     tags: row.tags || [],
     forkedFrom,
     forkCount,
+    readme: row.readme ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),

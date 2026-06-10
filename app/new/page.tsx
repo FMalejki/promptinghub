@@ -23,6 +23,7 @@ export default function NewPromptPage() {
     isPrivate: false,
   });
   const [price, setPrice] = useState("0");
+  const [readme, setReadme] = useState("");
   const [shareWith, setShareWith] = useState("");
   const [tags, setTags] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
@@ -241,6 +242,7 @@ export default function NewPromptPage() {
       testedModels: models.length > 0 ? models : undefined,
       priceCents: Math.round((parseFloat(price) || 0) * 100),
       tags: tags.trim() ? tags : undefined,
+      readme: readme.trim() ? readme : undefined,
       sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
     };
 
@@ -445,6 +447,19 @@ export default function NewPromptPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div>
+              <label className={label}>README (optional)</label>
+              <textarea
+                value={readme}
+                onChange={(e) => setReadme(e.target.value)}
+                className={`${input} font-mono min-h-[120px]`}
+                placeholder={"# How to use this prompt\n\nExplain what it does, when to use it, and any setup. Markdown supported."}
+                maxLength={20000}
+                rows={6}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, code, links).</p>
             </div>
 
             <CoverImageField
