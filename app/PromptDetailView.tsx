@@ -52,8 +52,6 @@ export type PromptDetail = {
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
-  locked?: boolean;
-  lockedForViewer?: boolean;
   handle?: string;
   slug?: string;
 };
@@ -484,25 +482,13 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       )}
 
       {/* Run this prompt in an assistant (text prompts only) */}
-      {!imageGen && !prompt.lockedForViewer && <AssistantLinks text={allText} onOpen={recordCopy} />}
+      {!imageGen && <AssistantLinks text={allText} onOpen={recordCopy} />}
 
       {/* Files */}
-      {prompt.lockedForViewer ? (
-        <div className="rounded-xl border border-amber-300/70 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-8 text-center">
-          <div className="text-4xl mb-2">🔒</div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">This prompt is locked</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            The author encrypted the contents. Only the author and people they&apos;ve shared it with can read the prompt body.
-          </p>
-        </div>
-      ) : (
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white shrink-0">{multi ? `${filled.length} files` : "Prompt"}</h2>
-            {prompt.locked && (
-              <span className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded px-1.5 py-0.5 shrink-0">🔒 Locked</span>
-            )}
             <span
               title={`${stats.words} words · ${stats.chars} characters · ~${stats.tokens} tokens (estimate)`}
               className="text-xs text-gray-400 dark:text-gray-500 truncate"
@@ -511,7 +497,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            {!prompt.isPrivate && !prompt.locked && (
+            {!prompt.isPrivate && (
               <>
                 <a
                   href={`/api/prompts/${prompt.id}/raw`}
@@ -566,7 +552,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         ))}
       </div>
-      )}
 
       {/* Community-tested models — confirm/deny + add models */}
       <div className="mt-6">
