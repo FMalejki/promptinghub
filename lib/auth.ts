@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { getDb } from "./db";
 import { verifyCredentials, ensureHandle } from "./users";
 import { resolveAuthSecret } from "./authSecret";
+import { rateLimit } from "./rateLimit";
 
 export const authOptions: NextAuthOptions = {
   secret: resolveAuthSecret(process.env),
@@ -16,6 +17,10 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         const db = await getDb();
+        // Throttle password attempts per target account: 10 per 10 minutes
+        // (slows brute-forcing a specific email; fails open on limiter error).
+        const rl = await rateLimit(db, `login:${credentials.email.toLowerCase()}`, 10, 10 * 60_000);
+        if (!rl.ok) return null;
         const user = await verifyCredentials(db, credentials.email, credentials.password);
         // Lazily backfill a @handle for pre-existing accounts that never got one,
         // so their profile and @mentions work after this login. Best-effort.

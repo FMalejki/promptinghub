@@ -11,7 +11,8 @@ export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const q = new URL(req.url).searchParams.get("q") || "";
+  // Cap length before it ever reaches a RegExp (defensive against ReDoS surface).
+  const q = (new URL(req.url).searchParams.get("q") || "").slice(0, 64);
   if (q.trim().length < 1) return NextResponse.json({ users: [] });
 
   const users = await searchUsersForMention(await getDb(), q, 6);
