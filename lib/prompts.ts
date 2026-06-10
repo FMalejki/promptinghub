@@ -31,6 +31,7 @@ export type Prompt = {
   tags: string[];
   createdAt: Date;
   tokens?: number; // rough length estimate for the card badge (optional)
+  locked?: boolean; // contents encrypted at rest — drives the card's lock badge
 };
 
 export type PromptWithBody = {
@@ -271,6 +272,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     tags: r.tags || [],
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
+    locked: r.locked || false,
     author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
   }));
 }
