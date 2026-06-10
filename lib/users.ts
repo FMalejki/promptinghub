@@ -2,10 +2,12 @@ import { Db } from "mongodb";
 import bcrypt from "bcryptjs";
 import { slugify } from "./slug";
 import { isVerifiedHandle } from "./verified";
+import { sanitizeMutedTypes } from "./notifications";
 
 export type User = { id: string; email: string; name: string; image: string | null };
 export type ProfileLinks = { website: string | null; x: string | null; github: string | null };
-export type Profile = { email: string; name: string; image: string | null; bio: string | null } & ProfileLinks;
+// mutedNotificationTypes is private: only ever populated by getProfile (self view).
+export type Profile = { email: string; name: string; image: string | null; bio: string | null; mutedNotificationTypes?: string[] } & ProfileLinks;
 export type Creator = Profile & { handle: string; verified: boolean };
 
 // Returns the user's stable @handle, generating + persisting a unique one on first call.
@@ -144,7 +146,16 @@ export async function verifyCredentials(db: Db, email: string, password: string)
 
 export async function getProfile(db: Db, email: string): Promise<Profile | null> {
   const row = await db.collection("users").findOne({ email });
-  return row ? { email: row.email, name: row.name, image: row.image ?? null, ...profileFields(row) } : null;
+  if (!row) return null;
+  // mutedNotificationTypes is returned only here (the signed-in self view), never
+  // via profileFields / public creator profiles — it's a private preference.
+  return {
+    email: row.email,
+    name: row.name,
+    image: row.image ?? null,
+    ...profileFields(row),
+    mutedNotificationTypes: Array.isArray(row.mutedNotificationTypes) ? row.mutedNotificationTypes : [],
+  };
 }
 
 export type ProfilePatch = {
@@ -154,6 +165,7 @@ export type ProfilePatch = {
   website?: string | null;
   x?: string | null;
   github?: string | null;
+  mutedNotificationTypes?: string[];
 };
 
 export async function updateProfile(db: Db, email: string, patch: ProfilePatch): Promise<Profile | null> {
@@ -164,6 +176,7 @@ export async function updateProfile(db: Db, email: string, patch: ProfilePatch):
   if (patch.website !== undefined) set.website = patch.website || null;
   if (patch.x !== undefined) set.x = patch.x || null;
   if (patch.github !== undefined) set.github = patch.github || null;
+  if (patch.mutedNotificationTypes !== undefined) set.mutedNotificationTypes = sanitizeMutedTypes(patch.mutedNotificationTypes);
   await db.collection("users").updateOne({ email }, { $set: set });
   return getProfile(db, email);
 }
