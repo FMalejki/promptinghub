@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "jest",
-    "seed:prompts": "tsx scripts/seed-prompts.ts"
+    "seed:prompts": "tsx scripts/seed-prompts.ts",
+    "seed:skills": "tsx scripts/seed-skills.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
