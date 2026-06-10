@@ -23,7 +23,9 @@ describe("promptOgMetadata", () => {
       description: "A B2B cold email generator",
       image: "https://img/x.png",
     });
-    expect(m.title).toBe("Cold Email · PromptingHub");
+    // Page title is bare (root layout template appends "· PromptingHub" once);
+    // OG/twitter titles are not templated, so they keep the brand explicitly.
+    expect(m.title).toBe("Cold Email");
     expect(m.description).toBe("A B2B cold email generator");
     expect(m.openGraph?.title).toBe("Cold Email · PromptingHub");
     expect(m.openGraph?.images).toEqual([{ url: "https://img/x.png" }]);
@@ -44,7 +46,7 @@ describe("promptOgMetadata", () => {
 
   it("falls back to a generic card when the prompt is missing/private", () => {
     const m = promptOgMetadata(null);
-    expect(m.title).toBe("Prompt · PromptingHub");
+    expect(m.title).toBe("Prompt");
     expect(typeof m.description).toBe("string");
   });
 

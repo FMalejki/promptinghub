@@ -8,7 +8,7 @@ import { Navbar } from "../../../components/Navbar";
 import { Avatar } from "../../../Avatar";
 
 export async function generateMetadata({ params }: { params: { handle: string } }): Promise<Metadata> {
-  return { title: `Followers of @${params.handle} · PromptingHub` };
+  return { title: `Followers of @${params.handle}` };
 }
 
 export default async function FollowersPage({ params }: { params: { handle: string } }) {

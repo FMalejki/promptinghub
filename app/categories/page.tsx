@@ -5,7 +5,7 @@ import { topCategories } from "@/lib/prompts";
 import { Navbar } from "../components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Categories · PromptingHub",
+  title: "Categories",
   description: "Browse AI prompts by category on PromptingHub.",
 };
 

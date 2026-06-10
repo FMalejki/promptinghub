@@ -4,7 +4,7 @@ import { Navbar } from "../components/Navbar";
 import { listTemplates } from "@/lib/templates";
 
 export const metadata: Metadata = {
-  title: "Prompt templates · PromptingHub",
+  title: "Prompt templates",
   description: "Start from a curated, battle-tested prompt template and make it your own.",
 };
 
