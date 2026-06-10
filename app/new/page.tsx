@@ -25,6 +25,7 @@ export default function NewPromptPage() {
     locked: false,
   });
   const [price, setPrice] = useState("0");
+  const [shareWith, setShareWith] = useState("");
   const [tags, setTags] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [similar, setSimilar] = useState<{ id: string; name: string }[]>([]);
@@ -242,6 +243,7 @@ export default function NewPromptPage() {
       testedModels: models.length > 0 ? models : undefined,
       priceCents: Math.round((parseFloat(price) || 0) * 100),
       tags: tags.trim() ? tags : undefined,
+      sharedWith: form.locked && shareWith.trim() ? shareWith : undefined,
     };
 
     try {
@@ -493,6 +495,25 @@ export default function NewPromptPage() {
                 🔒 Lock contents (encrypt at rest — only you and people you share with can read the prompt body; it still appears in listings)
               </label>
             </div>
+
+            {form.locked && (
+              <div className="mt-3 pl-6">
+                <label htmlFor="shareWith" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Share with (emails)
+                </label>
+                <textarea
+                  id="shareWith"
+                  value={shareWith}
+                  onChange={(e) => setShareWith(e.target.value)}
+                  rows={2}
+                  placeholder="alice@example.com, bob@example.com"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Comma- or newline-separated. These people (plus you) can read the locked contents. Leave empty to keep it owner-only.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Prompt Files */}

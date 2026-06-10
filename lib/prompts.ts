@@ -114,7 +114,24 @@ export type NewPrompt = {
   forkedFrom?: string;
   // Encrypt the prompt contents at rest and gate them to the owner + shared users.
   locked?: boolean;
+  // Emails allowed to decrypt a locked prompt (besides the owner). Accepts an
+  // array or a comma/whitespace-separated string (from the share textarea).
+  sharedWith?: string[] | string;
 };
+
+// Normalize a share list (array or comma/newline-separated string) into a clean,
+// deduped, lowercased list of valid emails. Caps length to keep the doc bounded.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function normalizeEmails(input?: string[] | string | null): string[] {
+  if (input == null) return [];
+  const parts = Array.isArray(input) ? input : String(input).split(/[\s,;]+/);
+  const seen = new Set<string>();
+  for (const raw of parts) {
+    const e = String(raw).trim().toLowerCase();
+    if (e && EMAIL_RE.test(e)) seen.add(e);
+  }
+  return Array.from(seen).slice(0, 100);
+}
 
 const LANG_BY_EXT: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
@@ -390,7 +407,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     tags: normalizeTags(data.tags),
     forkedFrom,
     starredBy: [],
-    sharedWith: [],
+    sharedWith: normalizeEmails(data.sharedWith),
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -456,6 +473,7 @@ export async function updatePrompt(
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
   if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
+  if (data.sharedWith !== undefined) set.sharedWith = normalizeEmails(data.sharedWith);
   // Compute the new plaintext content when a content edit is present.
   let newFiles: PromptFile[] | null = null;
   let newBody: string | null = null;
