@@ -40,7 +40,8 @@ export default function UserProfilePage({ params }: { params: { email: string } 
 
   useEffect(() => {
     loadProfile();
-  }, [params.email]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.email, session?.user?.email]);
 
   async function loadProfile() {
     try {
@@ -63,11 +64,28 @@ export default function UserProfilePage({ params }: { params: { email: string } 
       
       // Calculate stats
       const totalStars = userPrompts.reduce((sum: number, p: Prompt) => sum + p.stars, 0);
-      
+
+      // Identity defaults to the first prompt's author, but that's empty for a
+      // user with 0 prompts (was showing the email prefix + no avatar). When
+      // viewing your OWN profile, pull the real name/image from /api/profile.
+      let name = userPrompts[0]?.author?.name || email.split("@")[0];
+      let image: string | null = userPrompts[0]?.author?.image || null;
+      if (session?.user?.email === email) {
+        try {
+          const me = await fetch("/api/profile").then((r) => (r.ok ? r.json() : null));
+          if (me) {
+            if (me.name) name = me.name;
+            if (me.image !== undefined) image = me.image;
+          }
+        } catch {
+          /* best-effort — fall back to prompt-derived identity */
+        }
+      }
+
       setProfile({
         email,
-        name: userPrompts[0]?.author?.name || email.split("@")[0],
-        image: userPrompts[0]?.author?.image || null,
+        name,
+        image,
         promptCount: userPrompts.length,
         totalStars,
       });
