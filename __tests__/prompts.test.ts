@@ -45,14 +45,14 @@ describe("listPrompts (public pool)", () => {
   it("attaches author profile", async () => {
     const rows = await listPrompts(db);
     const summarize = rows.find((r) => r.name === "Summarize")!;
-    expect(summarize.author).toEqual({ email: "alice@x.com", name: "Alice", image: "http://img/a.png" });
+    expect(summarize.author).toEqual({ name: "Alice", image: "http://img/a.png", handle: null });
   });
 
   it("falls back to email-derived author when no user row exists", async () => {
     await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const rows = await listPrompts(db);
     const orphan = rows.find((r) => r.name === "Orphan")!;
-    expect(orphan.author.email).toBe("ghost@x.com");
+    expect(orphan.author.handle).toBeNull();
     expect(orphan.author.name).toBe("ghost");
   });
 
@@ -133,7 +133,7 @@ describe("getPromptDetail", () => {
       category: "Writing",
       body: "b1",
       files: [{ path: "prompt.txt", content: "b1", language: "text" }],
-      author: { email: "alice@x.com", name: "Alice", image: "http://img/a.png" },
+      author: { name: "Alice", image: "http://img/a.png", handle: null },
       image: null,
       stars: 0,
       isPrivate: false,
@@ -147,13 +147,23 @@ describe("getPromptDetail", () => {
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
       isStarred: false,
+      isOwner: false,
     });
+  });
+
+  it("sets isOwner true only for the owner and never exposes author.email", async () => {
+    const created = await createPrompt(db, "owner@x.com", { name: "Mine", description: "d", category: "Misc", body: "x" });
+    const asowner = await getPromptDetail(db, created.id, "owner@x.com");
+    const asother = await getPromptDetail(db, created.id, "someone@x.com");
+    expect(asowner?.isOwner).toBe(true);
+    expect(asother?.isOwner).toBe(false);
+    expect(asowner?.author).not.toHaveProperty("email");
   });
 
   it("falls back to email-derived author when no user row exists", async () => {
     const { id } = await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const detail = await getPromptDetail(db, id);
-    expect(detail?.author).toEqual({ email: "ghost@x.com", name: "ghost", image: null });
+    expect(detail?.author).toEqual({ name: "ghost", image: null, handle: null });
   });
 
   it("returns null for unknown id", async () => {

@@ -7,7 +7,7 @@ import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
 import { lengthLabel } from "@/lib/promptLength";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
 
 type PromptCardProps = {
@@ -122,14 +122,21 @@ export function PromptCard({ id, name, description, category, author, image, sta
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
           {/* Author */}
-          <Link
-            href={`/user/${author.email}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <Avatar name={author.name} image={author.image} size={24} />
-            <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
-          </Link>
+          {author.handle ? (
+            <Link
+              href={`/u/${author.handle}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <Avatar name={author.name} image={author.image} size={24} />
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Avatar name={author.name} image={author.image} size={24} />
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
+            </div>
+          )}
 
           {/* Stars + copies */}
           <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">

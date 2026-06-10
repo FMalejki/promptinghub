@@ -9,7 +9,7 @@ import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
   id: string;
   body: string;
@@ -19,6 +19,7 @@ type Comment = {
   edited?: boolean;
   likeCount?: number;
   liked?: boolean;
+  mine?: boolean;
 };
 
 // Render a plain-text segment with inline markdown (**bold**, *italic*, `code`).
@@ -178,7 +179,7 @@ export function Comments({ promptId }: { promptId: string }) {
             <span className="text-sm font-medium text-gray-900 dark:text-white">{c.author.name}</span>
             <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
             {c.edited && <span className="text-xs text-gray-400 italic">(edited)</span>}
-            {session?.user?.email === c.author.email && (
+            {c.mine && (
               <span className="ml-auto flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -241,7 +242,7 @@ export function Comments({ promptId }: { promptId: string }) {
                 {replyTo === c.id ? "Cancel" : "Reply"}
               </button>
             )}
-            {session?.user?.email && session.user.email !== c.author.email && (
+            {session?.user?.email && !c.mine && (
               <button onClick={() => report(c.id)} className="text-xs text-gray-400 hover:text-red-600" title="Report this comment">
                 report
               </button>

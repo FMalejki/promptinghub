@@ -17,7 +17,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
   const [tags, setTags] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [changeNote, setChangeNote] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -31,17 +31,17 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
         setShareWith((p.sharedWith || []).join(", "));
         setTags((p.tags || []).join(", "));
         setFiles((p.files?.length ? p.files : [{ path: "prompt.txt", content: p.body || "" }]).map((f: DraftFile) => ({ path: f.path, content: f.content })));
-        setOwnerEmail(p.author.email);
+        setIsOwner(!!p.isOwner);
         setLoaded(true);
       })
       .catch(() => router.push("/browse"));
   }, [params.id, router]);
 
   useEffect(() => {
-    if (loaded && status === "authenticated" && session?.user?.email && ownerEmail && session.user.email !== ownerEmail) {
+    if (loaded && status === "authenticated" && isOwner === false) {
       router.push(`/prompt/${params.id}`);
     }
-  }, [loaded, status, session, ownerEmail, params.id, router]);
+  }, [loaded, status, isOwner, params.id, router]);
 
   if (status === "unauthenticated") {
     router.push("/login");
