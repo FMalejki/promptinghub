@@ -1,6 +1,7 @@
 // Pure, network-free logic for "import a public GitHub repo as a multi-file prompt"
 // (infrastructure-as-a-prompt). The route layer does the actual fetching and
 // injects results here. Keeping parse + filtering pure makes it unit-testable.
+import { looksLikeSkill } from "./import";
 
 export type RepoRef = { owner: string; repo: string; ref?: string; subpath?: string };
 
@@ -133,6 +134,8 @@ export type ImportDraft = {
   tags: string[];
   files: { path: string; content: string }[];
   notes: { skipped: number; truncated: boolean; imported: number };
+  // True when the repo looks like an agent skill (e.g. contains a SKILL.md).
+  isSkill?: boolean;
 };
 
 export function buildDraft(
@@ -146,6 +149,7 @@ export function buildDraft(
   const desc =
     (meta.description && meta.description.trim()) ||
     `Imported from github.com/${ref.owner}/${ref.repo}`;
+  const isSkill = looksLikeSkill({ files });
   return {
     name: ref.repo,
     description: `${desc} — github.com/${ref.owner}/${ref.repo}`.slice(0, 280),
@@ -153,5 +157,6 @@ export function buildDraft(
     tags: [...new Set(tags)].slice(0, 8),
     files,
     notes: { skipped: selection.skipped, truncated: selection.truncated, imported: files.length },
+    ...(isSkill ? { isSkill: true } : {}),
   };
 }

@@ -107,7 +107,7 @@ export default function NewPromptPage() {
         return;
       }
       const { draft } = await res.json();
-      setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category }));
+      setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
       if (Array.isArray(draft.testedModels)) {
         setSelectedModels(new Set(draft.testedModels.map((m: TestedModel) => m.modelId)));
@@ -137,7 +137,7 @@ export default function NewPromptPage() {
         return;
       }
       const d = data.draft;
-      setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category }));
+      setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
       if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
       if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
       const n = d.notes || {};

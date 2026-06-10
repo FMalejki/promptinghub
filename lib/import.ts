@@ -11,7 +11,29 @@ export type ImportedDraft = {
   body: string;
   testedModels?: TestedModel[];
   source: string;
+  // True when the imported content looks like an agent "skill" (SKILL.md shape).
+  isSkill?: boolean;
 };
+
+/**
+ * Heuristic: does this imported content look like an agent **skill** (e.g. a
+ * Claude SKILL.md)? Strongest signal is a file literally named `SKILL.md`.
+ * For pasted text, a frontmatter block carrying BOTH `name:` and `description:`
+ * (the SKILL.md shape) or an explicit `# Skill …` heading counts. Conservative
+ * on purpose — only auto-flags when confident, so normal prompts aren't tagged.
+ */
+export function looksLikeSkill(input: { text?: string; files?: { path: string }[] }): boolean {
+  if (input.files?.some((f) => /(^|\/)skill\.md$/i.test((f.path || "").trim()))) return true;
+  const t = (input.text || "").trim();
+  if (!t) return false;
+  const fm = t.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (fm) {
+    const block = fm[1].toLowerCase();
+    if (/(^|\n)\s*name\s*:/.test(block) && /(^|\n)\s*description\s*:/.test(block)) return true;
+  }
+  if (/^#+\s*skill\b/im.test(t)) return true;
+  return false;
+}
 
 const NAME_KEYS = new Set(["name", "title"]);
 const DESC_KEYS = new Set(["description", "desc"]);
@@ -75,5 +97,6 @@ export function parsePastedPrompt(raw: string, source = "paste"): ImportedDraft 
         .map((modelId) => ({ modelId }))
     : undefined;
 
-  return { name, description, category, body, testedModels, source };
+  const isSkill = looksLikeSkill({ text: raw });
+  return { name, description, category, body, testedModels, source, ...(isSkill ? { isSkill: true } : {}) };
 }
