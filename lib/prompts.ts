@@ -4,6 +4,7 @@ import { IMAGE_MODEL_IDS } from "./imageModels";
 import { normalizeTags } from "./tags";
 import { promptToText } from "./promptText";
 import { estimateTokens } from "./promptStats";
+import { canEditPrompt, isCollaborator as isCollab, type AuthzRow } from "./promptAuthz";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -43,6 +44,7 @@ export type PromptWithBody = {
   stars: number;
   isPrivate: boolean;
   sharedWith: string[];
+  collaborators: string[];
   starredBy: string[];
   testedModels: TestedModel[];
   createdAt: Date;
@@ -73,6 +75,10 @@ export type PromptDetail = {
   // Server-computed: is the viewer the owner? Replaces client-side email comparison
   // (we no longer expose author.email).
   isOwner: boolean;
+  // Server-computed edit relationship: a collaborator can edit but is not the owner.
+  isCollaborator: boolean;
+  // Owner OR collaborator — gates the Edit affordance in the UI.
+  canEdit: boolean;
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
@@ -113,6 +119,9 @@ export type NewPrompt = {
   // Emails allowed to read a PRIVATE prompt (besides the owner). Accepts an
   // array or a comma/whitespace-separated string (from the share textarea).
   sharedWith?: string[] | string;
+  // Emails granted EDIT access (collaborators). Same accepted shapes as
+  // sharedWith. Owner-only to set; collaborators cannot change this list.
+  collaborators?: string[] | string;
 };
 
 // Normalize a share list (array or comma/newline-separated string) into a clean,
@@ -419,6 +428,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     forkedFrom,
     starredBy: [],
     sharedWith: normalizeEmails(data.sharedWith),
+    collaborators: normalizeEmails(data.collaborators),
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -458,26 +468,46 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
   };
 }
 
-// Owner-scoped update. Returns true only when the prompt exists AND belongs to ownerEmail.
+// Edit a prompt. Authorized for the OWNER or an explicit COLLABORATOR.
+// Returns false when the prompt is missing or the editor lacks edit rights.
+//
+// Collaborators may edit content/metadata (name, description, category, image,
+// tags, testedModels, body/files) but NOT owner-only fields — privacy, price,
+// the share allowlist, or the collaborator list. Those are silently dropped for
+// non-owners so a collaborator can never widen access or change pricing.
 export async function updatePrompt(
   db: Db,
   id: string,
-  ownerEmail: string,
+  editorEmail: string,
   data: Partial<NewPrompt>,
   opts?: { message?: string },
 ): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
+
+  // Authorize against the live document before touching anything.
+  const current = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
+  if (!current) return false;
+  if (!canEditPrompt(current as unknown as AuthzRow, editorEmail)) return false;
+  const isOwnerEdit = (current.ownerEmail as string) === editorEmail;
+
   const set: Record<string, unknown> = {};
   if (data.name !== undefined) set.name = data.name;
   if (data.description !== undefined) set.description = data.description;
   if (data.category !== undefined) set.category = data.category;
   if (data.image !== undefined) set.image = data.image || null;
-  if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
-  if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
-  const incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
-  if (incomingShared !== undefined) set.sharedWith = incomingShared;
+
+  // Owner-only fields — ignored entirely when a collaborator is editing.
+  let incomingShared: string[] | undefined;
+  if (isOwnerEdit) {
+    if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
+    if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
+    incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
+    if (incomingShared !== undefined) set.sharedWith = incomingShared;
+    if (data.collaborators !== undefined) set.collaborators = normalizeEmails(data.collaborators);
+  }
+
   // Compute the new plaintext content when a content edit is present.
   let newFiles: PromptFile[] | null = null;
   let newBody: string | null = null;
@@ -490,9 +520,6 @@ export async function updatePrompt(
   const contentEditing = newBody !== null;
 
   if (!contentEditing && Object.keys(set).length === 0) return false;
-
-  const current = await db.collection("prompts").findOne({ _id: new ObjectId(id), ownerEmail });
-  if (!current) return false;
 
   if (contentEditing) {
     set.body = newBody ?? "";
@@ -513,10 +540,12 @@ export async function updatePrompt(
   }
 
   set.updatedAt = new Date();
-  const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
-  // Notify users newly added to the share list (best-effort).
+  // Already authorized above; scope the write by _id (the editor may be a
+  // collaborator, not the owner, so we must not filter by ownerEmail here).
+  const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: set });
+  // Notify users newly added to the share list (best-effort; owner edits only).
   if (res.matchedCount > 0 && incomingShared !== undefined) {
-    await notifyNewlyShared(db, ownerEmail, id, current.name, (current.sharedWith as string[]) || [], incomingShared);
+    await notifyNewlyShared(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared);
   }
   return res.matchedCount > 0;
 }
@@ -543,6 +572,7 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
         stars: row.starredBy?.length || 0,
         isPrivate: row.isPrivate || false,
         sharedWith: row.sharedWith || [],
+        collaborators: row.collaborators || [],
         starredBy: row.starredBy || [],
         testedModels: row.testedModels || [],
         createdAt: row.createdAt,
@@ -586,9 +616,13 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
-    // Owner-only: surface the share allowlist so the edit page can manage it.
-    // Never sent to non-owners (would leak who a prompt is shared with).
-    ...(viewerEmail && viewerEmail === row.ownerEmail ? { sharedWith: (row.sharedWith as string[]) || [] } : {}),
+    isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
+    canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
+    // Owner-only: surface the share + collaborator allowlists so the edit page
+    // can manage them. Never sent to non-owners (would leak who has access).
+    ...(viewerEmail && viewerEmail === row.ownerEmail
+      ? { sharedWith: (row.sharedWith as string[]) || [], collaborators: (row.collaborators as string[]) || [] }
+      : {}),
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
@@ -792,6 +826,12 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
+    isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
+    canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
+    // Owner-only access lists, mirroring getPromptDetail.
+    ...(viewerEmail && viewerEmail === row.ownerEmail
+      ? { sharedWith: (row.sharedWith as string[]) || [], collaborators: (row.collaborators as string[]) || [] }
+      : {}),
     handle,
     slug,
   };
@@ -846,16 +886,17 @@ export async function getFavorites(db: Db, userEmail: string): Promise<string[]>
 }
 
 /**
- * Locked prompts that have been explicitly shared with `email` (the owner sees
- * their own under their dashboard, not here). Returns safe card fields only —
- * NEVER the decrypted body/files or the sharedWith allowlist.
+ * Private prompts the user can access but doesn't own — either shared with them
+ * (read-only) or where they're a collaborator (edit). The owner sees their own
+ * under their dashboard, not here. Returns safe card fields only — NEVER the
+ * body/files or the access lists.
  */
 export async function listSharedWithMe(db: Db, email: string): Promise<Prompt[]> {
   if (!email) return [];
   const rows = await db
     .collection("prompts")
     .aggregate([
-      { $match: { sharedWith: email, isPrivate: true } },
+      { $match: { isPrivate: true, $or: [{ sharedWith: email }, { collaborators: email }] } },
       { $addFields: { stars: { $size: { $ifNull: ["$starredBy", []] } } } },
       { $sort: { createdAt: -1, _id: -1 } },
       { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },

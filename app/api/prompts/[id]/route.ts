@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getPrompt, getPromptDetail, updatePrompt, deletePrompt } from "@/lib/prompts";
+import { canViewPrompt } from "@/lib/promptAuthz";
 import { newPromptSchema } from "@/lib/promptInput";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -15,16 +16,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Check if user has access to private prompt
-  if (prompt.isPrivate) {
-    const userEmail = session?.user?.email;
-    const hasAccess =
-      userEmail === prompt.ownerEmail ||
-      prompt.sharedWith.includes(userEmail || "");
-
-    if (!hasAccess) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
+  // Privacy gate: owner, shared-viewers, and collaborators may see a private prompt.
+  if (!canViewPrompt(prompt, session?.user?.email)) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   // Return the rich detail object (files, image, stars, testedModels, author, handle/slug).

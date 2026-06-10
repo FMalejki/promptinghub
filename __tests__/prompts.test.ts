@@ -148,6 +148,8 @@ describe("getPromptDetail", () => {
       updatedAt: null,
       isStarred: false,
       isOwner: false,
+      isCollaborator: false,
+      canEdit: false,
     });
   });
 
