@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { createUser, verifyCredentials, getProfile, updateProfile } from "../lib/users";
+import { createUser, verifyCredentials, getProfile, updateProfile, searchUsersForMention } from "../lib/users";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -62,6 +62,42 @@ describe("createUser", () => {
     const b = await db.collection("users").findOne({ email: "sam@two.com" });
     expect(a?.handle).toBe("sam");
     expect(b?.handle).toBe("sam-2");
+  });
+});
+
+describe("searchUsersForMention", () => {
+  beforeEach(async () => {
+    await db.collection("users").insertMany([
+      { email: "fm@x.com", name: "FMalejki", handle: "filipmalejki", image: null },
+      { email: "ada@x.com", name: "Ada Lovelace", handle: "ada-lovelace", image: null },
+      { email: "leg@x.com", name: "Legacy", image: null }, // no handle
+    ]);
+  });
+
+  it("matches by display name substring (so @fmalejki finds @filipmalejki)", async () => {
+    const out = await searchUsersForMention(db, "fmalejki");
+    expect(out.map((u) => u.handle)).toContain("filipmalejki");
+  });
+
+  it("matches by handle prefix", async () => {
+    const out = await searchUsersForMention(db, "ada");
+    expect(out.map((u) => u.handle)).toEqual(["ada-lovelace"]);
+  });
+
+  it("excludes users without a handle", async () => {
+    const out = await searchUsersForMention(db, "legacy");
+    expect(out).toEqual([]);
+  });
+
+  it("returns [] for empty query and never leaks email", async () => {
+    expect(await searchUsersForMention(db, "  ")).toEqual([]);
+    const out = await searchUsersForMention(db, "ada");
+    expect(out[0]).not.toHaveProperty("email");
+  });
+
+  it("treats the query as a literal (regex metacharacters don't throw or match-all)", async () => {
+    const out = await searchUsersForMention(db, ".*");
+    expect(out).toEqual([]);
   });
 });
 

@@ -46,6 +46,28 @@ export async function getUserByHandle(db: Db, handle: string): Promise<(Profile 
   return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle, ...profileFields(row) } : null;
 }
 
+export type MentionSuggestion = { handle: string; name: string; image: string | null };
+
+// Typeahead for @mention autocomplete: users (with a handle) whose handle starts
+// with the query OR whose display name contains it (case-insensitive). This is
+// what lets someone type "@fmalejki" and find "FMalejki (@filipmalejki)" — the
+// handle and the display name often differ. Returns public-safe fields only.
+export async function searchUsersForMention(db: Db, q: string, limit = 6): Promise<MentionSuggestion[]> {
+  const term = (q || "").trim();
+  if (!term) return [];
+  const esc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const handlePrefix = new RegExp("^" + esc, "i");
+  const nameContains = new RegExp(esc, "i");
+  const rows = await db
+    .collection("users")
+    .find(
+      { handle: { $exists: true, $ne: null }, $or: [{ handle: handlePrefix }, { name: nameContains }] },
+      { projection: { handle: 1, name: 1, image: 1, _id: 0 }, limit: Math.max(1, Math.min(limit, 25)) },
+    )
+    .toArray();
+  return rows.map((r: any) => ({ handle: r.handle as string, name: (r.name as string) || (r.handle as string), image: r.image ?? null }));
+}
+
 export type TopCreator = {
   handle: string;
   name: string;
