@@ -220,6 +220,8 @@ export function Comments({ promptId }: { promptId: string }) {
             <button
               onClick={() => toggleLike(c.id)}
               title="Like this comment"
+              aria-pressed={!!c.liked}
+              aria-label={c.liked ? "Unlike this comment" : "Like this comment"}
               className={`inline-flex items-center gap-1 text-xs ${
                 c.liked ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
               }`}

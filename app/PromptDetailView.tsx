@@ -305,6 +305,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={toggleStar}
+              aria-pressed={isStarred}
+              aria-label={isStarred ? "Unstar this prompt" : "Star this prompt"}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 isStarred
                   ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
