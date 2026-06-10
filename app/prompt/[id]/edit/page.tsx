@@ -12,7 +12,7 @@ type DraftFile = { path: string; content: string };
 export default function EditPromptPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false });
+  const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false, isSkill: false });
   const [price, setPrice] = useState("0");
   const [shareWith, setShareWith] = useState("");
   const [collaborators, setCollaborators] = useState("");
@@ -31,7 +31,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     fetch(`/api/prompts/${params.id}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p) => {
-        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate });
+        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate, isSkill: !!p.isSkill });
         setPrice(((p.priceCents || 0) / 100).toString());
         setShareWith((p.sharedWith || []).join(", "));
         setCollaborators((p.collaborators || []).join(", "));
@@ -141,6 +141,10 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
               <p className="mt-1 text-xs text-gray-400">Shown at the top of the prompt page. Markdown supported.</p>
             </div>
             <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="isSkill" checked={meta.isSkill} onChange={(e) => setMeta({ ...meta, isSkill: e.target.checked })} className="w-4 h-4" />
+              <label htmlFor="isSkill" className="text-sm text-gray-700 dark:text-gray-300">This is a <strong>skill</strong> (reusable agent capability)</label>
+            </div>
             <CoverImageField
               value={meta.image}
               onChange={(v) => setMeta({ ...meta, image: v })}

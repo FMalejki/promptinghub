@@ -19,13 +19,14 @@ type PromptCardProps = {
   image: string | null;
   stars: number;
   isPrivate: boolean;
+  isSkill?: boolean;
   testedModels?: TestedModel[];
   copyCount?: number;
   priceCents?: number;
   tokens?: number;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
@@ -56,6 +57,12 @@ export function PromptCard({ id, name, description, category, author, image, sta
             <span className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded">
               {category}
             </span>
+            {isSkill && (
+              <span title="Marked as a reusable skill" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Skill
+              </span>
+            )}
             {length && (
               <span
                 title={`~${length.tokens} tokens`}

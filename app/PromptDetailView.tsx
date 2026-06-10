@@ -52,6 +52,7 @@ export type PromptDetail = {
   forkCount?: number;
   readme?: string | null;
   attachments?: { url: string; name?: string }[];
+  isSkill?: boolean;
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
@@ -262,6 +263,12 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               <Link href={`/c/${encodeURIComponent(prompt.category)}`} className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
                 {prompt.category}
               </Link>
+              {prompt.isSkill && (
+                <Link href="/browse?skill=1" title="Browse all skills" className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  Skill
+                </Link>
+              )}
               {prompt.isPrivate && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-md">
                   Private

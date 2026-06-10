@@ -22,6 +22,7 @@ export default function NewPromptPage() {
     category: "",
     image: "",
     isPrivate: false,
+    isSkill: false,
   });
   const [price, setPrice] = useState("0");
   const [readme, setReadme] = useState("");
@@ -486,6 +487,19 @@ export default function NewPromptPage() {
                 placeholder="0.00"
               />
               <p className="mt-1 text-xs text-gray-400">Marketplace is in preview — payments aren’t live yet.</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isSkill"
+                checked={form.isSkill}
+                onChange={(e) => setForm({ ...form, isSkill: e.target.checked })}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="isSkill" className="text-sm text-gray-700 dark:text-gray-300">
+                This is a <strong>skill</strong> (a reusable capability for an agent/assistant)
+              </label>
             </div>
 
             <div className="flex items-center gap-2">

@@ -30,6 +30,7 @@ export type Prompt = {
   copyCount: number;
   priceCents: number;
   tags: string[];
+  isSkill?: boolean;
   createdAt: Date;
   tokens?: number; // rough length estimate for the card badge (optional)
 };
@@ -73,6 +74,8 @@ export type PromptDetail = {
   readme: string | null;
   // Multimodal attachments (by URL) the author added; [] when none.
   attachments: Attachment[];
+  // Whether the author marked this as a reusable "skill".
+  isSkill: boolean;
   createdAt: Date;
   updatedAt: Date | null;
   // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
@@ -96,6 +99,7 @@ export type ListOpts = {
   category?: string;
   model?: string;
   imageOnly?: boolean;
+  skillsOnly?: boolean;
   tag?: string;
   ownerEmail?: string;
   sort?: "recent" | "popular" | "copied" | "trending" | "viewed";
@@ -126,6 +130,8 @@ export type NewPrompt = {
   readme?: string;
   // Optional multimodal attachments (images/pdf/video/etc by URL) an LLM can view.
   attachments?: Attachment[];
+  // Mark this prompt as a reusable "skill" (Claude/agent skill).
+  isSkill?: boolean;
   // Emails allowed to read a PRIVATE prompt (besides the owner). Accepts an
   // array or a comma/whitespace-separated string (from the share textarea).
   sharedWith?: string[] | string;
@@ -230,6 +236,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   }
 
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
+  if (opts.skillsOnly) match.isSkill = true;
   if (opts.category) match.category = opts.category;
   if (opts.model) match["testedModels.modelId"] = opts.model;
   if (opts.tag) {
@@ -299,6 +306,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     copyCount: r.copyCount || 0,
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
+    isSkill: !!r.isSkill,
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
     author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
@@ -441,6 +449,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     collaborators: normalizeEmails(data.collaborators),
     readme: (data.readme || "").trim() || null,
     attachments: normalizeAttachments(data.attachments),
+    isSkill: !!data.isSkill,
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -511,6 +520,7 @@ export async function updatePrompt(
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
   if (data.readme !== undefined) set.readme = (data.readme || "").trim() || null;
   if (data.attachments !== undefined) set.attachments = normalizeAttachments(data.attachments);
+  if (data.isSkill !== undefined) set.isSkill = !!data.isSkill;
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
@@ -628,6 +638,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     forkCount,
     readme: row.readme ?? null,
     attachments: (row.attachments as Attachment[]) || [],
+    isSkill: !!row.isSkill,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
@@ -840,6 +851,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     forkCount,
     readme: row.readme ?? null,
     attachments: (row.attachments as Attachment[]) || [],
+    isSkill: !!row.isSkill,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
