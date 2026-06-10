@@ -53,6 +53,8 @@ export type PromptDetail = {
   updatedAt?: string | null;
   isStarred?: boolean;
   isOwner?: boolean;
+  isCollaborator?: boolean;
+  canEdit?: boolean;
   handle?: string;
   slug?: string;
 };
@@ -215,7 +217,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     .map((m) => ({ modelId: m.modelId, href: imageModelHome(m.modelId) }))
     .filter((l): l is { modelId: string; href: string } => l.href !== null);
   const author = prompt.author;
-  const canEdit = !!prompt.isOwner;
+  // Owner OR collaborator may edit. Falls back to isOwner for older payloads.
+  const canEdit = prompt.canEdit ?? !!prompt.isOwner;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -365,7 +368,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
             <SaveToCollection promptId={prompt.id} />
 
-            {canEdit && !prompt.isPrivate && (
+            {prompt.isOwner && !prompt.isPrivate && (
               <button
                 onClick={togglePin}
                 title={isPinned ? "Unpin from your profile" : "Pin to the top of your profile"}

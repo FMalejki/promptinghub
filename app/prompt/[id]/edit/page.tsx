@@ -14,10 +14,12 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
   const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false });
   const [price, setPrice] = useState("0");
   const [shareWith, setShareWith] = useState("");
+  const [collaborators, setCollaborators] = useState("");
   const [tags, setTags] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [changeNote, setChangeNote] = useState("");
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [canEdit, setCanEdit] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -29,19 +31,23 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
         setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate });
         setPrice(((p.priceCents || 0) / 100).toString());
         setShareWith((p.sharedWith || []).join(", "));
+        setCollaborators((p.collaborators || []).join(", "));
         setTags((p.tags || []).join(", "));
         setFiles((p.files?.length ? p.files : [{ path: "prompt.txt", content: p.body || "" }]).map((f: DraftFile) => ({ path: f.path, content: f.content })));
         setIsOwner(!!p.isOwner);
+        setCanEdit(p.canEdit ?? !!p.isOwner);
         setLoaded(true);
       })
       .catch(() => router.push("/browse"));
   }, [params.id, router]);
 
   useEffect(() => {
-    if (loaded && status === "authenticated" && isOwner === false) {
+    // Collaborators (not just owners) may reach the edit page; only redirect
+    // away viewers with no edit rights.
+    if (loaded && status === "authenticated" && canEdit === false) {
       router.push(`/prompt/${params.id}`);
     }
-  }, [loaded, status, isOwner, params.id, router]);
+  }, [loaded, status, canEdit, params.id, router]);
 
   if (status === "unauthenticated") {
     router.push("/login");
@@ -64,7 +70,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     const res = await fetch(`/api/prompts/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles, sharedWith: meta.isPrivate ? shareWith : "", message: changeNote.trim() || undefined }),
+      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, files: payloadFiles, sharedWith: meta.isPrivate ? shareWith : "", collaborators, message: changeNote.trim() || undefined }),
     });
     setSaving(false);
     if (res.ok) router.push(`/prompt/${params.id}`);
@@ -122,28 +128,46 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
               inputClassName={input}
               labelClassName={label}
             />
-            <div>
-              <label className={label}>Price (USD) — 0 = free</label>
-              <input className={input} type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
-              <p className="mt-1 text-xs text-gray-400">Marketplace is in preview — payments aren’t live yet.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="priv" checked={meta.isPrivate} onChange={(e) => setMeta({ ...meta, isPrivate: e.target.checked })} className="w-4 h-4" />
-              <label htmlFor="priv" className="text-sm text-gray-700 dark:text-gray-300">Private (only you can see it)</label>
-            </div>
-            {meta.isPrivate && (
-              <div className="pl-6">
-                <label className={label} htmlFor="shareWith">Share with (emails)</label>
-                <textarea
-                  id="shareWith"
-                  value={shareWith}
-                  onChange={(e) => setShareWith(e.target.value)}
-                  rows={2}
-                  placeholder="alice@example.com, bob@example.com"
-                  className={input}
-                />
-                <p className="mt-1 text-xs text-gray-400">Comma- or newline-separated. These people (plus you) can view this private prompt. Leave empty to keep it just yours.</p>
-              </div>
+            {/* Pricing, privacy, sharing and collaborators are owner-only.
+                Collaborators editing a shared prompt don't see these. */}
+            {isOwner && (
+              <>
+                <div>
+                  <label className={label}>Price (USD) — 0 = free</label>
+                  <input className={input} type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
+                  <p className="mt-1 text-xs text-gray-400">Marketplace is in preview — payments aren’t live yet.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="priv" checked={meta.isPrivate} onChange={(e) => setMeta({ ...meta, isPrivate: e.target.checked })} className="w-4 h-4" />
+                  <label htmlFor="priv" className="text-sm text-gray-700 dark:text-gray-300">Private (only you can see it)</label>
+                </div>
+                {meta.isPrivate && (
+                  <div className="pl-6">
+                    <label className={label} htmlFor="shareWith">Share with (emails) — read-only</label>
+                    <textarea
+                      id="shareWith"
+                      value={shareWith}
+                      onChange={(e) => setShareWith(e.target.value)}
+                      rows={2}
+                      placeholder="alice@example.com, bob@example.com"
+                      className={input}
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Comma- or newline-separated. These people (plus you) can <strong>view</strong> this private prompt. Leave empty to keep it just yours.</p>
+                  </div>
+                )}
+                <div>
+                  <label className={label} htmlFor="collaborators">Collaborators (emails) — can edit</label>
+                  <textarea
+                    id="collaborators"
+                    value={collaborators}
+                    onChange={(e) => setCollaborators(e.target.value)}
+                    rows={2}
+                    placeholder="teammate@example.com, editor@example.com"
+                    className={input}
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Comma- or newline-separated. Collaborators can <strong>edit</strong> this prompt (and view it if private) — but can’t change pricing, privacy, sharing, or delete it.</p>
+                </div>
+              </>
             )}
           </div>
 
@@ -179,7 +203,11 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex items-center justify-between gap-3">
-            <button type="button" onClick={del} className="px-6 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete</button>
+            {isOwner ? (
+              <button type="button" onClick={del} className="px-6 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete</button>
+            ) : (
+              <span className="text-xs text-gray-400">You’re editing as a collaborator.</span>
+            )}
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => router.push(`/prompt/${params.id}`)} className="px-6 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
               <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors">{saving ? "Saving…" : "Save changes"}</button>
