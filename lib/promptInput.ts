@@ -25,6 +25,8 @@ export const newPromptSchema = z
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
     forkedFrom: z.string().max(64).optional(),
+    // Encrypt contents at rest + gate them to owner/shared viewers.
+    locked: z.boolean().optional(),
     // Optional "commit message" describing an edit (used on update, ignored on create).
     message: z.string().max(200).optional(),
   })

@@ -147,6 +147,8 @@ describe("getPromptDetail", () => {
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
       isStarred: false,
+      locked: false,
+      lockedForViewer: false,
     });
   });
 

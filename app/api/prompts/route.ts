@@ -51,9 +51,14 @@ export async function POST(req: Request) {
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const created = await createPrompt(await getDb(), email, {
-    ...parsed.data,
-    image: parsed.data.image || undefined,
-  });
-  return NextResponse.json(created, { status: 201 });
+  try {
+    const created = await createPrompt(await getDb(), email, {
+      ...parsed.data,
+      image: parsed.data.image || undefined,
+    });
+    return NextResponse.json(created, { status: 201 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Failed to create prompt";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 }

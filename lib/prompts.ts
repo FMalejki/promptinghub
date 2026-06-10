@@ -4,6 +4,7 @@ import { IMAGE_MODEL_IDS } from "./imageModels";
 import { normalizeTags } from "./tags";
 import { promptToText } from "./promptText";
 import { estimateTokens } from "./promptStats";
+import { encryptJson, decryptJson, encryptionAvailable } from "./crypto";
 
 export type Author = { email: string; name: string; image: string | null };
 
@@ -70,6 +71,10 @@ export type PromptDetail = {
   updatedAt: Date | null;
   // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
   isStarred: boolean;
+  // Encryption: `locked` = contents are encrypted at rest. `lockedForViewer` =
+  // this viewer is NOT authorized, so body/files are redacted (empty).
+  locked: boolean;
+  lockedForViewer: boolean;
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
@@ -107,6 +112,8 @@ export type NewPrompt = {
   priceCents?: number;
   tags?: string[] | string;
   forkedFrom?: string;
+  // Encrypt the prompt contents at rest and gate them to the owner + shared users.
+  locked?: boolean;
 };
 
 const LANG_BY_EXT: Record<string, string> = {
@@ -129,6 +136,34 @@ export function normalizeFiles(row: { files?: PromptFile[]; body?: string }): Pr
     return row.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
   }
   return [{ path: "prompt.txt", content: row.body ?? "", language: "text" }];
+}
+
+type LockGate = { body: string; files: PromptFile[]; locked: boolean; lockedForViewer: boolean };
+
+// Resolve a prompt's readable content honoring the lock. For an unlocked prompt
+// this is just its plaintext. For a locked prompt, only the owner + shared users
+// get the decrypted content; everyone else gets redacted (empty) content.
+export function resolveLock(
+  row: { _id?: unknown; locked?: boolean; enc?: string; ownerEmail?: string; sharedWith?: string[]; files?: PromptFile[]; body?: string },
+  viewerEmail?: string | null,
+): LockGate {
+  if (!row.locked) {
+    const files = normalizeFiles(row);
+    return { body: row.body ?? files.map((f) => f.content).join("\n\n"), files, locked: false, lockedForViewer: false };
+  }
+  const authorized =
+    !!viewerEmail &&
+    (viewerEmail === row.ownerEmail || (Array.isArray(row.sharedWith) && row.sharedWith.includes(viewerEmail)));
+  if (authorized && typeof row.enc === "string") {
+    try {
+      const dec = decryptJson<{ body: string; files: PromptFile[] | null }>(row.enc);
+      const files = normalizeFiles({ files: dec.files ?? undefined, body: dec.body });
+      return { body: dec.body || files.map((f) => f.content).join("\n\n"), files, locked: true, lockedForViewer: false };
+    } catch {
+      // Key missing/rotated or tampered ciphertext → fail closed (stay locked).
+    }
+  }
+  return { body: "", files: [], locked: true, lockedForViewer: true };
 }
 
 export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]> {
@@ -359,6 +394,16 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     createdAt: new Date(),
   };
   if (files) doc.files = files;
+  // Locked prompt: encrypt the contents and blank the plaintext fields, so every
+  // read path that touches body/files sees nothing — only an authorized viewer
+  // gets a server-side decrypt (see getPromptDetail).
+  if (data.locked) {
+    if (!encryptionAvailable()) throw new Error("Locking unavailable: PROMPT_ENC_KEY not configured");
+    doc.locked = true;
+    doc.enc = encryptJson({ body, files: files ?? null });
+    doc.body = "";
+    delete doc.files;
+  }
   const { insertedId } = await db.collection("prompts").insertOne(doc);
   // Notify the source owner when their prompt is forked (best-effort, no self-notify).
   if (forkSource) {
@@ -411,23 +456,52 @@ export async function updatePrompt(
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
   if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
+  // Compute the new plaintext content when a content edit is present.
+  let newFiles: PromptFile[] | null = null;
+  let newBody: string | null = null;
   if (data.files !== undefined) {
-    const files = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
-    set.files = files;
-    set.body = files.map((f) => f.content).join("\n\n");
+    newFiles = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
+    newBody = newFiles.map((f) => f.content).join("\n\n");
   } else if (data.body !== undefined) {
-    set.body = data.body;
+    newBody = data.body;
   }
-  if (Object.keys(set).length === 0) return false;
+  const contentEditing = newBody !== null;
+  const lockToggling = data.locked !== undefined;
 
-  // Snapshot the prior content before applying a content edit (owner-scoped).
+  if (!contentEditing && !lockToggling && Object.keys(set).length === 0) return false;
+
   const current = await db.collection("prompts").findOne({ _id: new ObjectId(id), ownerEmail });
   if (!current) return false;
-  const contentChanged = set.name !== undefined || set.body !== undefined || set.files !== undefined;
-  if (contentChanged) {
+  const willLock = data.locked !== undefined ? !!data.locked : !!current.locked;
+
+  // When touching content OR toggling the lock we need the full plaintext to
+  // (re)encrypt or to expose. If not editing content, pull the current plaintext
+  // (decrypting if it's currently locked — the owner is authorized).
+  if (contentEditing || lockToggling) {
+    if (!contentEditing) {
+      const cur = resolveLock(current, ownerEmail);
+      newBody = cur.body;
+      newFiles = cur.files.length ? cur.files : null;
+    }
+    if (willLock) {
+      if (!encryptionAvailable()) throw new Error("Locking unavailable: PROMPT_ENC_KEY not configured");
+      set.enc = encryptJson({ body: newBody ?? "", files: newFiles });
+      set.locked = true;
+      set.body = "";
+      set.files = [];
+    } else {
+      set.locked = false;
+      set.enc = null;
+      set.body = newBody ?? "";
+      set.files = newFiles ?? [];
+    }
+  }
+
+  // Version snapshot of prior content — only for unlocked prompts (a locked
+  // prompt has no readable plaintext to snapshot, and we never want plaintext
+  // history for it).
+  if (contentEditing && !willLock) {
     const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;
-    // The "commit message" describes the edit being applied now; the snapshot
-    // captures the prior content that this edit replaces.
     const message = (opts?.message ?? "").trim().slice(0, 200);
     await db.collection("promptVersions").insertOne({
       promptId: id,
@@ -438,6 +512,10 @@ export async function updatePrompt(
       message,
       createdAt: new Date(),
     });
+  }
+  // Locking a previously-public prompt: purge any plaintext edit history.
+  if (willLock && !current.locked) {
+    await db.collection("promptVersions").deleteMany({ promptId: id });
   }
 
   set.updatedAt = new Date();
@@ -479,7 +557,8 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
   const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
   if (!row) return null;
   const u = await db.collection("users").findOne({ email: row.ownerEmail });
-  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  const gate = resolveLock(row, viewerEmail);
+  const files = gate.files;
   // Resolve lineage: the source this was forked from (if it still exists) and how many forks it has.
   let forkedFrom: { id: string; name: string } | null = null;
   if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
@@ -492,7 +571,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     name: row.name,
     description: row.description,
     category: row.category,
-    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    body: gate.body,
     files,
     author: { email: row.ownerEmail, name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null },
     image: row.image ?? null,
@@ -508,6 +587,8 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    locked: gate.locked,
+    lockedForViewer: gate.lockedForViewer,
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
@@ -681,7 +762,8 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
   if (!user) return null;
   const row = await db.collection("prompts").findOne({ ownerEmail: user.email, slug });
   if (!row) return null;
-  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  const gate = resolveLock(row, viewerEmail);
+  const files = gate.files;
   let forkedFrom: { id: string; name: string } | null = null;
   if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
     const src = await db.collection("prompts").findOne({ _id: new ObjectId(row.forkedFrom) }, { projection: { name: 1 } });
@@ -693,7 +775,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     name: row.name,
     description: row.description,
     category: row.category,
-    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    body: gate.body,
     files,
     author: { email: row.ownerEmail, name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null },
     image: row.image ?? null,
@@ -709,6 +791,8 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    locked: gate.locked,
+    lockedForViewer: gate.lockedForViewer,
     handle,
     slug,
   };
