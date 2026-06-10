@@ -3,9 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { getModelName } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
-
-type Vote = "works" | "broken" | "mixed";
-type ModelSummary = { modelId: string; works: number; broken: number; mixed: number; youVoted: Vote | null };
+import { addNeutralModel, type Vote, type ModelSummary } from "@/lib/attestations";
 
 // Community attestations: confirm/deny a prompt works on a model, and add models
 // the author didn't list. Optimistic-ish: re-fetches the authoritative summary
@@ -127,14 +125,16 @@ export function ModelAttestations({ promptId }: { promptId: string }) {
           <button
             onClick={() => {
               if (adding) {
-                vote(adding, "works", null);
+                // Add the row without presupposing a verdict — the user then
+                // picks Works / Mixed / No on the new row (that's what persists).
+                setModels((prev) => addNeutralModel(prev, adding));
                 setAdding("");
               }
             }}
             disabled={!adding || busy !== null}
             className="px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors"
           >
-            It works
+            Add
           </button>
         </div>
       )}
