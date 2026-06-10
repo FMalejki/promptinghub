@@ -84,6 +84,19 @@ function hashSeed(seed: string): number {
   return h;
 }
 
+// Tiny deterministic PRNG (mulberry32) — same seed always yields the same stream,
+// so a prompt's generated cover is stable across renders but unique per prompt.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // Group categories into visual "buckets" — each gets its own colour family and
 // glyph so a grid of placeholders reads as varied/intentional, not monotonous.
 type Bucket = "code" | "writing" | "image" | "social" | "learning" | "fun" | "default";
@@ -151,19 +164,60 @@ function bucketGlyph(bucket: Bucket, c: string): string {
 // variation within that family. Always an inline SVG data URI — can never 404.
 export function getPlaceholderImage(seed: string, category?: string): string {
   const h = hashSeed(seed);
+  const rng = mulberry32(h);
   const bucket: Bucket = (category && CATEGORY_BUCKET[category]) || "default";
   const base = BUCKET_HUE[bucket];
   const hue = (base + ((h % 50) - 25) + 360) % 360;
   const hue2 = (hue + 28) % 360;
-  const c = "rgba(255,255,255,0.6)";
+  const W = 400;
+  const Hh = 300;
+  const angle = Math.floor(rng() * 360);
+
+  // Soft "mesh" depth blobs — 3 large translucent circles placed by the PRNG.
+  let blobs = "";
+  for (let i = 0; i < 3; i++) {
+    const cx = Math.round(rng() * W);
+    const cy = Math.round(rng() * Hh);
+    const r = Math.round(70 + rng() * 130);
+    const light = rng() > 0.5;
+    const fill = light
+      ? `hsla(${hue2},70%,82%,0.16)`
+      : `hsla(${hue},70%,18%,0.18)`;
+    blobs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
+  }
+
+  // Mirrored identicon dot-grid — a stable texture unique to this prompt.
+  let dots = "";
+  const cols = 6;
+  const rows = 4;
+  const padX = 46;
+  const padY = 54;
+  const cw = (W - 2 * padX) / (cols - 1);
+  const ch = (Hh - 2 * padY) / (rows - 1);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols / 2; col++) {
+      if (rng() > 0.52) {
+        const x = padX + col * cw;
+        const y = padY + row * ch;
+        const rad = (4 + rng() * 6).toFixed(1);
+        const o = (0.12 + rng() * 0.2).toFixed(2);
+        dots +=
+          `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(255,255,255,${o})"/>` +
+          `<circle cx="${(W - x).toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(255,255,255,${o})"/>`;
+      }
+    }
+  }
+
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">` +
-    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
-    `<stop offset="0%" stop-color="hsl(${hue},45%,55%)"/>` +
-    `<stop offset="100%" stop-color="hsl(${hue2},42%,42%)"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}">` +
+    `<defs><linearGradient id="g" gradientTransform="rotate(${angle} 0.5 0.5)">` +
+    `<stop offset="0%" stop-color="hsl(${hue},52%,54%)"/>` +
+    `<stop offset="100%" stop-color="hsl(${hue2},48%,40%)"/>` +
     `</linearGradient></defs>` +
-    `<rect width="400" height="300" fill="url(#g)"/>` +
-    bucketGlyph(bucket, c) +
+    `<rect width="${W}" height="${Hh}" fill="url(#g)"/>` +
+    blobs +
+    dots +
+    bucketGlyph(bucket, "rgba(255,255,255,0.55)") +
     `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
