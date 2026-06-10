@@ -535,15 +535,24 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {!prompt.isPrivate && !prompt.locked && (
-              <a
-                href={`/api/prompts/${prompt.id}/raw`}
-                target="_blank"
-                rel="noreferrer"
-                title="Plain-text version (pipe-friendly)"
-                className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-              >
-                Raw
-              </a>
+              <>
+                <a
+                  href={`/api/prompts/${prompt.id}/raw`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Plain-text version (pipe-friendly)"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  Raw
+                </a>
+                <a
+                  href={`/api/prompts/${prompt.id}/raw?format=md&download=1`}
+                  title="Download this prompt as a Markdown file"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  Download .md
+                </a>
+              </>
             )}
             <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
           </div>
