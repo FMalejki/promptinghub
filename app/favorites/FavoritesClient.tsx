@@ -18,6 +18,7 @@ type Prompt = {
   stars: number;
   isPrivate: boolean;
   testedModels: TestedModel[];
+  locked?: boolean;
 };
 
 export default function FavoritesPage() {
