@@ -176,7 +176,7 @@ export default function BrowsePage() {
             <input
               ref={searchRef}
               type="search"
-              placeholder="Search prompts...  (press /)"
+              placeholder="Search prompts..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="w-full px-6 py-4 pl-12 text-base border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 shadow-sm"
