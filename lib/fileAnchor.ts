@@ -31,3 +31,15 @@ export function parseFileAnchor(hash: string): string | null {
 export function fileAnchorId(path: string): string {
   return `file-${path.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 }
+
+// Which file tab should be active given an optional requested path (e.g. from a
+// "#file=…" deep link). Returns the index of the matching path, or 0 when there's
+// no match / no request — so the viewer always has a valid selected tab.
+export function activeFileIndex(paths: string[], requestedPath?: string | null): number {
+  if (!paths.length) return 0;
+  if (requestedPath) {
+    const i = paths.indexOf(requestedPath);
+    if (i >= 0) return i;
+  }
+  return 0;
+}

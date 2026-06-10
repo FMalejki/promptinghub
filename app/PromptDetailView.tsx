@@ -21,7 +21,7 @@ import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
 import { promptStats } from "@/lib/promptStats";
-import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
+import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
 import { AssistantLinks } from "./components/AssistantLinks";
 import { PlaygroundPanel } from "./PlaygroundPanel";
@@ -108,16 +108,26 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
   const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
+  // Which file tab is open (multi-file prompts render as tabs, not a long stack).
+  const [activeFile, setActiveFile] = useState<string | null>(null);
 
-  // On load, if the URL carries a #file=… anchor, scroll to that file and flash it.
+  // On load, if the URL carries a #file=… anchor, open that file's tab, scroll to
+  // it and flash it.
   useEffect(() => {
     const path = parseFileAnchor(window.location.hash);
     if (!path) return;
     setAnchoredFile(path);
-    const el = document.getElementById(fileAnchorId(path));
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setActiveFile(path);
+    // Only the active tab renders, so wait a frame for it to mount before scrolling.
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(fileAnchorId(path));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
     const t = setTimeout(() => setAnchoredFile(null), 2000);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
   }, []);
 
   // Record a view once per page load (soft signal, best-effort).
@@ -210,6 +220,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => pickReadme(files), [files]);
+  // Active tab for multi-file prompts (falls back to the first file).
+  const activeIdx = activeFileIndex(filled.map((f) => f.path), activeFile);
   const stats = useMemo(() => promptStats(allText), [allText]);
   const installRef = prompt.handle && prompt.slug ? `${prompt.handle}/${prompt.slug}` : null;
   const imageGen = isImagePrompt({ testedModels: prompt.testedModels, category: prompt.category });
@@ -521,40 +533,66 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 </a>
               </>
             )}
-            <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
+            <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} />
           </div>
         </div>
-        {filled.map((f, i) => (
-          <div
-            key={f.path}
-            id={fileAnchorId(f.path)}
-            className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
-              anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
-            }`}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
-                <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {multi && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
-                    }}
-                    title="Copy a link to this file"
-                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                  >
-                    Link
-                  </button>
-                )}
-                <CopyButton text={f.content} />
-              </div>
-            </div>
-            <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[i].content} values={values} /></pre>
+        {/* Multi-file: tabs to browse one file at a time instead of a long scroll. */}
+        {multi && (
+          <div className="flex flex-wrap gap-1.5 overflow-x-auto" role="tablist" aria-label="Files">
+            {filled.map((f, i) => (
+              <button
+                key={f.path}
+                role="tab"
+                aria-selected={i === activeIdx}
+                onClick={() => setActiveFile(f.path)}
+                title={f.path}
+                className={`px-3 py-1 text-xs font-mono rounded-lg border whitespace-nowrap transition-colors ${
+                  i === activeIdx
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                {f.path}
+              </button>
+            ))}
           </div>
-        ))}
+        )}
+        {(() => {
+          const f = filled[activeIdx];
+          if (!f) return null;
+          return (
+            <div
+              key={f.path}
+              id={fileAnchorId(f.path)}
+              role={multi ? "tabpanel" : undefined}
+              className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
+                anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
+              }`}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {multi && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
+                      }}
+                      title="Copy a link to this file"
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      Link
+                    </button>
+                  )}
+                  <CopyButton text={f.content} label="Copy file" />
+                </div>
+              </div>
+              <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} /></pre>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Community-tested models — confirm/deny + add models */}
