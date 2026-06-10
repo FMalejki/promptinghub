@@ -18,6 +18,10 @@ export type SeedPrompt = {
   files?: { path: string; content: string }[];
   // Model ids this prompt was tested on, e.g. ["gemini-2.0-flash", "gpt-4o"].
   testedModels?: string[];
+  // Mark the seeded prompt as a reusable "skill".
+  isSkill?: boolean;
+  // Optional author-written README (markdown), shown atop the detail page.
+  readme?: string;
   // Per-prompt attribution. Overrides the dataset-level default source.
   source?: string;
   sourceUrl?: string;
@@ -82,6 +86,9 @@ export async function seedDatabase(
     // Defaults to the CC0 awesome-chatgpt-prompts batch. Pass `null` for an
     // original/community dataset so prompts aren't falsely attributed.
     defaultSource?: { name: string; url: string; license: string } | null;
+    // Collections to create (by prompt name). Defaults to SEED_COLLECTIONS;
+    // pass [] for a dataset (e.g. skills) that shouldn't create those.
+    collections?: { name: string; description: string; prompts: string[] }[];
   },
 ): Promise<SeedResult> {
   const ownerEmail = opts.ownerEmail;
@@ -130,6 +137,8 @@ export async function seedDatabase(
       ...(sp.files && sp.files.length ? { files: sp.files } : { body: sp.body }),
       tags: sp.tags,
       testedModels: (sp.testedModels ?? []).map((modelId) => ({ modelId })),
+      ...(sp.isSkill ? { isSkill: true } : {}),
+      ...(sp.readme ? { readme: sp.readme } : {}),
     });
     // Stamp attribution. Per-prompt `source` wins; otherwise the dataset default
     // (CC0 batch, or null for an original/community set).
@@ -151,7 +160,8 @@ export async function seedDatabase(
 
   let collectionsCreated = 0;
   let collectionsSkipped = 0;
-  for (const c of SEED_COLLECTIONS) {
+  const collections = opts.collections ?? SEED_COLLECTIONS;
+  for (const c of collections) {
     const existing = await db.collection("collections").findOne({ ownerEmail, name: c.name });
     if (existing) {
       collectionsSkipped++;

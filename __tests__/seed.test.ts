@@ -4,6 +4,7 @@ import { seedDatabase, SEED_SOURCE, SEED_COLLECTIONS } from "../lib/seed";
 import { AWESOME_PROMPTS } from "../scripts/seed-data/awesome-prompts";
 import { PRO_PROMPTS } from "../scripts/seed-data/pro-prompts";
 import { COMMUNITY_PROMPTS } from "../scripts/seed-data/community-prompts";
+import { SKILLS } from "../scripts/seed-data/skills";
 import { listPublicCollections } from "../lib/collections";
 import { PROMPT_CATEGORIES, AI_MODELS } from "../lib/constants";
 
@@ -109,6 +110,44 @@ describe("COMMUNITY_PROMPTS dataset integrity", () => {
       expect(p.authorEmail && p.authorEmail.includes("@")).toBeTruthy();
       for (const id of p.testedModels ?? []) expect(validModelIds.has(id)).toBe(true);
     }
+  });
+});
+
+describe("SKILLS dataset integrity", () => {
+  const validCategories = new Set<string>(PROMPT_CATEGORIES as readonly string[]);
+  const validModelIds = new Set<string>(AI_MODELS.map((m) => m.id));
+
+  it("every skill is multi-file, flagged isSkill, valid, and authored", () => {
+    expect(SKILLS.length).toBeGreaterThanOrEqual(6);
+    for (const p of SKILLS) {
+      expect(p.isSkill).toBe(true);
+      expect(validCategories.has(p.category)).toBe(true);
+      expect(p.tags.length).toBeGreaterThan(0);
+      expect((p.files?.length ?? 0)).toBeGreaterThanOrEqual(2); // SKILL.md + helper
+      for (const f of p.files ?? []) {
+        expect(f.path.trim().length).toBeGreaterThan(0);
+        expect(f.content.trim().length).toBeGreaterThan(40);
+      }
+      expect(p.files?.some((f) => /skill\.md$/i.test(f.path))).toBe(true);
+      expect((p.readme ?? "").length).toBeGreaterThan(20);
+      expect(p.authorEmail && p.authorEmail.includes("@")).toBeTruthy();
+      for (const id of p.testedModels ?? []) expect(validModelIds.has(id)).toBe(true);
+    }
+  });
+
+  it("seeds skills with isSkill=true, no false attribution, and no collections", async () => {
+    const res = await seedDatabase(db, SKILLS, {
+      ownerEmail: "skills@promptinghub.app",
+      ownerName: "PromptingHub Skills",
+      defaultSource: null,
+      collections: [],
+    });
+    expect(res.promptsCreated).toBe(SKILLS.length);
+    expect(res.collectionsCreated).toBe(0);
+    const doc = await db.collection("prompts").findOne({ name: SKILLS[0].name });
+    expect(doc?.isSkill).toBe(true);
+    expect(doc?.source ?? null).toBeNull(); // original content, not the CC0 batch
+    expect((doc?.files as unknown[])?.length).toBeGreaterThanOrEqual(2);
   });
 });
 
