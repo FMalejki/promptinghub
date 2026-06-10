@@ -134,6 +134,38 @@ export function normalizeEmails(input?: string[] | string | null): string[] {
   return Array.from(seen).slice(0, 100);
 }
 
+// Notify users newly added to a prompt's share list (best-effort, never the owner).
+async function notifyNewlyShared(
+  db: Db,
+  ownerEmail: string,
+  promptId: string,
+  promptName: string,
+  prev: string[],
+  next: string[],
+): Promise<void> {
+  const before = new Set(prev || []);
+  const added = (next || []).filter((e) => e && !before.has(e) && e !== ownerEmail);
+  if (!added.length) return;
+  try {
+    const { addNotification, actorName } = await import("./notifications");
+    const who = await actorName(db, ownerEmail);
+    await Promise.all(
+      added.map((email) =>
+        addNotification(db, {
+          recipientEmail: email,
+          type: "share",
+          actorEmail: ownerEmail,
+          actorName: who,
+          promptId,
+          promptName,
+        }),
+      ),
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
 const LANG_BY_EXT: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
   py: "python", rb: "ruby", go: "go", rs: "rust", java: "java", kt: "kotlin", swift: "swift",
@@ -440,6 +472,8 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
       /* notifications are best-effort */
     }
   }
+  // Notify anyone the prompt is shared with at creation time (best-effort).
+  await notifyNewlyShared(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[]);
   return {
     id: insertedId.toString(),
     name: data.name,
@@ -475,7 +509,8 @@ export async function updatePrompt(
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
   if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
-  if (data.sharedWith !== undefined) set.sharedWith = normalizeEmails(data.sharedWith);
+  const incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
+  if (incomingShared !== undefined) set.sharedWith = incomingShared;
   // Compute the new plaintext content when a content edit is present.
   let newFiles: PromptFile[] | null = null;
   let newBody: string | null = null;
@@ -540,6 +575,10 @@ export async function updatePrompt(
 
   set.updatedAt = new Date();
   const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
+  // Notify users newly added to the share list (best-effort).
+  if (res.matchedCount > 0 && incomingShared !== undefined) {
+    await notifyNewlyShared(db, ownerEmail, id, current.name, (current.sharedWith as string[]) || [], incomingShared);
+  }
   return res.matchedCount > 0;
 }
 
