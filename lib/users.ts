@@ -10,6 +10,16 @@ export type ProfileLinks = { website: string | null; x: string | null; github: s
 export type Profile = { email: string; name: string; image: string | null; bio: string | null; mutedNotificationTypes?: string[] } & ProfileLinks;
 export type Creator = Profile & { handle: string; verified: boolean };
 
+// Pick a unique @handle derived from an email's local part. Falls back to "user"
+// when the local part slugifies to empty (e.g. all-symbol addresses).
+async function uniqueHandle(db: Db, email: string): Promise<string> {
+  const users = db.collection("users");
+  const base = slugify(email.split("@")[0]) || "user";
+  let handle = base;
+  for (let n = 2; await users.findOne({ handle }); n++) handle = `${base}-${n}`;
+  return handle;
+}
+
 // Returns the user's stable @handle, generating + persisting a unique one on first call.
 export async function ensureHandle(db: Db, email: string): Promise<string> {
   const users = db.collection("users");
@@ -17,9 +27,7 @@ export async function ensureHandle(db: Db, email: string): Promise<string> {
   if (!row) throw new Error("User not found");
   if (row.handle) return row.handle as string;
 
-  const base = slugify(email.split("@")[0]);
-  let handle = base;
-  for (let n = 2; await users.findOne({ handle }); n++) handle = `${base}-${n}`;
+  const handle = await uniqueHandle(db, email);
   await users.updateOne({ email }, { $set: { handle } });
   return handle;
 }
@@ -133,7 +141,10 @@ export async function createUser(db: Db, email: string, password: string, name?:
   if (await users.findOne({ email })) throw new Error("User already exists");
   const displayName = name?.trim() || email.split("@")[0];
   const passwordHash = await bcrypt.hash(password, 10);
-  const { insertedId } = await users.insertOne({ email, passwordHash, name: displayName, image: null, createdAt: new Date() });
+  // Assign a stable @handle at creation so the user has a working /u/<handle>
+  // profile and can be @mentioned immediately (mentions resolve by handle).
+  const handle = await uniqueHandle(db, email);
+  const { insertedId } = await users.insertOne({ email, passwordHash, name: displayName, image: null, handle, createdAt: new Date() });
   return { id: insertedId.toString(), email, name: displayName, image: null };
 }
 

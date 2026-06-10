@@ -2,7 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { getDb } from "./db";
-import { verifyCredentials } from "./users";
+import { verifyCredentials, ensureHandle } from "./users";
 import { resolveAuthSecret } from "./authSecret";
 
 export const authOptions: NextAuthOptions = {
@@ -17,6 +17,15 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
         const db = await getDb();
         const user = await verifyCredentials(db, credentials.email, credentials.password);
+        // Lazily backfill a @handle for pre-existing accounts that never got one,
+        // so their profile and @mentions work after this login. Best-effort.
+        if (user) {
+          try {
+            await ensureHandle(db, user.email);
+          } catch {
+            /* non-fatal — never block login on handle assignment */
+          }
+        }
         return user ? { id: user.id, email: user.email, name: user.name, image: user.image } : null;
       },
     }),
@@ -33,6 +42,12 @@ export const authOptions: NextAuthOptions = {
           { $setOnInsert: { email: user.email, createdAt: new Date() }, $set: { name: user.name, image: user.image ?? null } },
           { upsert: true },
         );
+        // Ensure the (possibly just-created) Google user has a stable @handle.
+        try {
+          await ensureHandle(db, user.email);
+        } catch {
+          /* non-fatal */
+        }
       }
       return true;
     },

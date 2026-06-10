@@ -48,6 +48,21 @@ describe("createUser", () => {
     await createUser(db, "a@b.com", "secret123");
     await expect(createUser(db, "a@b.com", "other")).rejects.toThrow(/exists/i);
   });
+
+  it("assigns a @handle derived from the email local part", async () => {
+    await createUser(db, "ada.lovelace@b.com", "secret123");
+    const row = await db.collection("users").findOne({ email: "ada.lovelace@b.com" });
+    expect(row?.handle).toBe("ada-lovelace");
+  });
+
+  it("gives colliding local parts distinct handles", async () => {
+    await createUser(db, "sam@one.com", "secret123");
+    await createUser(db, "sam@two.com", "secret123");
+    const a = await db.collection("users").findOne({ email: "sam@one.com" });
+    const b = await db.collection("users").findOne({ email: "sam@two.com" });
+    expect(a?.handle).toBe("sam");
+    expect(b?.handle).toBe("sam-2");
+  });
 });
 
 describe("verifyCredentials", () => {
