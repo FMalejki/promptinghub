@@ -7,7 +7,6 @@ import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
-import { PromptQuality } from "../components/PromptQuality";
 import { CoverImageField } from "../components/CoverImageField";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -580,11 +579,6 @@ export default function NewPromptPage() {
               + Add file
             </button>
           </div>
-
-          {/* Prompt quality (advisory, computed live in the browser) */}
-          <PromptQuality
-            text={[form.description, ...files.map((f) => f.content)].filter(Boolean).join("\n\n")}
-          />
 
           {/* Tested Models */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
