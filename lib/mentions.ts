@@ -18,6 +18,24 @@ export function extractMentions(body: string): string[] {
   return out;
 }
 
+// Split the @handles in a draft into those that resolve to a real user
+// (`confirmed` — they'll actually be notified) and those that don't (`unknown`
+// — likely a typo or a not-yet-registered handle). `knownHandles` is whatever
+// the resolve endpoint reported as existing. Order follows first appearance in
+// the body; both lists are lowercased + deduped (via extractMentions).
+export function classifyMentions(
+  body: string,
+  knownHandles: string[],
+): { confirmed: string[]; unknown: string[] } {
+  const known = new Set(knownHandles.map((h) => h.toLowerCase()));
+  const confirmed: string[] = [];
+  const unknown: string[] = [];
+  for (const h of extractMentions(body)) {
+    (known.has(h) ? confirmed : unknown).push(h);
+  }
+  return { confirmed, unknown };
+}
+
 export type MentionPart = { type: "text"; text: string } | { type: "mention"; handle: string };
 
 // Split a body into text + mention segments so a renderer can linkify @handles
