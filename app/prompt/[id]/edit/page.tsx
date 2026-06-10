@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "../../../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { CoverImageField } from "../../../components/CoverImageField";
+import { AttachmentsField, type DraftAttachment } from "../../../components/AttachmentsField";
 
 type DraftFile = { path: string; content: string };
 
@@ -16,6 +17,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
   const [shareWith, setShareWith] = useState("");
   const [collaborators, setCollaborators] = useState("");
   const [readme, setReadme] = useState("");
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   const [tags, setTags] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   const [changeNote, setChangeNote] = useState("");
@@ -34,6 +36,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
         setShareWith((p.sharedWith || []).join(", "));
         setCollaborators((p.collaborators || []).join(", "));
         setReadme(p.readme || "");
+        setAttachments(Array.isArray(p.attachments) ? p.attachments : []);
         setTags((p.tags || []).join(", "));
         setFiles((p.files?.length ? p.files : [{ path: "prompt.txt", content: p.body || "" }]).map((f: DraftFile) => ({ path: f.path, content: f.content })));
         setIsOwner(!!p.isOwner);
@@ -72,7 +75,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     const res = await fetch(`/api/prompts/${params.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, readme, files: payloadFiles, sharedWith: meta.isPrivate ? shareWith : "", collaborators, message: changeNote.trim() || undefined }),
+      body: JSON.stringify({ ...meta, image: meta.image || undefined, priceCents: Math.round((parseFloat(price) || 0) * 100), tags, readme, attachments: attachments.filter((a) => a.url.trim()), files: payloadFiles, sharedWith: meta.isPrivate ? shareWith : "", collaborators, message: changeNote.trim() || undefined }),
     });
     setSaving(false);
     if (res.ok) router.push(`/prompt/${params.id}`);
@@ -137,6 +140,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
               />
               <p className="mt-1 text-xs text-gray-400">Shown at the top of the prompt page. Markdown supported.</p>
             </div>
+            <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
             <CoverImageField
               value={meta.image}
               onChange={(v) => setMeta({ ...meta, image: v })}

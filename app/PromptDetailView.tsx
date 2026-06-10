@@ -9,6 +9,7 @@ import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } f
 import { applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
 import { resolveReadme } from "@/lib/markdown";
+import { attachmentKind, attachmentLabel } from "@/lib/attachments";
 import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
@@ -50,6 +51,7 @@ export type PromptDetail = {
   forkedFrom?: { id: string; name: string } | null;
   forkCount?: number;
   readme?: string | null;
+  attachments?: { url: string; name?: string }[];
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
@@ -595,6 +597,45 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           );
         })()}
       </div>
+
+      {/* Attachments — multimodal references (images, video, pdf, docs) an LLM can view */}
+      {(prompt.attachments?.length ?? 0) > 0 && (
+        <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            Attachments <span className="text-gray-400 font-normal">({prompt.attachments!.length})</span>
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {prompt.attachments!.map((a) => {
+              const kind = attachmentKind(a.url);
+              const label = attachmentLabel(a);
+              return (
+                <a
+                  key={a.url}
+                  href={a.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={label}
+                  className="group block rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                >
+                  {kind === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.url} alt={label} loading="lazy" className="h-24 w-full object-cover bg-gray-50 dark:bg-gray-900" />
+                  ) : (
+                    <div className="h-24 w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                      <span className="text-[10px] font-mono uppercase tracking-wide text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                        {kind}
+                      </span>
+                    </div>
+                  )}
+                  <div className="px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    {label}
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Community-tested models — confirm/deny + add models */}
       <div className="mt-6">
