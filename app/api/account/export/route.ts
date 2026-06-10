@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { exportAccountData } from "@/lib/users";
+import { slugify } from "@/lib/slug";
 
 // Download all of the signed-in user's data as a JSON attachment.
 export async function GET() {
@@ -13,7 +14,7 @@ export async function GET() {
   const data = await exportAccountData(await getDb(), email);
   if (!data) return NextResponse.json({ error: "Account not found" }, { status: 404 });
 
-  const filename = `promptinghub-export-${email.replace(/[^a-z0-9]/gi, "-")}.json`;
+  const filename = `promptinghub-export-${slugify(email) || "account"}.json`;
   return new Response(JSON.stringify(data, null, 2), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
