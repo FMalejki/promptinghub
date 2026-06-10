@@ -607,6 +607,9 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
     locked: gate.locked,
     lockedForViewer: gate.lockedForViewer,
+    // Owner-only: surface the share allowlist so the edit page can manage it.
+    // Never sent to non-owners (would leak who a prompt is shared with).
+    ...(viewerEmail && viewerEmail === row.ownerEmail ? { sharedWith: (row.sharedWith as string[]) || [] } : {}),
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };

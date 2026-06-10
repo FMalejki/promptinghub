@@ -103,6 +103,17 @@ describe("locked prompts", () => {
     expect(after?.files).toHaveLength(0);
   });
 
+  it("exposes the sharedWith allowlist to the owner only", async () => {
+    const { id } = await makeLocked({ sharedWith: [STRANGER] });
+    const asOwner = (await getPromptDetail(db, id, OWNER)) as { sharedWith?: string[] };
+    expect(asOwner.sharedWith).toEqual([STRANGER]);
+    // a shared user can read content but must NOT see the full allowlist
+    const asStranger = (await getPromptDetail(db, id, STRANGER)) as { sharedWith?: string[] };
+    expect(asStranger.sharedWith).toBeUndefined();
+    const asAnon = (await getPromptDetail(db, id, null)) as { sharedWith?: string[] };
+    expect(asAnon.sharedWith).toBeUndefined();
+  });
+
   it("normalizeEmails dedupes, lowercases, trims and drops invalid", () => {
     expect(normalizeEmails(["  A@B.com ", "a@b.com", "x", "c@d.io"])).toEqual(["a@b.com", "c@d.io"]);
     expect(normalizeEmails("a@b.com, c@d.io\n a@b.com")).toEqual(["a@b.com", "c@d.io"]);
