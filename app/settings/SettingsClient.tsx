@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [showAvatarUrl, setShowAvatarUrl] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDeleteAccount() {
@@ -188,17 +189,37 @@ export default function SettingsPage() {
 
             <div>
               <label className={label}>Profile Picture</label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className={input}
-                placeholder="https://example.com/avatar.jpg"
-              />
+              {/* Upload from device is the primary action; the raw URL field is
+                  tucked behind a toggle so it doesn't dominate (URL avatars still
+                  work — existing/seed accounts use them). */}
               <ImageUploadButton kind="avatar" onUploaded={(url) => setForm((f) => ({ ...f, image: url }))} />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Paste an image URL, or upload one from your device.
-              </p>
+              {!showAvatarUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarUrl(true)}
+                  className="mt-2 block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  or paste an image URL
+                </button>
+              ) : (
+                <input
+                  type="url"
+                  value={form.image}
+                  onChange={(e) => setForm({ ...form, image: e.target.value })}
+                  className={`${input} mt-2`}
+                  placeholder="https://example.com/avatar.jpg"
+                  autoFocus
+                />
+              )}
+              {form.image && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, image: "" }))}
+                  className="mt-2 ml-3 inline text-xs text-gray-400 hover:text-red-600"
+                >
+                  remove
+                </button>
+              )}
             </div>
 
             <div>
