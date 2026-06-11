@@ -115,6 +115,39 @@ const BUCKET_HUE: Record<Bucket, number> = {
   code: 210, writing: 265, image: 330, social: 20, learning: 150, fun: 45, default: 235,
 };
 
+// HSL → linear-ish RGB (0..1). h in [0,360), s/l in [0,100].
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const sn = s / 100;
+  const ln = l / 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = sn * Math.min(ln, 1 - ln);
+  const f = (n: number) => ln - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)];
+}
+
+// Perceived relative luminance (0..1) of an HSL color — used to decide whether a
+// generated cover gradient is light or dark so the glyph/dots stay legible.
+export function hslLuminance(h: number, s: number, l: number): number {
+  const [r, g, b] = hslToRgb(h, s, l);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Pick a contrast-safe "ink" (glyph + dot color) for a cover whose gradient runs
+// between two hues. Bright gradients (yellow/green/pink category buckets) get a
+// dark ink so the glyph doesn't vanish; dark gradients keep the white ink. This
+// fixes the "covers unreadable on light category colors" bug.
+export function coverInk(
+  hue: number,
+  hue2: number,
+): { rgb: string; glyphAlpha: number; dotMin: number; dotRange: number; useDark: boolean } {
+  // Match the gradient stops used in getPlaceholderImage (54%/52% → 40%/48%).
+  const lum = (hslLuminance(hue, 52, 54) + hslLuminance(hue2, 48, 40)) / 2;
+  const useDark = lum > 0.5;
+  return useDark
+    ? { rgb: "17,24,39", glyphAlpha: 0.66, dotMin: 0.1, dotRange: 0.16, useDark } // slate ink on light gradient
+    : { rgb: "255,255,255", glyphAlpha: 0.7, dotMin: 0.12, dotRange: 0.2, useDark }; // white ink on dark gradient
+}
+
 function bucketGlyph(bucket: Bucket, c: string): string {
   switch (bucket) {
     case "code":
@@ -169,6 +202,8 @@ export function getPlaceholderImage(seed: string, category?: string): string {
   const base = BUCKET_HUE[bucket];
   const hue = (base + ((h % 50) - 25) + 360) % 360;
   const hue2 = (hue + 28) % 360;
+  // Contrast-safe ink so the glyph/dots stay legible on light category gradients.
+  const ink = coverInk(hue, hue2);
   const W = 400;
   const Hh = 300;
   const angle = Math.floor(rng() * 360);
@@ -200,10 +235,10 @@ export function getPlaceholderImage(seed: string, category?: string): string {
         const x = padX + col * cw;
         const y = padY + row * ch;
         const rad = (4 + rng() * 6).toFixed(1);
-        const o = (0.12 + rng() * 0.2).toFixed(2);
+        const o = (ink.dotMin + rng() * ink.dotRange).toFixed(2);
         dots +=
-          `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(255,255,255,${o})"/>` +
-          `<circle cx="${(W - x).toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(255,255,255,${o})"/>`;
+          `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(${ink.rgb},${o})"/>` +
+          `<circle cx="${(W - x).toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="rgba(${ink.rgb},${o})"/>`;
       }
     }
   }
@@ -217,7 +252,7 @@ export function getPlaceholderImage(seed: string, category?: string): string {
     `<rect width="${W}" height="${Hh}" fill="url(#g)"/>` +
     blobs +
     dots +
-    bucketGlyph(bucket, "rgba(255,255,255,0.55)") +
+    bucketGlyph(bucket, `rgba(${ink.rgb},${ink.glyphAlpha})`) +
     `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
