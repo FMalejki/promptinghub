@@ -17,9 +17,9 @@ describe("resolveUseWith", () => {
 });
 
 describe("useWithFilter", () => {
-  it("includes 'both' alongside a specific target", () => {
-    expect(useWithFilter("chat")).toEqual({ $in: ["chat", "both"] });
-    expect(useWithFilter("agent")).toEqual({ $in: ["agent", "both"] });
+  it("includes 'both' and null (legacy/missing field) alongside a specific target", () => {
+    expect(useWithFilter("chat")).toEqual({ $in: ["chat", "both", null] });
+    expect(useWithFilter("agent")).toEqual({ $in: ["agent", "both", null] });
   });
   it("returns undefined for 'both' / invalid (no narrowing)", () => {
     expect(useWithFilter("both")).toBeUndefined();

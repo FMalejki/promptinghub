@@ -17,12 +17,14 @@ export function resolveUseWith(input: unknown): UseWith {
 /**
  * Mongo match clause for a browse filter on useWith. A prompt tagged "both" is
  * usable everywhere, so filtering by "chat" or "agent" includes "both" too.
- * Returns undefined for "both"/invalid (no narrowing → show everything).
+ * `null` is included so LEGACY docs without a useWith field (created before this
+ * field existed = effectively "both") still match — `$in: [null]` matches a
+ * missing field in MongoDB. Returns undefined for "both"/invalid (no narrowing).
  */
-export function useWithFilter(input: unknown): { $in: UseWith[] } | undefined {
+export function useWithFilter(input: unknown): { $in: (UseWith | null)[] } | undefined {
   const v = resolveUseWith(input);
   if (v === "both") return undefined;
-  return { $in: [v, "both"] };
+  return { $in: [v, "both", null] };
 }
 
 /** Display label + emoji for the UI badge/selector. */
