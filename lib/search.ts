@@ -4,6 +4,38 @@
 
 export type SearchablePrompt = { id: string; name: string; description?: string; tags?: string[] };
 
+// Escape a user string so it is matched literally inside a MongoDB $regex
+// (so symbol queries like ".*" or "c++" can't act as a raw regex).
+export function escapeRegex(s: string): string {
+  return (s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Small, high-signal synonym map so common short/long forms find each other
+// ("gpt" → ChatGPT prompts, "img" → image prompts). Bidirectional entries are
+// listed explicitly. A synonym hit scores modestly (below a direct match) so it
+// never outranks an exact name match.
+const SYNONYMS: Record<string, string[]> = {
+  gpt: ["chatgpt"],
+  chatgpt: ["gpt"],
+  image: ["img", "picture", "photo"],
+  img: ["image"],
+  picture: ["image"],
+  photo: ["image"],
+  js: ["javascript"],
+  javascript: ["js"],
+  ts: ["typescript"],
+  typescript: ["ts"],
+  py: ["python"],
+  python: ["py"],
+  ai: ["llm"],
+  llm: ["ai"],
+  email: ["mail"],
+  mail: ["email"],
+  k8s: ["kubernetes"],
+  kubernetes: ["k8s"],
+  seo: ["search engine"],
+};
+
 // True when a and b are within Levenshtein distance 1 (one insert/delete/replace
 // or one adjacent transposition). Cheap: early-exits on a length gap > 1.
 export function withinOneEdit(a: string, b: string): boolean {
@@ -58,6 +90,16 @@ export function scorePromptMatch(query: string, p: SearchablePrompt): number {
     // Fuzzy: a single typo against a name word (only for tokens long enough to be safe).
     if (token.length >= 4 && !name.includes(token) && nameWords.some((w) => withinOneEdit(token, w))) {
       score += 2;
+    }
+    // Synonym credit: if the token itself didn't appear but a synonym does,
+    // give a modest boost so e.g. "gpt" still finds a "ChatGPT" prompt.
+    if (!name.includes(token) && !tags.some((t) => t.includes(token)) && !desc.includes(token)) {
+      for (const syn of SYNONYMS[token] || []) {
+        if (name.includes(syn) || tags.some((t) => t.includes(syn)) || desc.includes(syn)) {
+          score += 2;
+          break;
+        }
+      }
     }
   }
   return score;

@@ -39,3 +39,15 @@ export function useWithLabel(v: UseWith): string {
       return "↔️ Chat & agents";
   }
 }
+
+/**
+ * Compact card chip for a prompt's useWith — but ONLY when it's specialized.
+ * "both" (the default, and most prompts) returns null so we don't clutter every
+ * card with a meaningless "works everywhere" badge. Invalid input → null too.
+ */
+export function useWithBadge(input: unknown): { emoji: string; label: string } | null {
+  const v = resolveUseWith(input);
+  if (v === "chat") return { emoji: "💬", label: "Chat" };
+  if (v === "agent") return { emoji: "🤖", label: "Agents" };
+  return null; // "both" → no chip
+}

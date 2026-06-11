@@ -1,4 +1,4 @@
-import { resolveUseWith, useWithFilter, useWithLabel, USE_WITH_VALUES } from "../lib/useWith";
+import { resolveUseWith, useWithFilter, useWithLabel, useWithBadge, USE_WITH_VALUES } from "../lib/useWith";
 
 describe("resolveUseWith", () => {
   it("passes through valid values", () => {
@@ -33,5 +33,20 @@ describe("useWithLabel", () => {
     expect(useWithLabel("chat")).toContain("Web chat");
     expect(useWithLabel("agent")).toContain("Coding agents");
     expect(useWithLabel("both")).toMatch(/Chat|agents/);
+  });
+});
+
+describe("useWithBadge", () => {
+  it("returns a compact chip for specialized targets", () => {
+    expect(useWithBadge("chat")).toEqual({ emoji: "💬", label: "Chat" });
+    expect(useWithBadge("agent")).toEqual({ emoji: "🤖", label: "Agents" });
+  });
+  it("returns null for 'both' so the card stays uncluttered", () => {
+    expect(useWithBadge("both")).toBeNull();
+  });
+  it("returns null for missing / invalid (treated as 'both')", () => {
+    expect(useWithBadge(undefined)).toBeNull();
+    expect(useWithBadge("garbage")).toBeNull();
+    expect(useWithBadge(null)).toBeNull();
   });
 });

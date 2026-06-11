@@ -42,3 +42,28 @@ describe("incrementViewCount", () => {
     expect(detail?.viewCount).toBe(0);
   });
 });
+
+describe("incrementViewCount — idempotency per viewer", () => {
+  it("does not re-count a refresh by the same viewer within the window", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Misc", body: "x" });
+    const viewer = "abcdef0123456789";
+    expect(await incrementViewCount(db, id, { viewer, nowMs: 1000 })).toBe(1);
+    expect(await incrementViewCount(db, id, { viewer, nowMs: 2000 })).toBe(1); // refresh, same window
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.viewCount).toBe(1);
+  });
+
+  it("counts distinct viewers and the same viewer in a later window", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Misc", body: "x" });
+    expect(await incrementViewCount(db, id, { viewer: "1111111111111111", nowMs: 1000 })).toBe(1);
+    expect(await incrementViewCount(db, id, { viewer: "2222222222222222", nowMs: 1000 })).toBe(2);
+    const later = 7 * 60 * 60 * 1000;
+    expect(await incrementViewCount(db, id, { viewer: "1111111111111111", nowMs: later })).toBe(3);
+  });
+
+  it("falls back to always-count when no/invalid viewer is given", async () => {
+    const { id } = await createPrompt(db, "a@x.com", { name: "P", description: "d", category: "Misc", body: "x" });
+    expect(await incrementViewCount(db, id, { viewer: "junk" })).toBe(1); // too short → no dedup
+    expect(await incrementViewCount(db, id, { viewer: "junk" })).toBe(2);
+  });
+});

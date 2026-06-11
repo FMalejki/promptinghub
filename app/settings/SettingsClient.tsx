@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
-import { ApiKeysManager } from "../ApiKeysManager";
 import { Avatar } from "../Avatar";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 
@@ -26,6 +25,7 @@ export default function SettingsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [showAvatarUrl, setShowAvatarUrl] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDeleteAccount() {
@@ -138,6 +138,7 @@ export default function SettingsPage() {
     { type: "mention", label: "Mentions of you" },
     { type: "fork", label: "Forks of your prompts" },
     { type: "share", label: "Prompts shared with you" },
+    { type: "collaborator", label: "Added as a collaborator" },
     { type: "collection", label: "Updates to collections you follow" },
   ];
 
@@ -162,9 +163,9 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Preview</p>
             <div className="flex items-center gap-3">
               <Avatar name={form.name} image={form.image} size={56} />
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">{form.name || "Your Name"}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">{session?.user?.email}</div>
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-white truncate">{form.name || "Your Name"}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{session?.user?.email}</div>
               </div>
             </div>
           </div>
@@ -188,17 +189,37 @@ export default function SettingsPage() {
 
             <div>
               <label className={label}>Profile Picture</label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className={input}
-                placeholder="https://example.com/avatar.jpg"
-              />
+              {/* Upload from device is the primary action; the raw URL field is
+                  tucked behind a toggle so it doesn't dominate (URL avatars still
+                  work — existing/seed accounts use them). */}
               <ImageUploadButton kind="avatar" onUploaded={(url) => setForm((f) => ({ ...f, image: url }))} />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Paste an image URL, or upload one from your device.
-              </p>
+              {!showAvatarUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarUrl(true)}
+                  className="mt-2 block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  or paste an image URL
+                </button>
+              ) : (
+                <input
+                  type="url"
+                  value={form.image}
+                  onChange={(e) => setForm({ ...form, image: e.target.value })}
+                  className={`${input} mt-2`}
+                  placeholder="https://example.com/avatar.jpg"
+                  autoFocus
+                />
+              )}
+              {form.image && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, image: "" }))}
+                  className="mt-2 ml-3 inline text-xs text-gray-400 hover:text-red-600"
+                >
+                  remove
+                </button>
+              )}
             </div>
 
             <div>
@@ -272,9 +293,6 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* API Keys */}
-        <ApiKeysManager />
-
         {/* Notifications */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notifications</h2>
@@ -318,7 +336,7 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Once you delete your account, there is no going back. This permanently removes your
-            prompts, collections, comments and API keys. Please be certain.
+            prompts, collections and comments. Please be certain.
           </p>
           {!confirmOpen ? (
             <button
@@ -331,7 +349,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-3">
               <label className="block text-sm text-gray-700 dark:text-gray-300">
-                Type <span className="font-mono font-semibold">{session?.user?.email}</span> to confirm:
+                Type <span className="font-mono font-semibold break-all">{session?.user?.email}</span> to confirm:
               </label>
               <input
                 type="email"

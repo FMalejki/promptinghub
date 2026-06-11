@@ -25,7 +25,7 @@ import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
 import { AssistantLinks } from "./components/AssistantLinks";
-import { track } from "./components/AnalyticsBeacon";
+import { track, getAnonId } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 
@@ -105,7 +105,11 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     if (counted) return;
     setCounted(true);
     setCopyCount((c) => c + 1);
-    fetch(`/api/prompts/${prompt.id}/copy`, { method: "POST" }).catch(() => {});
+    fetch(`/api/prompts/${prompt.id}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anonId: getAnonId() }),
+    }).catch(() => {});
   }
   const [values, setValues] = useState<Record<string, string>>({});
   const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id, prompt.category));
@@ -140,7 +144,11 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   // Record a view once per page load (soft signal, best-effort).
   useEffect(() => {
     track("prompt_view", typeof window !== "undefined" ? window.location.pathname : `/prompt/${prompt.id}`, { id: prompt.id });
-    fetch(`/api/prompts/${prompt.id}/view`, { method: "POST" })
+    fetch(`/api/prompts/${prompt.id}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anonId: getAnonId() }),
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && typeof d.viewCount === "number" && setViewCount(d.viewCount))
       .catch(() => {});
@@ -291,7 +299,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 {formatPrice(prompt.priceCents ?? 0)}
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">{prompt.name}</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3 break-words">{prompt.name}</h1>
             {installRef && <div className="text-sm font-mono text-gray-400 dark:text-gray-500 mb-2">{installRef}</div>}
             {prompt.forkedFrom && (
               <div className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-2">
@@ -600,8 +608,10 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Install box */}
       {installRef && (
         <div className="mt-6 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-4 py-3">
-          <code className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
-          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
+          <code className="flex-1 min-w-0 text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
+          <div className="shrink-0">
+            <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
+          </div>
         </div>
       )}
 

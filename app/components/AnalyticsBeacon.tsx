@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 
 const ANON_KEY = "ph_anon";
 
-function getAnonId(): string {
+export function getAnonId(): string {
   try {
     let id = localStorage.getItem(ANON_KEY);
     if (!id || !/^[A-Za-z0-9]{8,40}$/.test(id)) {

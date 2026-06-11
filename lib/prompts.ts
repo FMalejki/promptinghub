@@ -10,6 +10,8 @@ import { resolveSort, sortSpec } from "./sort";
 import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
 import { aggregateAttestations, type AttestationRow } from "./modelAttestations";
 import { summarizeCardAttestation, type CardAttestation } from "./attestations";
+import { escapeRegex } from "./search";
+import { VIEW_WINDOW_MS, COPY_WINDOW_MS, timeBucket, normalizeViewer } from "./idempotency";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -169,13 +171,14 @@ export function normalizeEmails(input?: string[] | string | null): string[] {
 }
 
 // Notify users newly added to a prompt's share list (best-effort, never the owner).
-async function notifyNewlyShared(
+async function notifyNewlyAdded(
   db: Db,
   ownerEmail: string,
   promptId: string,
   promptName: string,
   prev: string[],
   next: string[],
+  type: "share" | "collaborator",
 ): Promise<void> {
   const before = new Set(prev || []);
   const added = (next || []).filter((e) => e && !before.has(e) && e !== ownerEmail);
@@ -187,7 +190,7 @@ async function notifyNewlyShared(
       added.map((email) =>
         addNotification(db, {
           recipientEmail: email,
-          type: "share",
+          type,
           actorEmail: ownerEmail,
           actorName: who,
           promptId,
@@ -268,7 +271,10 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     ]);
   }
   if (opts.q) {
-    const rx = { $regex: opts.q, $options: "i" };
+    // Escape so symbol queries (".*", "c++") match literally instead of acting
+    // as a raw regex. (The /api/prompts search path ranks in memory via
+    // rankBySearch and does NOT pass q here; this guards any other caller.)
+    const rx = { $regex: escapeRegex(opts.q), $options: "i" };
     orGroups.push([{ name: rx }, { description: rx }, { tags: rx }]);
   }
 
@@ -495,8 +501,10 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
       /* notifications are best-effort */
     }
   }
-  // Notify anyone the prompt is shared with at creation time (best-effort).
-  await notifyNewlyShared(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[]);
+  // Notify anyone the prompt is shared with / added as a collaborator at
+  // creation time (best-effort).
+  await notifyNewlyAdded(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[], "share");
+  await notifyNewlyAdded(db, ownerEmail, insertedId.toString(), data.name, [], doc.collaborators as string[], "collaborator");
   return {
     id: insertedId.toString(),
     name: data.name,
@@ -550,12 +558,14 @@ export async function updatePrompt(
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
+  let incomingCollaborators: string[] | undefined;
   if (isOwnerEdit) {
     if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
     if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
     incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
     if (incomingShared !== undefined) set.sharedWith = incomingShared;
-    if (data.collaborators !== undefined) set.collaborators = normalizeEmails(data.collaborators);
+    incomingCollaborators = data.collaborators !== undefined ? normalizeEmails(data.collaborators) : undefined;
+    if (incomingCollaborators !== undefined) set.collaborators = incomingCollaborators;
   }
 
   // Compute the new plaintext content when a content edit is present.
@@ -593,9 +603,13 @@ export async function updatePrompt(
   // Already authorized above; scope the write by _id (the editor may be a
   // collaborator, not the owner, so we must not filter by ownerEmail here).
   const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: set });
-  // Notify users newly added to the share list (best-effort; owner edits only).
+  // Notify users newly added to the share / collaborator lists (best-effort;
+  // owner edits only).
   if (res.matchedCount > 0 && incomingShared !== undefined) {
-    await notifyNewlyShared(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared);
+    await notifyNewlyAdded(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared, "share");
+  }
+  if (res.matchedCount > 0 && incomingCollaborators !== undefined) {
+    await notifyNewlyAdded(db, current.ownerEmail as string, id, current.name as string, (current.collaborators as string[]) || [], incomingCollaborators, "collaborator");
   }
   return res.matchedCount > 0;
 }
@@ -686,8 +700,32 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
  * Atomically bump a prompt's copy/usage counter and return the new total.
  * Returns null for a malformed or missing id.
  */
-export async function incrementCopyCount(db: Db, id: string): Promise<number | null> {
+export type CounterOpts = { viewer?: string; nowMs?: number };
+
+async function readCounter(db: Db, id: string, field: "copyCount" | "viewCount"): Promise<number | null> {
+  const p = await db.collection("prompts").findOne({ _id: new ObjectId(id) }, { projection: { [field]: 1 } });
+  if (!p) return null;
+  return ((p as Record<string, unknown>)[field] as number) || 0;
+}
+
+export async function incrementCopyCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
+  const viewer = normalizeViewer(opts.viewer);
+  const now = opts.nowMs ?? Date.now();
+
+  // Idempotent path: when we know the (anonymous) viewer, only count the first
+  // copy per viewer per window. An atomic upsert into the copyEvents ledger is
+  // the dedup gate — upsertedCount===0 means "already copied recently".
+  if (viewer) {
+    const bucket = timeBucket(now, COPY_WINDOW_MS);
+    const r = await db.collection("copyEvents").updateOne(
+      { promptId: id, viewer, bucket },
+      { $setOnInsert: { promptId: id, viewer, bucket, createdAt: new Date(now) } },
+      { upsert: true },
+    );
+    if (!r.upsertedCount) return readCounter(db, id, "copyCount");
+  }
+
   const res = await db.collection("prompts").findOneAndUpdate(
     { _id: new ObjectId(id) },
     { $inc: { copyCount: 1 } },
@@ -695,11 +733,14 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
   );
   const doc = (res as { value?: { copyCount?: number } } | null)?.value ?? (res as { copyCount?: number } | null);
   if (!doc || typeof doc.copyCount !== "number") return null;
-  // Log a copy event for over-time analytics (best-effort).
-  try {
-    await db.collection("copyEvents").insertOne({ promptId: id, createdAt: new Date() });
-  } catch {
-    /* analytics is best-effort */
+  // No viewer token → legacy behavior: still log a plain copy event (the deduped
+  // path above already recorded one via the upsert).
+  if (!viewer) {
+    try {
+      await db.collection("copyEvents").insertOne({ promptId: id, createdAt: new Date(now) });
+    } catch {
+      /* analytics is best-effort */
+    }
   }
   return doc.copyCount;
 }
@@ -708,8 +749,23 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
  * Bump a prompt's view counter and return the new total. A soft engagement
  * signal — public and not auth-gated. Returns null for a malformed/missing id.
  */
-export async function incrementViewCount(db: Db, id: string): Promise<number | null> {
+export async function incrementViewCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
+  const viewer = normalizeViewer(opts.viewer);
+  const now = opts.nowMs ?? Date.now();
+
+  // Idempotent path: a known viewer only counts once per window, so a refresh or
+  // re-open doesn't inflate views. The viewEvents upsert is the dedup gate.
+  if (viewer) {
+    const bucket = timeBucket(now, VIEW_WINDOW_MS);
+    const r = await db.collection("viewEvents").updateOne(
+      { promptId: id, viewer, bucket },
+      { $setOnInsert: { promptId: id, viewer, bucket, createdAt: new Date(now) } },
+      { upsert: true },
+    );
+    if (!r.upsertedCount) return readCounter(db, id, "viewCount");
+  }
+
   const res = await db.collection("prompts").findOneAndUpdate(
     { _id: new ObjectId(id) },
     { $inc: { viewCount: 1 } },

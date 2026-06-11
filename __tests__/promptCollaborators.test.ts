@@ -25,6 +25,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection("prompts").deleteMany({});
   await db.collection("promptVersions").deleteMany({});
+  await db.collection("notifications").deleteMany({});
 });
 
 async function makePrompt(extra: Record<string, unknown> = {}) {
@@ -125,6 +126,29 @@ describe("collaborator edit access", () => {
     expect(forCollab.map((p) => p.id)).toContain(id);
     expect(forViewer.map((p) => p.id)).toContain(id);
     expect((await listSharedWithMe(db, STRANGER)).map((p) => p.id)).not.toContain(id);
+  });
+
+  it("notifies a collaborator added at creation time", async () => {
+    const id = await makePrompt();
+    const notifs = await db.collection("notifications").find({ recipientEmail: COLLAB }).toArray();
+    const collab = notifs.find((n) => n.type === "collaborator" && n.promptId === id);
+    expect(collab).toBeTruthy();
+    expect(collab?.actorEmail).toBe(OWNER);
+  });
+
+  it("notifies only NEWLY-added collaborators on an owner edit (not existing ones)", async () => {
+    const id = await makePrompt(); // COLLAB already a collaborator (1 notif)
+    await db.collection("notifications").deleteMany({}); // clear the create-time notif
+    await updatePrompt(db, id, OWNER, { collaborators: [COLLAB, "fresh@x.com"] });
+    const all = await db.collection("notifications").find({ type: "collaborator" }).toArray();
+    expect(all.map((n) => n.recipientEmail)).toEqual(["fresh@x.com"]); // COLLAB not re-notified
+  });
+
+  it("does not notify when a collaborator (non-owner) edits content", async () => {
+    const id = await makePrompt();
+    await db.collection("notifications").deleteMany({});
+    await updatePrompt(db, id, COLLAB, { body: "edited by collab" });
+    expect(await db.collection("notifications").countDocuments({ type: "collaborator" })).toBe(0);
   });
 
   it("snapshots a version when a collaborator edits content", async () => {

@@ -37,6 +37,9 @@ describe("listPublicCollections", () => {
     expect(list[0]).toMatchObject({ id: full.id, promptCount: 1, description: "good ones" });
     expect(list[0].owner.name).toBe("Alice");
     expect(typeof list[0].owner.handle).toBe("string");
+    // SEC: the public collection shape must never leak the owner's email.
+    expect(list[0].owner).not.toHaveProperty("email");
+    expect(JSON.stringify(list[0])).not.toContain("a@x.com");
     expect(empty.id).toBeTruthy();
   });
 

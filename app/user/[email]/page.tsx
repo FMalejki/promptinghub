@@ -142,11 +142,11 @@ export default function UserProfilePage({ params }: { params: { email: string } 
             
             <div className="flex-1">
               <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 break-words">
                     {profile.name}
                   </h1>
-                  <p className="text-gray-600 dark:text-gray-400">{profile.email}</p>
+                  <p className="text-gray-600 dark:text-gray-400 break-all">{profile.email}</p>
                 </div>
                 
                 {isOwnProfile && (
