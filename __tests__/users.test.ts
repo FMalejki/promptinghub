@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { createUser, verifyCredentials, getProfile, updateProfile } from "../lib/users";
+import { createUser, verifyCredentials, getProfile, updateProfile, searchUsersForMention, getUsersByHandles } from "../lib/users";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -48,6 +48,83 @@ describe("createUser", () => {
     await createUser(db, "a@b.com", "secret123");
     await expect(createUser(db, "a@b.com", "other")).rejects.toThrow(/exists/i);
   });
+
+  it("assigns a @handle derived from the email local part", async () => {
+    await createUser(db, "ada.lovelace@b.com", "secret123");
+    const row = await db.collection("users").findOne({ email: "ada.lovelace@b.com" });
+    expect(row?.handle).toBe("ada-lovelace");
+  });
+
+  it("gives colliding local parts distinct handles", async () => {
+    await createUser(db, "sam@one.com", "secret123");
+    await createUser(db, "sam@two.com", "secret123");
+    const a = await db.collection("users").findOne({ email: "sam@one.com" });
+    const b = await db.collection("users").findOne({ email: "sam@two.com" });
+    expect(a?.handle).toBe("sam");
+    expect(b?.handle).toBe("sam-2");
+  });
+});
+
+describe("searchUsersForMention", () => {
+  beforeEach(async () => {
+    await db.collection("users").insertMany([
+      { email: "fm@x.com", name: "FMalejki", handle: "filipmalejki", image: null },
+      { email: "ada@x.com", name: "Ada Lovelace", handle: "ada-lovelace", image: null },
+      { email: "leg@x.com", name: "Legacy", image: null }, // no handle
+    ]);
+  });
+
+  it("matches by display name substring (so @fmalejki finds @filipmalejki)", async () => {
+    const out = await searchUsersForMention(db, "fmalejki");
+    expect(out.map((u) => u.handle)).toContain("filipmalejki");
+  });
+
+  it("matches by handle prefix", async () => {
+    const out = await searchUsersForMention(db, "ada");
+    expect(out.map((u) => u.handle)).toEqual(["ada-lovelace"]);
+  });
+
+  it("excludes users without a handle", async () => {
+    const out = await searchUsersForMention(db, "legacy");
+    expect(out).toEqual([]);
+  });
+
+  it("returns [] for empty query and never leaks email", async () => {
+    expect(await searchUsersForMention(db, "  ")).toEqual([]);
+    const out = await searchUsersForMention(db, "ada");
+    expect(out[0]).not.toHaveProperty("email");
+  });
+
+  it("treats the query as a literal (regex metacharacters don't throw or match-all)", async () => {
+    const out = await searchUsersForMention(db, ".*");
+    expect(out).toEqual([]);
+  });
+});
+
+describe("getUsersByHandles (mention confirm indicator)", () => {
+  beforeEach(async () => {
+    await db.collection("users").insertMany([
+      { email: "fm@x.com", name: "FMalejki", handle: "filipmalejki", image: null },
+      { email: "ada@x.com", name: "Ada Lovelace", handle: "ada-lovelace", image: "http://i/ada.png" },
+    ]);
+  });
+
+  it("returns only the handles that resolve to a real user", async () => {
+    const out = await getUsersByHandles(db, ["filipmalejki", "nobody", "ada-lovelace"]);
+    expect(out.map((u) => u.handle).sort()).toEqual(["ada-lovelace", "filipmalejki"]);
+  });
+
+  it("is case-insensitive and dedupes input", async () => {
+    const out = await getUsersByHandles(db, ["FilipMalejki", "FILIPMALEJKI"]);
+    expect(out.map((u) => u.handle)).toEqual(["filipmalejki"]);
+  });
+
+  it("returns [] for empty input and never leaks email", async () => {
+    expect(await getUsersByHandles(db, [])).toEqual([]);
+    const out = await getUsersByHandles(db, ["ada-lovelace"]);
+    expect(out[0]).not.toHaveProperty("email");
+    expect(out[0]).toEqual({ handle: "ada-lovelace", name: "Ada Lovelace", image: "http://i/ada.png" });
+  });
 });
 
 describe("verifyCredentials", () => {
@@ -70,7 +147,7 @@ describe("verifyCredentials", () => {
 describe("profiles", () => {
   it("getProfile returns email, name, image", async () => {
     await createUser(db, "a@b.com", "secret123", "Ada");
-    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Ada", image: null, bio: null, website: null, x: null, github: null });
+    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Ada", image: null, bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 
   it("getProfile returns null for unknown user", async () => {
@@ -80,12 +157,12 @@ describe("profiles", () => {
   it("updateProfile changes name and image", async () => {
     await createUser(db, "a@b.com", "secret123");
     const updated = await updateProfile(db, "a@b.com", { name: "New Name", image: "http://img/x.png" });
-    expect(updated).toEqual({ email: "a@b.com", name: "New Name", image: "http://img/x.png", bio: null, website: null, x: null, github: null });
+    expect(updated).toEqual({ email: "a@b.com", name: "New Name", image: "http://img/x.png", bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 
   it("updateProfile applies a partial update", async () => {
     await createUser(db, "a@b.com", "secret123", "Keep");
     await updateProfile(db, "a@b.com", { image: "http://img/y.png" });
-    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Keep", image: "http://img/y.png", bio: null, website: null, x: null, github: null });
+    expect(await getProfile(db, "a@b.com")).toEqual({ email: "a@b.com", name: "Keep", image: "http://img/y.png", bio: null, website: null, x: null, github: null, mutedNotificationTypes: [] });
   });
 });

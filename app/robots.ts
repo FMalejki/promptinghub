@@ -4,8 +4,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night
 
 // Personal / auth-gated / write surfaces that hold no indexable public content.
 // Each entry is a distinct path prefix chosen to avoid collisions with public
-// routes — e.g. we use "/new" not "/n", and deliberately omit a bare "/feed"
-// so the public RSS at /feed.xml stays crawlable.
+// routes — e.g. we use "/new" not "/n".
 export const DISALLOW = [
   "/api/",
   "/login",
@@ -19,6 +18,7 @@ export const DISALLOW = [
   "/profile",
   "/moderation",
   "/curate",
+  "/admin",
 ];
 
 export default function robots(): MetadataRoute.Robots {

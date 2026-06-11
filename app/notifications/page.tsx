@@ -6,7 +6,7 @@ import { Navbar } from "../components/Navbar";
 
 type Notif = {
   id: string;
-  type: "follow" | "comment" | "fork" | "reply" | "mention" | "collection";
+  type: "follow" | "comment" | "fork" | "reply" | "mention" | "collection" | "share";
   actorName?: string;
   actorEmail: string;
   promptId?: string;
@@ -21,6 +21,7 @@ function summarize(n: Notif): string {
   const on = n.promptName ? ` “${n.promptName}”` : " your prompt";
   if (n.type === "follow") return `${who} followed you`;
   if (n.type === "fork") return `${who} forked your prompt${n.promptName ? ` “${n.promptName}”` : ""}`;
+  if (n.type === "share") return `${who} shared a private prompt with you${n.promptName ? ` “${n.promptName}”` : ""}`;
   if (n.type === "reply") return `${who} replied to your comment on${on}`;
   if (n.type === "mention") return `${who} mentioned you on${on}`;
   if (n.type === "collection") return `${who} ${n.text || "updated a collection you follow"}`;

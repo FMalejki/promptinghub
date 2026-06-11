@@ -1,6 +1,19 @@
 import { Db, ObjectId } from "mongodb";
 
-export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention" | "collection";
+export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention" | "collection" | "share";
+
+// Canonical list (drives the Settings toggles + mute validation).
+export const NOTIFICATION_TYPES: NotificationType[] = ["follow", "comment", "fork", "reply", "mention", "collection", "share"];
+
+// Keep only valid, deduped notification types from arbitrary input (used when
+// saving a user's muted-types preference).
+export function sanitizeMutedTypes(input: unknown): NotificationType[] {
+  if (!Array.isArray(input)) return [];
+  const valid = new Set<string>(NOTIFICATION_TYPES);
+  const out = new Set<NotificationType>();
+  for (const v of input) if (typeof v === "string" && valid.has(v)) out.add(v as NotificationType);
+  return Array.from(out);
+}
 
 export type NewNotification = {
   recipientEmail: string;
@@ -18,6 +31,12 @@ export type Notification = NewNotification & { id: string; read: boolean; create
 // Best-effort: emission is wrapped by callers in try/catch so it never breaks the action.
 export async function addNotification(db: Db, n: NewNotification): Promise<void> {
   if (!n.recipientEmail || n.recipientEmail === n.actorEmail) return;
+  // Respect the recipient's muted notification types (best-effort: one cheap read).
+  const recipient = await db
+    .collection("users")
+    .findOne({ email: n.recipientEmail }, { projection: { mutedNotificationTypes: 1 } });
+  const muted = Array.isArray(recipient?.mutedNotificationTypes) ? (recipient!.mutedNotificationTypes as string[]) : [];
+  if (muted.includes(n.type)) return;
   await db.collection("notifications").insertOne({
     recipientEmail: n.recipientEmail,
     type: n.type,

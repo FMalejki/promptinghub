@@ -6,9 +6,29 @@ import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
 import { lengthLabel } from "@/lib/promptLength";
+import type { CardAttestation } from "@/lib/attestations";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
+
+// Community-attestation card badge styling per dominant verdict.
+const ATTEST_BADGE: Record<CardAttestation["verdict"], { label: string; cls: string; title: string }> = {
+  works: {
+    label: "✓ Works",
+    cls: "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30",
+    title: "Community confirms this works",
+  },
+  mixed: {
+    label: "~ Mixed",
+    cls: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30",
+    title: "Community reports mixed / partial results",
+  },
+  broken: {
+    label: "✗ Issues",
+    cls: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30",
+    title: "Community reports this doesn't work well",
+  },
+};
 
 type PromptCardProps = {
   id: string;
@@ -19,115 +39,134 @@ type PromptCardProps = {
   image: string | null;
   stars: number;
   isPrivate: boolean;
+  isSkill?: boolean;
   testedModels?: TestedModel[];
   copyCount?: number;
   priceCents?: number;
   tokens?: number;
+  attestation?: CardAttestation | null;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
-  const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id));
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation }: PromptCardProps) {
+  const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
+  const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
 
   return (
     <Link
       href={`/prompt/${id}`}
-      className="group block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
+      className="group block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
     >
-      {/* Image */}
-      <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
-        <img
-          src={imgSrc}
-          alt={name}
-          loading="lazy"
-          onError={() => setImgSrc(getPlaceholderImage(id))}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-        />
-        {isPrivate && (
-          <div className="absolute top-3 right-3 px-2 py-1 bg-gray-900/80 backdrop-blur-sm rounded-md flex items-center gap-1">
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <span className="text-xs text-white font-medium">Private</span>
-          </div>
-        )}
-        {isPaid(priceCents) && (
-          <div className="absolute bottom-3 right-3 px-2 py-1 bg-green-600/90 backdrop-blur-sm rounded-md">
-            <span className="text-xs text-white font-semibold">{formatPrice(priceCents)}</span>
-          </div>
-        )}
-        {imageGen && (
-          <div className="absolute top-3 left-3 px-2 py-1 bg-purple-600/90 backdrop-blur-sm rounded-md flex items-center gap-1">
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xs text-white font-medium">Image</span>
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-4">
-        {/* Category + length badges */}
-        <div className="mb-2 flex items-center gap-2">
-          <span className="inline-block px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md">
-            {category}
-          </span>
-          {length && (
-            <span
-              title={`~${length.tokens} tokens`}
-              className="inline-block px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 rounded-md"
-            >
-              {length.label}
-            </span>
-          )}
+      {/* Header: small cover thumbnail + title + inline meta (HF-style — the
+          cover is secondary, not a hero). */}
+      <div className="flex items-start gap-3">
+        <div className="relative w-14 h-14 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-700">
+          <img
+            src={imgSrc}
+            alt=""
+            loading="lazy"
+            onError={() => setImgSrc(getPlaceholderImage(id, category))}
+            className="w-full h-full object-cover"
+          />
         </div>
 
-        {/* Title */}
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words">
-          {name}
-        </h3>
-
-        {/* Description */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
-          {description}
-        </p>
-
-        {/* Tested Models */}
-        {testedModels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {testedModels.slice(0, 3).map((model, idx) => (
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words">
+            {name}
+          </h3>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded">
+              {category}
+            </span>
+            {attest && attestation && (
               <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
-                title={model.version ? `${getModelName(model.modelId)} ${model.version}` : getModelName(model.modelId)}
+                title={`${attest.title} — ${attestation.works}✓ / ${attestation.mixed}~ / ${attestation.broken}✗ across ${attestation.models} model${attestation.models === 1 ? "" : "s"}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-semibold rounded ${attest.cls}`}
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
-                {getModelName(model.modelId)}
+                {attest.label}
+                <span className="tabular-nums font-normal opacity-70">{attestation.works + attestation.mixed + attestation.broken}</span>
               </span>
-            ))}
-            {testedModels.length > 3 && (
-              <span className="inline-flex items-center px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded">
-                +{testedModels.length - 3}
+            )}
+            {isSkill && (
+              <span title="Marked as a reusable skill" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Skill
+              </span>
+            )}
+            {length && (
+              <span
+                title={`~${length.tokens} tokens`}
+                className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 rounded"
+              >
+                {length.label}
+              </span>
+            )}
+            {imageGen && (
+              <span className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 rounded">
+                Image
+              </span>
+            )}
+            {isPrivate && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700/50 rounded">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Private
+              </span>
+            )}
+            {isPaid(priceCents) && (
+              <span className="inline-block px-1.5 py-0.5 text-[11px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded">
+                {formatPrice(priceCents)}
               </span>
             )}
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+      {/* Description */}
+      <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+        {description}
+      </p>
+
+      {/* Tested Models */}
+      {testedModels.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {testedModels.slice(0, 3).map((model, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
+              title={model.version ? `${getModelName(model.modelId)} ${model.version}` : getModelName(model.modelId)}
+            >
+              {getModelName(model.modelId)}
+            </span>
+          ))}
+          {testedModels.length > 3 && (
+            <span className="inline-flex items-center px-2 py-0.5 text-[11px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded">
+              +{testedModels.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="mt-3 flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
           {/* Author */}
-          <Link
-            href={`/user/${author.email}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <Avatar name={author.name} image={author.image} size={24} />
-            <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
-          </Link>
+          {author.handle ? (
+            <Link
+              href={`/u/${author.handle}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <Avatar name={author.name} image={author.image} size={24} />
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Avatar name={author.name} image={author.image} size={24} />
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
+            </div>
+          )}
 
           {/* Stars + copies */}
           <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
@@ -147,7 +186,6 @@ export function PromptCard({ id, name, description, category, author, image, sta
             )}
           </div>
         </div>
-      </div>
     </Link>
   );
 }

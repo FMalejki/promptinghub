@@ -1,4 +1,4 @@
-import { pickReadme, parseBlocks, parseInline } from "../lib/markdown";
+import { pickReadme, resolveReadme, parseBlocks, parseInline } from "../lib/markdown";
 
 describe("pickReadme", () => {
   it("finds a README.md regardless of case or folder", () => {
@@ -11,6 +11,23 @@ describe("pickReadme", () => {
   });
   it("ignores a readme with empty content", () => {
     expect(pickReadme([{ path: "README.md", content: "   " }])).toBeNull();
+  });
+});
+
+describe("resolveReadme", () => {
+  const files = [{ path: "prompt.txt", content: "p" }, { path: "README.md", content: "from file" }];
+  it("prefers the explicit readme field over a README file", () => {
+    expect(resolveReadme("explicit readme", files)).toBe("explicit readme");
+  });
+  it("falls back to a README file when the explicit field is empty/blank/absent", () => {
+    expect(resolveReadme("", files)).toBe("from file");
+    expect(resolveReadme("   ", files)).toBe("from file");
+    expect(resolveReadme(null, files)).toBe("from file");
+    expect(resolveReadme(undefined, files)).toBe("from file");
+  });
+  it("returns null when neither has content", () => {
+    expect(resolveReadme("", [{ path: "prompt.txt", content: "p" }])).toBeNull();
+    expect(resolveReadme(null, [])).toBeNull();
   });
 });
 

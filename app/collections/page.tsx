@@ -9,7 +9,7 @@ import { Navbar } from "../components/Navbar";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
 
 export const metadata: Metadata = {
-  title: "Collections · PromptingHub",
+  title: "Collections",
   description: "Curated collections of AI prompts on PromptingHub.",
 };
 

@@ -2,11 +2,23 @@ import { Db } from "mongodb";
 import bcrypt from "bcryptjs";
 import { slugify } from "./slug";
 import { isVerifiedHandle } from "./verified";
+import { sanitizeMutedTypes } from "./notifications";
 
 export type User = { id: string; email: string; name: string; image: string | null };
 export type ProfileLinks = { website: string | null; x: string | null; github: string | null };
-export type Profile = { email: string; name: string; image: string | null; bio: string | null } & ProfileLinks;
+// mutedNotificationTypes is private: only ever populated by getProfile (self view).
+export type Profile = { email: string; name: string; image: string | null; bio: string | null; mutedNotificationTypes?: string[] } & ProfileLinks;
 export type Creator = Profile & { handle: string; verified: boolean };
+
+// Pick a unique @handle derived from an email's local part. Falls back to "user"
+// when the local part slugifies to empty (e.g. all-symbol addresses).
+async function uniqueHandle(db: Db, email: string): Promise<string> {
+  const users = db.collection("users");
+  const base = slugify(email.split("@")[0]) || "user";
+  let handle = base;
+  for (let n = 2; await users.findOne({ handle }); n++) handle = `${base}-${n}`;
+  return handle;
+}
 
 // Returns the user's stable @handle, generating + persisting a unique one on first call.
 export async function ensureHandle(db: Db, email: string): Promise<string> {
@@ -15,9 +27,7 @@ export async function ensureHandle(db: Db, email: string): Promise<string> {
   if (!row) throw new Error("User not found");
   if (row.handle) return row.handle as string;
 
-  const base = slugify(email.split("@")[0]);
-  let handle = base;
-  for (let n = 2; await users.findOne({ handle }); n++) handle = `${base}-${n}`;
+  const handle = await uniqueHandle(db, email);
   await users.updateOne({ email }, { $set: { handle } });
   return handle;
 }
@@ -34,6 +44,45 @@ function profileFields(row: any) {
 export async function getUserByHandle(db: Db, handle: string): Promise<(Profile & { handle: string }) | null> {
   const row = await db.collection("users").findOne({ handle });
   return row ? { email: row.email, name: row.name, image: row.image ?? null, handle: row.handle, ...profileFields(row) } : null;
+}
+
+export type MentionSuggestion = { handle: string; name: string; image: string | null };
+
+// Typeahead for @mention autocomplete: users (with a handle) whose handle starts
+// with the query OR whose display name contains it (case-insensitive). This is
+// what lets someone type "@fmalejki" and find "FMalejki (@filipmalejki)" — the
+// handle and the display name often differ. Returns public-safe fields only.
+export async function searchUsersForMention(db: Db, q: string, limit = 6): Promise<MentionSuggestion[]> {
+  const term = (q || "").trim();
+  if (!term) return [];
+  const esc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const handlePrefix = new RegExp("^" + esc, "i");
+  const nameContains = new RegExp(esc, "i");
+  const rows = await db
+    .collection("users")
+    .find(
+      { handle: { $exists: true, $ne: null }, $or: [{ handle: handlePrefix }, { name: nameContains }] },
+      { projection: { handle: 1, name: 1, image: 1, _id: 0 }, limit: Math.max(1, Math.min(limit, 25)) },
+    )
+    .toArray();
+  return rows.map((r: any) => ({ handle: r.handle as string, name: (r.name as string) || (r.handle as string), image: r.image ?? null }));
+}
+
+// Exact-handle lookup for the @mention confirmation indicator: given the handles
+// parsed out of a draft comment, return the ones that map to a real user (so the
+// composer can show "✓ @handle will be notified"). Handles are matched
+// case-insensitively; input is capped to keep the $in bounded.
+export async function getUsersByHandles(db: Db, handles: string[]): Promise<MentionSuggestion[]> {
+  const wanted = Array.from(new Set((handles || []).map((h) => (h || "").trim().toLowerCase()).filter(Boolean))).slice(0, 20);
+  if (wanted.length === 0) return [];
+  const rows = await db
+    .collection("users")
+    .find(
+      { handle: { $in: wanted } },
+      { projection: { handle: 1, name: 1, image: 1, _id: 0 } },
+    )
+    .toArray();
+  return rows.map((r: any) => ({ handle: r.handle as string, name: (r.name as string) || (r.handle as string), image: r.image ?? null }));
 }
 
 export type TopCreator = {
@@ -131,7 +180,10 @@ export async function createUser(db: Db, email: string, password: string, name?:
   if (await users.findOne({ email })) throw new Error("User already exists");
   const displayName = name?.trim() || email.split("@")[0];
   const passwordHash = await bcrypt.hash(password, 10);
-  const { insertedId } = await users.insertOne({ email, passwordHash, name: displayName, image: null, createdAt: new Date() });
+  // Assign a stable @handle at creation so the user has a working /u/<handle>
+  // profile and can be @mentioned immediately (mentions resolve by handle).
+  const handle = await uniqueHandle(db, email);
+  const { insertedId } = await users.insertOne({ email, passwordHash, name: displayName, image: null, handle, createdAt: new Date() });
   return { id: insertedId.toString(), email, name: displayName, image: null };
 }
 
@@ -144,7 +196,16 @@ export async function verifyCredentials(db: Db, email: string, password: string)
 
 export async function getProfile(db: Db, email: string): Promise<Profile | null> {
   const row = await db.collection("users").findOne({ email });
-  return row ? { email: row.email, name: row.name, image: row.image ?? null, ...profileFields(row) } : null;
+  if (!row) return null;
+  // mutedNotificationTypes is returned only here (the signed-in self view), never
+  // via profileFields / public creator profiles — it's a private preference.
+  return {
+    email: row.email,
+    name: row.name,
+    image: row.image ?? null,
+    ...profileFields(row),
+    mutedNotificationTypes: Array.isArray(row.mutedNotificationTypes) ? row.mutedNotificationTypes : [],
+  };
 }
 
 export type ProfilePatch = {
@@ -154,6 +215,7 @@ export type ProfilePatch = {
   website?: string | null;
   x?: string | null;
   github?: string | null;
+  mutedNotificationTypes?: string[];
 };
 
 export async function updateProfile(db: Db, email: string, patch: ProfilePatch): Promise<Profile | null> {
@@ -164,6 +226,7 @@ export async function updateProfile(db: Db, email: string, patch: ProfilePatch):
   if (patch.website !== undefined) set.website = patch.website || null;
   if (patch.x !== undefined) set.x = patch.x || null;
   if (patch.github !== undefined) set.github = patch.github || null;
+  if (patch.mutedNotificationTypes !== undefined) set.mutedNotificationTypes = sanitizeMutedTypes(patch.mutedNotificationTypes);
   await db.collection("users").updateOne({ email }, { $set: set });
   return getProfile(db, email);
 }

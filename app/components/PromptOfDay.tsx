@@ -24,7 +24,7 @@ export function PromptOfDay() {
       .then((d) => {
         if (!active) return;
         setPrompt(d.prompt);
-        if (d.prompt) setImgSrc(promptImageSrc(d.prompt.image, d.prompt.id));
+        if (d.prompt) setImgSrc(promptImageSrc(d.prompt.image, d.prompt.id, d.prompt.category));
       })
       .catch(() => {});
     return () => {
@@ -46,7 +46,7 @@ export function PromptOfDay() {
               src={imgSrc}
               alt={prompt.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-              onError={() => setImgSrc(getPlaceholderImage(prompt.id))}
+              onError={() => setImgSrc(getPlaceholderImage(prompt.id, prompt.category))}
             />
           )}
         </div>

@@ -2,12 +2,15 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Avatar } from "./Avatar";
+import { MentionTextarea } from "./components/MentionTextarea";
 import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
+import { REACTION_EMOJIS } from "@/lib/reactionEmojis";
 
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
   id: string;
   body: string;
@@ -17,6 +20,9 @@ type Comment = {
   edited?: boolean;
   likeCount?: number;
   liked?: boolean;
+  mine?: boolean;
+  reactionCounts?: Record<string, number>;
+  myReactions?: string[];
 };
 
 // Render a plain-text segment with inline markdown (**bold**, *italic*, `code`).
@@ -155,6 +161,22 @@ export function Comments({ promptId }: { promptId: string }) {
     }
   }
 
+  async function toggleReaction(id: string, emoji: string) {
+    if (!session?.user?.email) {
+      router.push("/login");
+      return;
+    }
+    const res = await fetch(`/api/comments/${id}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    if (res.ok) {
+      const { counts, mine } = await res.json();
+      setComments((cs) => cs.map((c) => (c.id === id ? { ...c, reactionCounts: counts, myReactions: mine } : c)));
+    }
+  }
+
   // Group replies under their parent; the list arrives newest-first.
   const roots = sortRoots(comments.filter((c) => !c.parentId), sort);
   const repliesByParent = new Map<string, Comment[]>();
@@ -176,7 +198,7 @@ export function Comments({ promptId }: { promptId: string }) {
             <span className="text-sm font-medium text-gray-900 dark:text-white">{c.author.name}</span>
             <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
             {c.edited && <span className="text-xs text-gray-400 italic">(edited)</span>}
-            {session?.user?.email === c.author.email && (
+            {c.mine && (
               <span className="ml-auto flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -195,9 +217,9 @@ export function Comments({ promptId }: { promptId: string }) {
           </div>
           {editing === c.id ? (
             <div className="mt-1">
-              <textarea
+              <MentionTextarea
                 value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
+                onChange={setEditBody}
                 rows={2}
                 maxLength={2000}
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -219,6 +241,8 @@ export function Comments({ promptId }: { promptId: string }) {
             <button
               onClick={() => toggleLike(c.id)}
               title="Like this comment"
+              aria-pressed={!!c.liked}
+              aria-label={c.liked ? "Unlike this comment" : "Like this comment"}
               className={`inline-flex items-center gap-1 text-xs ${
                 c.liked ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
               }`}
@@ -237,20 +261,64 @@ export function Comments({ promptId }: { promptId: string }) {
                 {replyTo === c.id ? "Cancel" : "Reply"}
               </button>
             )}
-            {session?.user?.email && session.user.email !== c.author.email && (
+            {session?.user?.email && !c.mine && (
               <button onClick={() => report(c.id)} className="text-xs text-gray-400 hover:text-red-600" title="Report this comment">
                 report
               </button>
             )}
           </div>
+          {/* Emoji reactions */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {REACTION_EMOJIS.map((emoji) => {
+              const count = c.reactionCounts?.[emoji] ?? 0;
+              const reacted = c.myReactions?.includes(emoji) ?? false;
+              if (count === 0 && !reacted) return null;
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(c.id, emoji)}
+                  aria-pressed={reacted}
+                  title={reacted ? `Remove ${emoji}` : `React ${emoji}`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                    reacted
+                      ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
+                      : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  {count > 0 && <span className="tabular-nums">{count}</span>}
+                </button>
+              );
+            })}
+            <div className="relative group/react">
+              <button
+                aria-label="Add a reaction"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+              >
+                +
+              </button>
+              <div className="absolute left-0 bottom-full mb-1 hidden group-hover/react:flex gap-1 p-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-10">
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => toggleReaction(c.id, emoji)}
+                    title={`React ${emoji}`}
+                    className="w-7 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-base leading-none"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           {replyTo === c.id && (
             <div className="mt-2">
-              <textarea
+              <MentionTextarea
                 value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
+                onChange={setReplyBody}
                 rows={2}
                 maxLength={2000}
-                placeholder="Write a reply… use @handle to mention"
+                placeholder="Write a reply… type @ to mention someone"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="mt-1 flex justify-end">
@@ -301,25 +369,36 @@ export function Comments({ promptId }: { promptId: string }) {
         )}
       </div>
 
-      <form onSubmit={post} className="mb-6">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          placeholder={session?.user?.email ? "Share how you used this prompt… use @handle to mention" : "Sign in to comment"}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="mt-2 flex justify-end">
-          <button
-            type="submit"
-            disabled={posting || !body.trim()}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {posting ? "Posting…" : "Post comment"}
-          </button>
+      {session?.user?.email ? (
+        <form onSubmit={post} className="mb-6">
+          <MentionTextarea
+            value={body}
+            onChange={setBody}
+            rows={3}
+            maxLength={2000}
+            placeholder="Share how you used this prompt… type @ to mention someone"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={posting || !body.trim()}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {posting ? "Posting…" : "Post comment"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="mb-6 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-6 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <Link href="/login" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+              Sign in
+            </Link>{" "}
+            to join the conversation and share how you used this prompt.
+          </p>
         </div>
-      </form>
+      )}
 
       {roots.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No comments yet — be the first.</p>

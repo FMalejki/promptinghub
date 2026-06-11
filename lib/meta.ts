@@ -39,11 +39,14 @@ export function canonicalPromptUrl(
 export function promptOgMetadata(input: PromptMetaInput | null, opts: PromptMetaOpts = {}): Metadata {
   if (!input) {
     return {
-      title: "Prompt · PromptingHub",
+      title: "Prompt",
       description: "Discover, share, and install AI prompts on PromptingHub.",
     };
   }
-  const title = `${input.name} · PromptingHub`;
+  // Page <title> is bare — the root layout template appends "· PromptingHub" once.
+  // OG/twitter titles are NOT templated, so they carry the brand explicitly.
+  const title = input.name;
+  const branded = `${input.name} · PromptingHub`;
   const description = truncate(input.description, 200);
   // Fall back to a generated OG card so every share has an image (resolved to an
   // absolute URL by Next via metadataBase).
@@ -52,8 +55,8 @@ export function promptOgMetadata(input: PromptMetaInput | null, opts: PromptMeta
   const meta: Metadata = {
     title,
     description,
-    openGraph: { title, description, type: "article", images },
-    twitter: { card: "summary_large_image", title, description, images: images?.map((i) => i.url) },
+    openGraph: { title: branded, description, type: "article", images },
+    twitter: { card: "summary_large_image", title: branded, description, images: images?.map((i) => i.url) },
   };
   if (opts.oembedUrl || opts.canonical) {
     meta.alternates = {

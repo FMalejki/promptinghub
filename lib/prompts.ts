@@ -4,8 +4,14 @@ import { IMAGE_MODEL_IDS } from "./imageModels";
 import { normalizeTags } from "./tags";
 import { promptToText } from "./promptText";
 import { estimateTokens } from "./promptStats";
+import { canEditPrompt, isCollaborator as isCollab, type AuthzRow } from "./promptAuthz";
+import { normalizeAttachments, type Attachment } from "./attachments";
+import { resolveSort, sortSpec } from "./sort";
+import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
+import { aggregateAttestations, type AttestationRow } from "./modelAttestations";
+import { summarizeCardAttestation, type CardAttestation } from "./attestations";
 
-export type Author = { email: string; name: string; image: string | null };
+export type Author = { name: string; image: string | null; handle: string | null };
 
 export type TestedModel = {
   modelId: string;
@@ -28,8 +34,14 @@ export type Prompt = {
   copyCount: number;
   priceCents: number;
   tags: string[];
+  isSkill?: boolean;
+  // "Best used with" target — optional on the card to avoid breaking producers.
+  useWith?: UseWith;
   createdAt: Date;
   tokens?: number; // rough length estimate for the card badge (optional)
+  // Compact community model-attestation signal (derived, read-only). Null/absent
+  // when there are no community votes. Optional so other card producers needn't set it.
+  attestation?: CardAttestation | null;
 };
 
 export type PromptWithBody = {
@@ -43,6 +55,7 @@ export type PromptWithBody = {
   stars: number;
   isPrivate: boolean;
   sharedWith: string[];
+  collaborators: string[];
   starredBy: string[];
   testedModels: TestedModel[];
   createdAt: Date;
@@ -66,8 +79,25 @@ export type PromptDetail = {
   tags: string[];
   forkedFrom: { id: string; name: string } | null;
   forkCount: number;
+  // Author-written README markdown (first-class), or null.
+  readme: string | null;
+  // Multimodal attachments (by URL) the author added; [] when none.
+  attachments: Attachment[];
+  // Whether the author marked this as a reusable "skill".
+  isSkill: boolean;
+  // "Best used with": web chat, coding agent, or both. Defaults to "both".
+  useWith: UseWith;
   createdAt: Date;
   updatedAt: Date | null;
+  // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
+  isStarred: boolean;
+  // Server-computed: is the viewer the owner? Replaces client-side email comparison
+  // (we no longer expose author.email).
+  isOwner: boolean;
+  // Server-computed edit relationship: a collaborator can edit but is not the owner.
+  isCollaborator: boolean;
+  // Owner OR collaborator — gates the Edit affordance in the UI.
+  canEdit: boolean;
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
@@ -80,6 +110,8 @@ export type ListOpts = {
   category?: string;
   model?: string;
   imageOnly?: boolean;
+  skillsOnly?: boolean;
+  useWith?: string;
   tag?: string;
   ownerEmail?: string;
   sort?: "recent" | "popular" | "copied" | "trending" | "viewed";
@@ -105,7 +137,68 @@ export type NewPrompt = {
   priceCents?: number;
   tags?: string[] | string;
   forkedFrom?: string;
+  // Optional author-written README (markdown), shown above the files on the
+  // detail page. First-class — takes precedence over a README.md file.
+  readme?: string;
+  // Optional multimodal attachments (images/pdf/video/etc by URL) an LLM can view.
+  attachments?: Attachment[];
+  // Mark this prompt as a reusable "skill" (Claude/agent skill).
+  isSkill?: boolean;
+  // "Best used with" target: "chat" | "agent" | "both" (default "both").
+  useWith?: UseWith;
+  // Emails allowed to read a PRIVATE prompt (besides the owner). Accepts an
+  // array or a comma/whitespace-separated string (from the share textarea).
+  sharedWith?: string[] | string;
+  // Emails granted EDIT access (collaborators). Same accepted shapes as
+  // sharedWith. Owner-only to set; collaborators cannot change this list.
+  collaborators?: string[] | string;
 };
+
+// Normalize a share list (array or comma/newline-separated string) into a clean,
+// deduped, lowercased list of valid emails. Caps length to keep the doc bounded.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function normalizeEmails(input?: string[] | string | null): string[] {
+  if (input == null) return [];
+  const parts = Array.isArray(input) ? input : String(input).split(/[\s,;]+/);
+  const seen = new Set<string>();
+  for (const raw of parts) {
+    const e = String(raw).trim().toLowerCase();
+    if (e && EMAIL_RE.test(e)) seen.add(e);
+  }
+  return Array.from(seen).slice(0, 100);
+}
+
+// Notify users newly added to a prompt's share list (best-effort, never the owner).
+async function notifyNewlyShared(
+  db: Db,
+  ownerEmail: string,
+  promptId: string,
+  promptName: string,
+  prev: string[],
+  next: string[],
+): Promise<void> {
+  const before = new Set(prev || []);
+  const added = (next || []).filter((e) => e && !before.has(e) && e !== ownerEmail);
+  if (!added.length) return;
+  try {
+    const { addNotification, actorName } = await import("./notifications");
+    const who = await actorName(db, ownerEmail);
+    await Promise.all(
+      added.map((email) =>
+        addNotification(db, {
+          recipientEmail: email,
+          type: "share",
+          actorEmail: ownerEmail,
+          actorName: who,
+          promptId,
+          promptName,
+        }),
+      ),
+    );
+  } catch {
+    /* best-effort */
+  }
+}
 
 const LANG_BY_EXT: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
@@ -129,6 +222,17 @@ export function normalizeFiles(row: { files?: PromptFile[]; body?: string }): Pr
   return [{ path: "prompt.txt", content: row.body ?? "", language: "text" }];
 }
 
+type Content = { body: string; files: PromptFile[] };
+
+// Resolve a prompt's readable content (plaintext). Access control for PRIVATE
+// prompts is enforced upstream — listings exclude isPrivate, and the detail API
+// route 403s a private prompt for non-owner/non-shared viewers — so this just
+// reads the stored content.
+export function resolveContent(row: { _id?: unknown; files?: PromptFile[]; body?: string }): Content {
+  const files = normalizeFiles(row);
+  return { body: row.body ?? files.map((f) => f.content).join("\n\n"), files };
+}
+
 export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]> {
   const match: Record<string, unknown> = {};
   // Each OR-group is ANDed together so privacy / image / search filters never clobber each other.
@@ -146,6 +250,11 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   }
 
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
+  if (opts.skillsOnly) match.isSkill = true;
+  if (opts.useWith) {
+    const f = useWithFilter(opts.useWith);
+    if (f) match.useWith = f;
+  }
   if (opts.category) match.category = opts.category;
   if (opts.model) match["testedModels.modelId"] = opts.model;
   if (opts.tag) {
@@ -169,16 +278,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     match.$and = orGroups.map((g) => ({ $or: g }));
   }
 
-  const sortField =
-    opts.sort === "popular"
-      ? { stars: -1, createdAt: -1 }
-      : opts.sort === "copied"
-      ? { copyCount: -1, createdAt: -1 }
-      : opts.sort === "trending"
-      ? { trendingScore: -1, createdAt: -1 }
-      : opts.sort === "viewed"
-      ? { viewCount: -1, createdAt: -1 }
-      : { createdAt: -1, _id: -1 };
+  const sortField = sortSpec(resolveSort(opts.sort));
 
   const pipeline: Record<string, unknown>[] = [
     { $match: match },
@@ -199,6 +299,19 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   pipeline.push(
     { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
     { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+    // Community model attestations for the (single) page of cards. promptId is the
+    // string form of the prompt _id, so match on a stringified id. Project only the
+    // fields the fold needs to keep the join light.
+    { $addFields: { idStr: { $toString: "$_id" } } },
+    {
+      $lookup: {
+        from: "modelAttestations",
+        localField: "idStr",
+        foreignField: "promptId",
+        as: "atts",
+        pipeline: [{ $project: { _id: 0, modelId: 1, email: 1, vote: 1 } }],
+      },
+    },
   );
 
   const rows = await db.collection("prompts").aggregate(pipeline).toArray();
@@ -215,9 +328,12 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     copyCount: r.copyCount || 0,
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
+    isSkill: !!r.isSkill,
+    useWith: resolveUseWith(r.useWith),
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    attestation: summarizeCardAttestation(aggregateAttestations((r.atts || []) as AttestationRow[])),
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -353,7 +469,12 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     tags: normalizeTags(data.tags),
     forkedFrom,
     starredBy: [],
-    sharedWith: [],
+    sharedWith: normalizeEmails(data.sharedWith),
+    collaborators: normalizeEmails(data.collaborators),
+    readme: (data.readme || "").trim() || null,
+    attachments: normalizeAttachments(data.attachments),
+    isSkill: !!data.isSkill,
+    useWith: resolveUseWith(data.useWith),
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -374,6 +495,8 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
       /* notifications are best-effort */
     }
   }
+  // Notify anyone the prompt is shared with at creation time (best-effort).
+  await notifyNewlyShared(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[]);
   return {
     id: insertedId.toString(),
     name: data.name,
@@ -391,41 +514,69 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
   };
 }
 
-// Owner-scoped update. Returns true only when the prompt exists AND belongs to ownerEmail.
+// Edit a prompt. Authorized for the OWNER or an explicit COLLABORATOR.
+// Returns false when the prompt is missing or the editor lacks edit rights.
+//
+// Collaborators may edit content/metadata (name, description, category, image,
+// tags, testedModels, body/files) but NOT owner-only fields — privacy, price,
+// the share allowlist, or the collaborator list. Those are silently dropped for
+// non-owners so a collaborator can never widen access or change pricing.
 export async function updatePrompt(
   db: Db,
   id: string,
-  ownerEmail: string,
+  editorEmail: string,
   data: Partial<NewPrompt>,
   opts?: { message?: string },
 ): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
+
+  // Authorize against the live document before touching anything.
+  const current = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
+  if (!current) return false;
+  if (!canEditPrompt(current as unknown as AuthzRow, editorEmail)) return false;
+  const isOwnerEdit = (current.ownerEmail as string) === editorEmail;
+
   const set: Record<string, unknown> = {};
   if (data.name !== undefined) set.name = data.name;
   if (data.description !== undefined) set.description = data.description;
   if (data.category !== undefined) set.category = data.category;
   if (data.image !== undefined) set.image = data.image || null;
-  if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
   if (data.testedModels !== undefined) set.testedModels = data.testedModels;
-  if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
   if (data.tags !== undefined) set.tags = normalizeTags(data.tags);
-  if (data.files !== undefined) {
-    const files = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
-    set.files = files;
-    set.body = files.map((f) => f.content).join("\n\n");
-  } else if (data.body !== undefined) {
-    set.body = data.body;
-  }
-  if (Object.keys(set).length === 0) return false;
+  if (data.readme !== undefined) set.readme = (data.readme || "").trim() || null;
+  if (data.attachments !== undefined) set.attachments = normalizeAttachments(data.attachments);
+  if (data.isSkill !== undefined) set.isSkill = !!data.isSkill;
+  if (data.useWith !== undefined) set.useWith = resolveUseWith(data.useWith);
 
-  // Snapshot the prior content before applying a content edit (owner-scoped).
-  const current = await db.collection("prompts").findOne({ _id: new ObjectId(id), ownerEmail });
-  if (!current) return false;
-  const contentChanged = set.name !== undefined || set.body !== undefined || set.files !== undefined;
-  if (contentChanged) {
+  // Owner-only fields — ignored entirely when a collaborator is editing.
+  let incomingShared: string[] | undefined;
+  if (isOwnerEdit) {
+    if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
+    if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
+    incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
+    if (incomingShared !== undefined) set.sharedWith = incomingShared;
+    if (data.collaborators !== undefined) set.collaborators = normalizeEmails(data.collaborators);
+  }
+
+  // Compute the new plaintext content when a content edit is present.
+  let newFiles: PromptFile[] | null = null;
+  let newBody: string | null = null;
+  if (data.files !== undefined) {
+    newFiles = data.files.map((f) => ({ path: f.path, content: f.content, language: f.language || languageFromPath(f.path) }));
+    newBody = newFiles.map((f) => f.content).join("\n\n");
+  } else if (data.body !== undefined) {
+    newBody = data.body;
+  }
+  const contentEditing = newBody !== null;
+
+  if (!contentEditing && Object.keys(set).length === 0) return false;
+
+  if (contentEditing) {
+    set.body = newBody ?? "";
+    set.files = newFiles ?? [];
+
+    // Snapshot the prior content as a version before overwriting it.
     const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;
-    // The "commit message" describes the edit being applied now; the snapshot
-    // captures the prior content that this edit replaces.
     const message = (opts?.message ?? "").trim().slice(0, 200);
     await db.collection("promptVersions").insertOne({
       promptId: id,
@@ -439,7 +590,13 @@ export async function updatePrompt(
   }
 
   set.updatedAt = new Date();
-  const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id), ownerEmail }, { $set: set });
+  // Already authorized above; scope the write by _id (the editor may be a
+  // collaborator, not the owner, so we must not filter by ownerEmail here).
+  const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: set });
+  // Notify users newly added to the share list (best-effort; owner edits only).
+  if (res.matchedCount > 0 && incomingShared !== undefined) {
+    await notifyNewlyShared(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared);
+  }
   return res.matchedCount > 0;
 }
 
@@ -465,6 +622,7 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
         stars: row.starredBy?.length || 0,
         isPrivate: row.isPrivate || false,
         sharedWith: row.sharedWith || [],
+        collaborators: row.collaborators || [],
         starredBy: row.starredBy || [],
         testedModels: row.testedModels || [],
         createdAt: row.createdAt,
@@ -472,12 +630,13 @@ export async function getPrompt(db: Db, id: string): Promise<PromptWithBody | nu
     : null;
 }
 
-export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail | null> {
+export async function getPromptDetail(db: Db, id: string, viewerEmail?: string | null): Promise<PromptDetail | null> {
   if (!ObjectId.isValid(id)) return null;
   const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) });
   if (!row) return null;
   const u = await db.collection("users").findOne({ email: row.ownerEmail });
-  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  const gate = resolveContent(row);
+  const files = gate.files;
   // Resolve lineage: the source this was forked from (if it still exists) and how many forks it has.
   let forkedFrom: { id: string; name: string } | null = null;
   if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
@@ -490,9 +649,9 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     name: row.name,
     description: row.description,
     category: row.category,
-    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    body: gate.body,
     files,
-    author: { email: row.ownerEmail, name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null },
+    author: { name: u?.name || row.ownerEmail.split("@")[0], image: u?.image ?? null, handle: u?.handle ?? null },
     image: row.image ?? null,
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
@@ -503,8 +662,21 @@ export async function getPromptDetail(db: Db, id: string): Promise<PromptDetail 
     tags: row.tags || [],
     forkedFrom,
     forkCount,
+    readme: row.readme ?? null,
+    attachments: (row.attachments as Attachment[]) || [],
+    isSkill: !!row.isSkill,
+    useWith: resolveUseWith(row.useWith),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
+    isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
+    isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
+    canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
+    // Owner-only: surface the share + collaborator allowlists so the edit page
+    // can manage them. Never sent to non-owners (would leak who has access).
+    ...(viewerEmail && viewerEmail === row.ownerEmail
+      ? { sharedWith: (row.sharedWith as string[]) || [], collaborators: (row.collaborators as string[]) || [] }
+      : {}),
     // canonical handle/slug included only when both are backfilled (kept off the strict type)
     ...(u?.handle && row.slug ? { handle: u.handle as string, slug: row.slug as string } : {}),
   };
@@ -583,7 +755,7 @@ export async function getRelatedPrompts(db: Db, id: string, limit = 4): Promise<
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -622,7 +794,7 @@ export async function listMoreByAuthor(db: Db, id: string, limit = 4): Promise<P
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
@@ -669,16 +841,17 @@ export async function getRelatedByTags(db: Db, id: string, limit = 4): Promise<P
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     createdAt: r.createdAt,
-    author: { email: r.ownerEmail, name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null },
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }
 
-export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string): Promise<NamespacedPromptDetail | null> {
+export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slug: string, viewerEmail?: string | null): Promise<NamespacedPromptDetail | null> {
   const user = await db.collection("users").findOne({ handle });
   if (!user) return null;
   const row = await db.collection("prompts").findOne({ ownerEmail: user.email, slug });
   if (!row) return null;
-  const files = normalizeFiles(row as { files?: PromptFile[]; body?: string });
+  const gate = resolveContent(row);
+  const files = gate.files;
   let forkedFrom: { id: string; name: string } | null = null;
   if (row.forkedFrom && ObjectId.isValid(row.forkedFrom)) {
     const src = await db.collection("prompts").findOne({ _id: new ObjectId(row.forkedFrom) }, { projection: { name: 1 } });
@@ -690,9 +863,9 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     name: row.name,
     description: row.description,
     category: row.category,
-    body: row.body ?? files.map((f) => f.content).join("\n\n"),
+    body: gate.body,
     files,
-    author: { email: row.ownerEmail, name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null },
+    author: { name: user.name || row.ownerEmail.split("@")[0], image: user.image ?? null, handle: user.handle ?? null },
     image: row.image ?? null,
     stars: row.starredBy?.length || 0,
     isPrivate: row.isPrivate || false,
@@ -703,8 +876,20 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     tags: row.tags || [],
     forkedFrom,
     forkCount,
+    readme: row.readme ?? null,
+    attachments: (row.attachments as Attachment[]) || [],
+    isSkill: !!row.isSkill,
+    useWith: resolveUseWith(row.useWith),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
+    isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
+    isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
+    canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
+    // Owner-only access lists, mirroring getPromptDetail.
+    ...(viewerEmail && viewerEmail === row.ownerEmail
+      ? { sharedWith: (row.sharedWith as string[]) || [], collaborators: (row.collaborators as string[]) || [] }
+      : {}),
     handle,
     slug,
   };
@@ -756,6 +941,41 @@ export async function removeFromFavorites(db: Db, userEmail: string, promptId: s
 export async function getFavorites(db: Db, userEmail: string): Promise<string[]> {
   const user = await db.collection("users").findOne({ email: userEmail });
   return user?.favorites || [];
+}
+
+/**
+ * Private prompts the user can access but doesn't own — either shared with them
+ * (read-only) or where they're a collaborator (edit). The owner sees their own
+ * under their dashboard, not here. Returns safe card fields only — NEVER the
+ * body/files or the access lists.
+ */
+export async function listSharedWithMe(db: Db, email: string): Promise<Prompt[]> {
+  if (!email) return [];
+  const rows = await db
+    .collection("prompts")
+    .aggregate([
+      { $match: { isPrivate: true, $or: [{ sharedWith: email }, { collaborators: email }] } },
+      { $addFields: { stars: { $size: { $ifNull: ["$starredBy", []] } } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
+      { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+    ])
+    .toArray();
+  return rows.map((r: any) => ({
+    id: r._id.toString(),
+    name: r.name,
+    description: r.description,
+    category: r.category,
+    image: r.image ?? null,
+    stars: r.stars || 0,
+    isPrivate: r.isPrivate || false,
+    testedModels: r.testedModels || [],
+    copyCount: r.copyCount || 0,
+    priceCents: r.priceCents || 0,
+    tags: r.tags || [],
+    createdAt: r.createdAt,
+    author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
+  }));
 }
 
 export async function sharePrompt(db: Db, promptId: string, ownerEmail: string, shareWithEmail: string): Promise<boolean> {

@@ -50,7 +50,7 @@ describe("draft curation", () => {
     expect(res?.promptId).toBeTruthy();
     const detail = await getPromptDetail(db, res!.promptId);
     expect(detail?.body).toBe("approve me");
-    expect(detail?.author.email).toBe("curator@x.com");
+    expect(detail?.author.name).toBe("curator");
     // no longer pending
     expect(await listPendingDrafts(db)).toHaveLength(0);
   });

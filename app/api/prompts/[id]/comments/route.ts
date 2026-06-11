@@ -5,14 +5,25 @@ import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { addComment, listComments } from "@/lib/comments";
 import { getCommentLikes } from "@/lib/commentLikes";
+import { getCommentReactions } from "@/lib/commentReactions";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const db = await getDb();
-  const comments = await listComments(db, params.id);
   const session = await getServerSession(authOptions);
-  const likes = await getCommentLikes(db, comments.map((c) => c.id), session?.user?.email ?? undefined);
-  const withLikes = comments.map((c) => ({ ...c, likeCount: likes[c.id]?.count ?? 0, liked: likes[c.id]?.liked ?? false }));
-  return NextResponse.json({ comments: withLikes });
+  const viewer = session?.user?.email ?? undefined;
+  const comments = await listComments(db, params.id, viewer);
+  const ids = comments.map((c) => c.id);
+  const likes = await getCommentLikes(db, ids, viewer);
+  const reactions = await getCommentReactions(db, ids, viewer);
+  const withMeta = comments.map((c) => ({
+    ...c,
+    likeCount: likes[c.id]?.count ?? 0,
+    liked: likes[c.id]?.liked ?? false,
+    reactionCounts: reactions[c.id]?.counts ?? {},
+    myReactions: reactions[c.id]?.mine ?? [],
+  }));
+  return NextResponse.json({ comments: withMeta });
 }
 
 const bodySchema = z.object({ body: z.string().min(1).max(2000), parentId: z.string().optional() });
@@ -21,6 +32,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Throttle commenting: 12 per user per 5 minutes (anti flood).
+  const rl = await rateLimit(await getDb(), `comment:${email}`, 12, 5 * 60_000);
+  if (!rl.ok) return NextResponse.json({ error: "You're commenting too fast. Please slow down." }, { status: 429 });
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   try {

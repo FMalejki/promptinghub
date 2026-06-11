@@ -1,69 +1,11 @@
-"use client";
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import Link from "next/link";
+import type { Metadata } from "next";
+import RegisterClient from "./RegisterClient";
 
-export default function RegisterPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+export const metadata: Metadata = {
+  title: "Create your account",
+  description: "Join PromptingHub to publish your own AI prompts and follow what works.",
+};
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({ error: "Failed" }));
-      setErr(error);
-      return;
-    }
-    const r = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
-    if (r?.url) window.location.href = r.url;
-  }
-
-  return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-8">
-        <h1 className="text-xl font-medium text-gray-900 dark:text-white mb-1">Create account</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Use email and a password (min 8 chars).</p>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            type="text"
-            placeholder="Account name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
-            required
-          />
-          {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-          <button className="w-full bg-gray-800 hover:bg-gray-900 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-sm rounded py-2">Register</button>
-        </form>
-        <p className="mt-6 text-xs text-gray-500 dark:text-gray-400 text-center">
-          Have an account?{" "}
-          <Link href="/login" className="text-gray-800 dark:text-gray-200 underline">Sign in</Link>
-        </p>
-      </div>
-    </main>
-  );
+export default function Page() {
+  return <RegisterClient />;
 }

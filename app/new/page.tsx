@@ -2,10 +2,14 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Navbar } from "../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { useModels } from "@/lib/useModels";
-import { PromptQuality } from "../components/PromptQuality";
+import { getTemplate } from "@/lib/templates";
+import { CoverImageField } from "../components/CoverImageField";
+import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
+import { track } from "../components/AnalyticsBeacon";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -19,8 +23,13 @@ export default function NewPromptPage() {
     category: "",
     image: "",
     isPrivate: false,
+    isSkill: false,
+    useWith: "both" as "chat" | "agent" | "both",
   });
   const [price, setPrice] = useState("0");
+  const [readme, setReadme] = useState("");
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
+  const [shareWith, setShareWith] = useState("");
   const [tags, setTags] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [similar, setSimilar] = useState<{ id: string; name: string }[]>([]);
@@ -30,6 +39,19 @@ export default function NewPromptPage() {
       .then((r) => (r.ok ? r.json() : { tags: [] }))
       .then((d) => setTagSuggestions((d.tags || []).map((t: { tag: string }) => t.tag)))
       .catch(() => {});
+  }, []);
+
+  // Prefill from a starter template (/new?template=<id>), applied once on mount.
+  const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("template");
+    if (!id) return;
+    const t = getTemplate(id);
+    if (!t) return;
+    setForm((f) => ({ ...f, name: t.promptName, description: t.description, category: t.category }));
+    setTags(t.tags.join(", "));
+    setFiles([{ path: "prompt.txt", content: t.body }]);
+    setAppliedTemplate(t.title);
   }, []);
 
   function addTag(tag: string) {
@@ -49,6 +71,10 @@ export default function NewPromptPage() {
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [ghUrl, setGhUrl] = useState("");
+  const [ghToken, setGhToken] = useState("");
+  const [ghImporting, setGhImporting] = useState(false);
+  const [ghNote, setGhNote] = useState<string | null>(null);
 
   // Debounced check for existing prompts with a similar name (duplicate warning).
   useEffect(() => {
@@ -83,7 +109,8 @@ export default function NewPromptPage() {
         return;
       }
       const { draft } = await res.json();
-      setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category }));
+      track("import_click", "/new", { source: "paste" });
+      setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
       if (Array.isArray(draft.testedModels)) {
         setSelectedModels(new Set(draft.testedModels.map((m: TestedModel) => m.modelId)));
@@ -95,13 +122,66 @@ export default function NewPromptPage() {
     }
   }
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
+  // Import a whole public GitHub repo as a multi-file prompt ("infra as a prompt").
+  async function applyGithubImport() {
+    if (!ghUrl.trim()) return;
+    setGhImporting(true);
+    setError(null);
+    setGhNote(null);
+    try {
+      const res = await fetch("/api/import/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: ghUrl.trim(), token: ghToken.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "GitHub import failed.");
+        return;
+      }
+      const d = data.draft;
+      track("import_click", "/new", { source: "github" });
+      setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
+      if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
+      if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
+      const n = d.notes || {};
+      setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
+      setGhUrl("");
+      setGhToken("");
+    } catch {
+      setError("GitHub import failed.");
+    } finally {
+      setGhImporting(false);
     }
-  }, [status, router]);
+  }
 
-  if (status !== "authenticated") return null;
+  // Don't flash a blank page while the session resolves, and don't hard-redirect
+  // unauthenticated visitors — show a Navbar + a clear sign-in CTA instead.
+  if (status !== "authenticated") {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navbar />
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          {status === "loading" ? (
+            <p className="text-center text-gray-400">Loading…</p>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Sign in to create a prompt</h1>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">You need an account to publish prompts to PromptingHub. It's free.</p>
+              <div className="flex items-center justify-center gap-3">
+                <Link href="/login?callbackUrl=/new" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">Sign in</Link>
+                <Link href="/register" className="px-5 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Create account</Link>
+              </div>
+              <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                Meanwhile, <Link href="/templates" className="text-blue-600 dark:text-blue-400 hover:underline">browse prompt templates</Link> or{" "}
+                <Link href="/browse" className="text-blue-600 dark:text-blue-400 hover:underline">explore the community</Link>.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
 
   function toggleModel(modelId: string) {
     const newSelected = new Set(selectedModels);
@@ -169,6 +249,9 @@ export default function NewPromptPage() {
       testedModels: models.length > 0 ? models : undefined,
       priceCents: Math.round((parseFloat(price) || 0) * 100),
       tags: tags.trim() ? tags : undefined,
+      readme: readme.trim() ? readme : undefined,
+      attachments: attachments.filter((a) => a.url.trim()).length ? attachments.filter((a) => a.url.trim()) : undefined,
+      sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
     };
 
     try {
@@ -202,8 +285,23 @@ export default function NewPromptPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create New Prompt</h1>
-          <p className="text-gray-600 dark:text-gray-400">Share your prompt with the community</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create New Prompt</h1>
+              <p className="text-gray-600 dark:text-gray-400">Share your prompt with the community</p>
+            </div>
+            <a
+              href="/templates"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+            >
+              ✨ Start from a template
+            </a>
+          </div>
+          {appliedTemplate && (
+            <div className="mt-4 flex items-center gap-2 text-sm rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 py-2 text-blue-800 dark:text-blue-300">
+              <span>✨ Started from the “{appliedTemplate}” template — replace the {"{{placeholders}}"} with your details.</span>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -213,18 +311,26 @@ export default function NewPromptPage() {
               Import from text — paste a prompt to auto-fill
             </summary>
             <p className="mt-3 text-xs text-blue-700/80 dark:text-blue-300/70">
-              Paste raw prompt text, or add a{" "}
-              <code className="font-mono">---</code> frontmatter block with{" "}
-              <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
-              <code className="font-mono">category</code>, <code className="font-mono">models</code>. We fill the form below — you review before publishing.
+              Paste your prompt — we&apos;ll fill in the title, category and the rest below for you to review.
             </p>
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               rows={5}
-              placeholder={"---\nname: My Prompt\ncategory: Coding\nmodels: gpt-4o\n---\nWrite a function that…"}
+              placeholder={"Paste your prompt here…\n\ne.g. You are an expert code reviewer. Review the diff I paste and flag bugs, security issues, and unclear naming…"}
               className={`${input} mt-3 font-mono text-sm`}
             />
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[11px] text-blue-700/70 dark:text-blue-300/60 hover:underline">
+                Advanced: set fields with frontmatter
+              </summary>
+              <p className="mt-1.5 text-[11px] text-blue-700/70 dark:text-blue-300/60">
+                Start with a <code className="font-mono">---</code> block to preset fields:{" "}
+                <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
+                <code className="font-mono">category</code>, <code className="font-mono">models</code> — then{" "}
+                <code className="font-mono">---</code> and your prompt.
+              </p>
+            </details>
             <button
               type="button"
               onClick={applyImport}
@@ -233,6 +339,46 @@ export default function NewPromptPage() {
             >
               {importing ? "Parsing…" : "Fill form from text"}
             </button>
+          </details>
+
+          {/* Import a whole public GitHub repo as a multi-file prompt */}
+          <details className="bg-gray-900 dark:bg-gray-950 rounded-xl border border-gray-700 p-6">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-100 flex items-center gap-2">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+              Import from GitHub — paste a public repo URL
+            </summary>
+            <p className="mt-3 text-xs text-gray-400">
+              Pulls the repo&apos;s text/source files into a multi-file prompt (skips binaries &amp; build dirs; up to 40 files / 1.5 MB). Review before publishing.
+            </p>
+            <input
+              type="text"
+              value={ghUrl}
+              onChange={(e) => setGhUrl(e.target.value)}
+              placeholder="https://github.com/owner/repo  (or owner/repo, or .../tree/branch/path)"
+              className={`${input} mt-3 font-mono text-sm`}
+            />
+            <input
+              type="password"
+              name="gh-pat"
+              value={ghToken}
+              onChange={(e) => setGhToken(e.target.value)}
+              placeholder="Optional GitHub token (private repos / higher rate limit)"
+              className={`${input} mt-2 font-mono text-sm`}
+              autoComplete="off"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-bwignore="true"
+              data-form-type="other"
+            />
+            <button
+              type="button"
+              onClick={applyGithubImport}
+              disabled={ghImporting || !ghUrl.trim()}
+              className="mt-3 px-4 py-2 bg-gray-100 hover:bg-white text-gray-900 disabled:opacity-50 text-sm font-medium rounded-lg transition-colors"
+            >
+              {ghImporting ? "Importing…" : "Import repo"}
+            </button>
+            {ghNote && <p className="mt-3 text-xs text-green-400">{ghNote}</p>}
           </details>
 
           {/* Basic Info */}
@@ -325,15 +471,26 @@ export default function NewPromptPage() {
             </div>
 
             <div>
-              <label className={label}>Cover Image URL (optional)</label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className={input}
-                placeholder="https://example.com/image.jpg"
+              <label className={label}>README (optional)</label>
+              <textarea
+                value={readme}
+                onChange={(e) => setReadme(e.target.value)}
+                className={`${input} font-mono min-h-[120px]`}
+                placeholder={"# How to use this prompt\n\nExplain what it does, when to use it, and any setup. Markdown supported."}
+                maxLength={20000}
+                rows={6}
               />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, code, links).</p>
             </div>
+
+            <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
+
+            <CoverImageField
+              value={form.image}
+              onChange={(v) => setForm({ ...form, image: v })}
+              inputClassName={input}
+              labelClassName={label}
+            />
 
             <div>
               <label className={label}>Price (USD) — 0 = free</label>
@@ -352,6 +509,44 @@ export default function NewPromptPage() {
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
+                id="isSkill"
+                checked={form.isSkill}
+                onChange={(e) => setForm({ ...form, isSkill: e.target.checked })}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="isSkill" className="text-sm text-gray-700 dark:text-gray-300">
+                This is a <strong>skill</strong> (a reusable capability for an agent/assistant)
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Best used with</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["both", "↔️ Chat & agents"],
+                  ["chat", "💬 Web chat"],
+                  ["agent", "🤖 Coding agents"],
+                ] as const).map(([val, lbl]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setForm({ ...form, useWith: val })}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      form.useWith === val
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Where this prompt works best — a web chat UI, a coding agent, or both.</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
                 id="isPrivate"
                 checked={form.isPrivate}
                 onChange={(e) => setForm({ ...form, isPrivate: e.target.checked })}
@@ -361,6 +556,25 @@ export default function NewPromptPage() {
                 Make this prompt private (only you can see it)
               </label>
             </div>
+
+            {form.isPrivate && (
+              <div className="mt-3 pl-6">
+                <label htmlFor="shareWith" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Share with (emails)
+                </label>
+                <textarea
+                  id="shareWith"
+                  value={shareWith}
+                  onChange={(e) => setShareWith(e.target.value)}
+                  rows={2}
+                  placeholder="alice@example.com, bob@example.com"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Comma- or newline-separated. These people (plus you) can view this private prompt. Leave empty to keep it just yours.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Prompt Files */}
@@ -427,11 +641,6 @@ export default function NewPromptPage() {
               + Add file
             </button>
           </div>
-
-          {/* Prompt quality (advisory, computed live in the browser) */}
-          <PromptQuality
-            text={[form.description, ...files.map((f) => f.content)].filter(Boolean).join("\n\n")}
-          />
 
           {/* Tested Models */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

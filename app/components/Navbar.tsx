@@ -1,35 +1,93 @@
 "use client";
+import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useTheme } from "../ThemeProvider";
 import { Avatar } from "../Avatar";
 import { NotificationBell } from "./NotificationBell";
 
+type NavLink = { href: string; label: string; authOnly?: boolean; group: "primary" | "explore" };
+
+const NAV_LINKS: NavLink[] = [
+  { href: "/browse", label: "Browse", group: "primary" },
+  { href: "/templates", label: "Templates", group: "primary" },
+  { href: "/feed", label: "Feed", authOnly: true, group: "primary" },
+  { href: "/dashboard", label: "Dashboard", authOnly: true, group: "primary" },
+  { href: "/trending", label: "Trending", group: "primary" },
+  { href: "/categories", label: "Categories", group: "explore" },
+  { href: "/tags", label: "Tags", group: "explore" },
+  { href: "/collections", label: "Collections", group: "explore" },
+  { href: "/creators", label: "Creators", group: "explore" },
+];
+
 export function Navbar() {
   const { status, data } = useSession();
   const { theme, toggleTheme } = useTheme();
   const authed = status === "authenticated";
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
+
+  const links = NAV_LINKS.filter((l) => !l.authOnly || authed);
+  const primaryLinks = links.filter((l) => l.group === "primary");
+  const exploreLinks = links.filter((l) => l.group === "explore");
+  const linkClass =
+    "px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors";
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={() => setMobileOpen(false)}>
             <img src="/static/image.png" alt="PromptingHub Logo" className="w-8 h-8 object-contain" />
             <span className="text-xl font-semibold text-gray-900 dark:text-white">PromptingHub</span>
           </Link>
 
-          {/* Primary nav */}
+          {/* Primary nav (desktop) */}
           <div className="hidden sm:flex items-center gap-1 ml-6">
-            <Link href="/browse" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Browse</Link>
-            {authed && <Link href="/feed" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Feed</Link>}
-            {authed && <Link href="/dashboard" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Dashboard</Link>}
-            <Link href="/trending" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Trending</Link>
-            <Link href="/categories" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Categories</Link>
-            <Link href="/tags" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Tags</Link>
-            <Link href="/collections" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Collections</Link>
-            <Link href="/creators" className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Creators</Link>
+            {primaryLinks.map((l) => (
+              <Link key={l.href} href={l.href} className={linkClass}>
+                {l.label}
+              </Link>
+            ))}
+
+            {/* Explore dropdown — secondary destinations, collapsed to de-clutter. */}
+            <div className="relative">
+              <button
+                onClick={() => setExploreOpen((o) => !o)}
+                className={`${linkClass} flex items-center gap-1`}
+                aria-haspopup="true"
+                aria-expanded={exploreOpen}
+              >
+                Explore
+                <svg className={`w-3.5 h-3.5 transition-transform ${exploreOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {exploreOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <button
+                    aria-hidden
+                    tabIndex={-1}
+                    onClick={() => setExploreOpen(false)}
+                    className="fixed inset-0 z-40 cursor-default"
+                  />
+                  <div className="absolute right-0 mt-1 w-44 z-50 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1">
+                    {exploreLinks.map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        onClick={() => setExploreOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Spacer */}
@@ -67,15 +125,21 @@ export function Navbar() {
                   New Prompt
                 </Link>
 
-                {/* User menu */}
-                <div className="flex items-center gap-3">
+                {/* User menu (desktop) */}
+                <div className="hidden sm:flex items-center gap-3">
                   <NotificationBell />
                   <Link href="/favorites" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Favorites">
                     <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                   </Link>
-                  
+
+                  <Link href="/shared" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Shared with me">
+                    <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </Link>
+
                   <Link href="/settings" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Settings">
                     <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -105,14 +169,86 @@ export function Navbar() {
             ) : (
               <Link
                 href="/login"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="hidden sm:inline-flex px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 Sign in
               </Link>
             )}
+
+            {/* Hamburger (mobile only) */}
+            <button
+              onClick={() => setMobileOpen((o) => !o)}
+              className="sm:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+            >
+              <svg className="w-6 h-6 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {mobileOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile menu panel */}
+      {mobileOpen && (
+        <div className="sm:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+          <nav className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1">
+            {authed && (
+              <Link
+                href="/new"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center gap-2 mb-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Prompt
+              </Link>
+            )}
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setMobileOpen(false)}
+                className="px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                {l.label}
+              </Link>
+            ))}
+            <div className="my-2 border-t border-gray-200 dark:border-gray-800" />
+            {authed ? (
+              <>
+                <Link href="/favorites" onClick={() => setMobileOpen(false)} className="px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Favorites</Link>
+                <Link href="/shared" onClick={() => setMobileOpen(false)} className="px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Shared with me</Link>
+                <Link href={`/user/${data?.user?.email}`} onClick={() => setMobileOpen(false)} className="px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">My profile</Link>
+                <Link href="/settings" onClick={() => setMobileOpen(false)} className="px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Settings</Link>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    signOut();
+                  }}
+                  className="text-left px-3 py-2.5 text-base font-medium text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Sign in
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

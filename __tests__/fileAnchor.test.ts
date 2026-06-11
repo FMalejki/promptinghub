@@ -1,4 +1,4 @@
-import { fileAnchorHash, fileAnchorLink, parseFileAnchor, fileAnchorId } from "../lib/fileAnchor";
+import { fileAnchorHash, fileAnchorLink, parseFileAnchor, fileAnchorId, activeFileIndex } from "../lib/fileAnchor";
 
 describe("fileAnchor", () => {
   it("builds a hash from a file path", () => {
@@ -33,5 +33,21 @@ describe("fileAnchor", () => {
     expect(id).toMatch(/^file-[A-Za-z0-9_-]+$/);
     expect(fileAnchorId("src/My File.ts")).toBe(id); // deterministic
     expect(fileAnchorId("other.ts")).not.toBe(id); // distinct paths differ
+  });
+
+  describe("activeFileIndex", () => {
+    const paths = ["prompt.txt", "system.md", "examples.json"];
+    it("returns the index of the requested path", () => {
+      expect(activeFileIndex(paths, "system.md")).toBe(1);
+      expect(activeFileIndex(paths, "examples.json")).toBe(2);
+    });
+    it("defaults to 0 when the request is missing or unknown", () => {
+      expect(activeFileIndex(paths, null)).toBe(0);
+      expect(activeFileIndex(paths, undefined)).toBe(0);
+      expect(activeFileIndex(paths, "does-not-exist.ts")).toBe(0);
+    });
+    it("returns 0 for an empty file list", () => {
+      expect(activeFileIndex([], "anything")).toBe(0);
+    });
   });
 });

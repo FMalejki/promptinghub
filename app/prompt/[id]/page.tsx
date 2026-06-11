@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     const detail = await getPromptDetail(await getDb(), params.id);
     if (!detail || detail.isPrivate) return promptOgMetadata(null);
     return promptOgMetadata(
-      { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id) },
+      { name: detail.name, description: detail.description, image: detail.image || getPlaceholderImage(detail.id, detail.category) },
       {
         oembedUrl: oembedDiscoveryUrl(SITE_URL, `${SITE_URL}/prompt/${detail.id}`),
         canonical: canonicalPromptUrl(SITE_URL, detail),

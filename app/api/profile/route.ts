@@ -19,6 +19,7 @@ const schema = z.object({
   website: z.string().max(200).optional(),
   x: z.string().max(60).optional(),
   github: z.string().max(60).optional(),
+  mutedNotificationTypes: z.array(z.string().max(40)).max(20).optional(),
 });
 
 export async function PUT(req: Request) {

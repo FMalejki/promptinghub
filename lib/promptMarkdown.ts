@@ -1,5 +1,11 @@
 // Render a single prompt as a readable Markdown document (title + description +
 // fenced files), complementing the plain-text /raw endpoint. Pure.
+import { slugify } from "./slug";
+
+// Safe download filename for a prompt's Markdown export (slug + .md).
+export function markdownFilename(name: string): string {
+  return `${slugify(name || "")}.md`;
+}
 
 type PromptMd = {
   name: string;

@@ -45,14 +45,14 @@ describe("listPrompts (public pool)", () => {
   it("attaches author profile", async () => {
     const rows = await listPrompts(db);
     const summarize = rows.find((r) => r.name === "Summarize")!;
-    expect(summarize.author).toEqual({ email: "alice@x.com", name: "Alice", image: "http://img/a.png" });
+    expect(summarize.author).toEqual({ name: "Alice", image: "http://img/a.png", handle: null });
   });
 
   it("falls back to email-derived author when no user row exists", async () => {
     await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const rows = await listPrompts(db);
     const orphan = rows.find((r) => r.name === "Orphan")!;
-    expect(orphan.author.email).toBe("ghost@x.com");
+    expect(orphan.author.handle).toBeNull();
     expect(orphan.author.name).toBe("ghost");
   });
 
@@ -133,7 +133,7 @@ describe("getPromptDetail", () => {
       category: "Writing",
       body: "b1",
       files: [{ path: "prompt.txt", content: "b1", language: "text" }],
-      author: { email: "alice@x.com", name: "Alice", image: "http://img/a.png" },
+      author: { name: "Alice", image: "http://img/a.png", handle: null },
       image: null,
       stars: 0,
       isPrivate: false,
@@ -144,15 +144,64 @@ describe("getPromptDetail", () => {
       tags: [],
       forkedFrom: null,
       forkCount: 0,
+      readme: null,
+      attachments: [],
+      isSkill: false,
+      useWith: "both",
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
+      isStarred: false,
+      isOwner: false,
+      isCollaborator: false,
+      canEdit: false,
     });
+  });
+
+  it("sets isOwner true only for the owner and never exposes author.email", async () => {
+    const created = await createPrompt(db, "owner@x.com", { name: "Mine", description: "d", category: "Misc", body: "x" });
+    const asowner = await getPromptDetail(db, created.id, "owner@x.com");
+    const asother = await getPromptDetail(db, created.id, "someone@x.com");
+    expect(asowner?.isOwner).toBe(true);
+    expect(asother?.isOwner).toBe(false);
+    expect(asowner?.author).not.toHaveProperty("email");
   });
 
   it("falls back to email-derived author when no user row exists", async () => {
     const { id } = await createPrompt(db, "ghost@x.com", { name: "Orphan", description: "d", category: "Misc", body: "x" });
     const detail = await getPromptDetail(db, id);
-    expect(detail?.author).toEqual({ email: "ghost@x.com", name: "ghost", image: null });
+    expect(detail?.author).toEqual({ name: "ghost", image: null, handle: null });
+  });
+
+  it("marks a prompt as a skill and filters by skillsOnly", async () => {
+    const skill = await createPrompt(db, "owner@x.com", { name: "Refactorer", description: "d", category: "Coding", body: "x", isSkill: true });
+    await createPrompt(db, "owner@x.com", { name: "Plain", description: "d", category: "Coding", body: "x" });
+    const all = await listPrompts(db, { category: "Coding" });
+    const skills = await listPrompts(db, { category: "Coding", skillsOnly: true });
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(skills.map((p) => p.id)).toEqual([skill.id]);
+    expect(skills[0].isSkill).toBe(true);
+    expect((await getPromptDetail(db, skill.id))?.isSkill).toBe(true);
+  });
+
+  it("persists useWith (default both) and filters by it (incl. 'both')", async () => {
+    const agent = await createPrompt(db, "uw@x.com", { name: "AgentOne", description: "d", category: "Coding", body: "x", useWith: "agent" });
+    const chat = await createPrompt(db, "uw@x.com", { name: "ChatOne", description: "d", category: "Coding", body: "x", useWith: "chat" });
+    const both = await createPrompt(db, "uw@x.com", { name: "BothOne", description: "d", category: "Coding", body: "x" }); // default
+    expect((await getPromptDetail(db, both.id))?.useWith).toBe("both");
+    expect((await getPromptDetail(db, agent.id))?.useWith).toBe("agent");
+
+    const forAgents = await listPrompts(db, { ownerEmail: "uw@x.com", useWith: "agent" });
+    const ids = forAgents.map((p) => p.id).sort();
+    // "agent" filter includes agent-tagged AND both-tagged, excludes chat-only.
+    expect(ids).toEqual([agent.id, both.id].sort());
+    expect(ids).not.toContain(chat.id);
+  });
+
+  it("stores and returns an explicit README (trimmed; null when blank)", async () => {
+    const withReadme = await createPrompt(db, "owner@x.com", { name: "Doc", description: "d", category: "Misc", body: "x", readme: "  # Hello\nuse me  " });
+    const blank = await createPrompt(db, "owner@x.com", { name: "NoDoc", description: "d", category: "Misc", body: "x", readme: "   " });
+    expect((await getPromptDetail(db, withReadme.id))?.readme).toBe("# Hello\nuse me");
+    expect((await getPromptDetail(db, blank.id))?.readme).toBeNull();
   });
 
   it("returns null for unknown id", async () => {

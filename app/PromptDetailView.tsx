@@ -6,9 +6,10 @@ import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
-import { applyVariables, extractVariablesFromFiles } from "@/lib/template";
+import { applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
-import { pickReadme } from "@/lib/markdown";
+import { resolveReadme } from "@/lib/markdown";
+import { attachmentKind, attachmentLabel } from "@/lib/attachments";
 import { Markdown } from "./Markdown";
 import { PromptCard } from "./components/PromptCard";
 import { SaveToCollection } from "./SaveToCollection";
@@ -21,14 +22,15 @@ import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
 import { promptStats } from "@/lib/promptStats";
-import { fileAnchorId, fileAnchorLink, parseFileAnchor } from "@/lib/fileAnchor";
+import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
-import { buildLlmLinks } from "@/lib/llmLinks";
+import { AssistantLinks } from "./components/AssistantLinks";
+import { track } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
-type Author = { email: string; name: string; image: string | null };
+type Author = { name: string; image: string | null; handle: string | null };
 type PromptFile = { path: string; content: string; language: string };
 
 export type PromptDetail = {
@@ -49,11 +51,44 @@ export type PromptDetail = {
   tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
   forkCount?: number;
+  readme?: string | null;
+  attachments?: { url: string; name?: string }[];
+  isSkill?: boolean;
+  useWith?: "chat" | "agent" | "both";
   createdAt: string;
   updatedAt?: string | null;
+  isStarred?: boolean;
+  isOwner?: boolean;
+  isCollaborator?: boolean;
+  canEdit?: boolean;
   handle?: string;
   slug?: string;
 };
+
+// Render prompt text with {{variables}} resolved to their values, and any
+// UNFILLED variable shown as a highlighted chip instead of a confusing blank.
+function PromptText({ content, values }: { content: string; values: Record<string, string> }) {
+  const tokens = tokenizeTemplate(content);
+  return (
+    <>
+      {tokens.map((t, i) => {
+        if (t.type === "text") return <span key={i}>{t.text}</span>;
+        const v = values[t.name];
+        const resolved = v !== undefined && v !== "" ? v : t.default;
+        if (resolved) return <span key={i}>{resolved}</span>;
+        return (
+          <span
+            key={i}
+            title={`Unfilled variable — set "${t.name}" in Customize above`}
+            className="inline rounded border border-amber-300/70 dark:border-amber-700/60 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1 py-0.5 text-xs font-medium align-baseline"
+          >
+            {`{{${t.name}}}`}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const { data: session } = useSession();
@@ -61,38 +96,50 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [stars, setStars] = useState(prompt.stars);
   const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
   const [counted, setCounted] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
+  const [isStarred, setIsStarred] = useState(prompt.isStarred ?? false);
   const [isPinned, setIsPinned] = useState(false);
 
   // Record a copy at most once per page view so the counter reflects users, not clicks.
   async function recordCopy() {
+    track("prompt_copy", typeof window !== "undefined" ? window.location.pathname : `/prompt/${prompt.id}`, { id: prompt.id });
     if (counted) return;
     setCounted(true);
     setCopyCount((c) => c + 1);
     fetch(`/api/prompts/${prompt.id}/copy`, { method: "POST" }).catch(() => {});
   }
   const [values, setValues] = useState<Record<string, string>>({});
-  const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id));
+  const [imgSrc, setImgSrc] = useState(promptImageSrc(prompt.image, prompt.id, prompt.category));
   const [forking, setForking] = useState(false);
   const [related, setRelated] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
   const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
+  // Which file tab is open (multi-file prompts render as tabs, not a long stack).
+  const [activeFile, setActiveFile] = useState<string | null>(null);
 
-  // On load, if the URL carries a #file=… anchor, scroll to that file and flash it.
+  // On load, if the URL carries a #file=… anchor, open that file's tab, scroll to
+  // it and flash it.
   useEffect(() => {
     const path = parseFileAnchor(window.location.hash);
     if (!path) return;
     setAnchoredFile(path);
-    const el = document.getElementById(fileAnchorId(path));
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setActiveFile(path);
+    // Only the active tab renders, so wait a frame for it to mount before scrolling.
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(fileAnchorId(path));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
     const t = setTimeout(() => setAnchoredFile(null), 2000);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
   }, []);
 
   // Record a view once per page load (soft signal, best-effort).
   useEffect(() => {
+    track("prompt_view", typeof window !== "undefined" ? window.location.pathname : `/prompt/${prompt.id}`, { id: prompt.id });
     fetch(`/api/prompts/${prompt.id}/view`, { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && typeof d.viewCount === "number" && setViewCount(d.viewCount))
@@ -136,7 +183,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   // Owners can pin a prompt to the top of their public profile.
   useEffect(() => {
-    if (session?.user?.email !== prompt.author.email) return;
+    if (!prompt.isOwner) return;
     let active = true;
     fetch("/api/pins")
       .then((r) => (r.ok ? r.json() : { pinned: [] }))
@@ -145,7 +192,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     return () => {
       active = false;
     };
-  }, [session?.user?.email, prompt.author.email, prompt.id]);
+  }, [prompt.isOwner, prompt.id]);
 
   async function togglePin() {
     const res = await fetch("/api/pins", {
@@ -180,7 +227,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const filled = useMemo(() => files.map((f) => ({ ...f, content: applyVariables(f.content, values) })), [files, values]);
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
-  const readme = useMemo(() => pickReadme(files), [files]);
+  const readme = useMemo(() => resolveReadme(prompt.readme, files), [prompt.readme, files]);
+  // Active tab for multi-file prompts (falls back to the first file).
+  const activeIdx = activeFileIndex(filled.map((f) => f.path), activeFile);
   const stats = useMemo(() => promptStats(allText), [allText]);
   const installRef = prompt.handle && prompt.slug ? `${prompt.handle}/${prompt.slug}` : null;
   const imageGen = isImagePrompt({ testedModels: prompt.testedModels, category: prompt.category });
@@ -188,7 +237,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     .map((m) => ({ modelId: m.modelId, href: imageModelHome(m.modelId) }))
     .filter((l): l is { modelId: string; href: string } => l.href !== null);
   const author = prompt.author;
-  const canEdit = session?.user?.email === author.email;
+  // Owner OR collaborator may edit. Falls back to isOwner for older payloads.
+  const canEdit = prompt.canEdit ?? !!prompt.isOwner;
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -198,7 +248,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           src={imgSrc}
           alt={prompt.name}
           className="w-full h-64 object-cover"
-          onError={() => setImgSrc(getPlaceholderImage(prompt.id))}
+          onError={() => setImgSrc(getPlaceholderImage(prompt.id, prompt.category))}
         />
       </div>
 
@@ -217,6 +267,21 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               <Link href={`/c/${encodeURIComponent(prompt.category)}`} className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
                 {prompt.category}
               </Link>
+              {prompt.isSkill && (
+                <Link href="/browse?skill=1" title="Browse all skills" className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  Skill
+                </Link>
+              )}
+              {prompt.useWith && prompt.useWith !== "both" && (
+                <Link
+                  href={`/browse?useWith=${prompt.useWith}`}
+                  title="Browse prompts best used here"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                >
+                  {prompt.useWith === "agent" ? "🤖 For coding agents" : "💬 For web chat"}
+                </Link>
+              )}
               {prompt.isPrivate && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-md">
                   Private
@@ -255,7 +320,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </div>
             )}
 
-            <Link href={prompt.handle ? `/u/${prompt.handle}` : `/user/${author.email}`} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link href={prompt.handle || author.handle ? `/u/${prompt.handle || author.handle}` : "#"} className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Avatar name={author.name} image={author.image} size={32} />
               <div>
                 <div className="flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-white">
@@ -277,6 +342,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={toggleStar}
+              aria-pressed={isStarred}
+              aria-label={isStarred ? "Unstar this prompt" : "Star this prompt"}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 isStarred
                   ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
@@ -336,7 +403,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
             <SaveToCollection promptId={prompt.id} />
 
-            {canEdit && !prompt.isPrivate && (
+            {prompt.isOwner && !prompt.isPrivate && (
               <button
                 onClick={togglePin}
                 title={isPinned ? "Unpin from your profile" : "Pin to the top of your profile"}
@@ -361,70 +428,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
         </div>
       </div>
-
-      {/* Install box */}
-      {installRef && (
-        <div className="mb-6 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-4 py-3">
-          <code className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
-          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
-        </div>
-      )}
-
-      {/* Tested Models */}
-      {prompt.testedModels.length > 0 && (
-        <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-            Tested on {prompt.testedModels.length} {prompt.testedModels.length === 1 ? "model" : "models"}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {prompt.testedModels.map((model, idx) => (
-              <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="font-medium text-gray-900 dark:text-white text-sm">{getModelName(model.modelId)}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">{getModelProvider(model.modelId)}</div>
-                {model.version && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Version: {model.version}</div>}
-                {model.notes && <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 italic">{model.notes}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Paid prompt — marketplace is in preview (no live payments yet) */}
-      {isPaid(prompt.priceCents) && (
-        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-green-800 dark:text-green-300">{formatPrice(prompt.priceCents ?? 0)}</div>
-            <div className="text-xs text-green-700/80 dark:text-green-300/70">Marketplace is in preview — payments aren’t live yet.</div>
-          </div>
-          <button
-            disabled
-            title="Payments are coming soon"
-            className="px-4 py-2 rounded-lg font-medium bg-green-600/60 text-white cursor-not-allowed"
-          >
-            Buy (coming soon)
-          </button>
-        </div>
-      )}
-
-      {/* Image-gen: quick links to each tested image model's playground */}
-      {imageGen && imageGenLinks.length > 0 && (
-        <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-300 mb-3">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Image-generation prompt — open a model to run it
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {imageGenLinks.map((l) => (
-              <a key={l.modelId} href={l.href} target="_blank" rel="noopener noreferrer"
-                className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
-                Open {getModelName(l.modelId)} ↗
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Customize panel ({{variable}} templates) */}
       {vars.length > 0 && (
@@ -453,34 +456,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         </div>
       )}
 
-      {/* Run this prompt in an assistant (text prompts only) */}
-      {!imageGen && (() => {
-        const llm = buildLlmLinks(allText);
-        return llm ? (
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400 mr-1">Run it:</span>
-            <a
-              href={llm.chatgpt}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={recordCopy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Open in ChatGPT ↗
-            </a>
-            <a
-              href={llm.claude}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={recordCopy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Open in Claude ↗
-            </a>
-          </div>
-        ) : null;
-      })()}
-
       {/* Files */}
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -495,51 +470,196 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {!prompt.isPrivate && (
-              <a
-                href={`/api/prompts/${prompt.id}/raw`}
-                target="_blank"
-                rel="noreferrer"
-                title="Plain-text version (pipe-friendly)"
-                className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-              >
-                Raw
-              </a>
+              <>
+                <a
+                  href={`/api/prompts/${prompt.id}/raw`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Plain-text version (pipe-friendly)"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  Raw
+                </a>
+                <a
+                  href={`/api/prompts/${prompt.id}/raw?format=md&download=1`}
+                  title="Download this prompt as a Markdown file"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  Download .md
+                </a>
+              </>
             )}
-            <CopyButton text={allText} label={multi ? "Copy all" : "Copy"} onCopy={recordCopy} />
+            <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} variant="primary" />
           </div>
         </div>
-        {filled.map((f) => (
-          <div
-            key={f.path}
-            id={fileAnchorId(f.path)}
-            className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
-              anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
-            }`}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
-                <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {multi && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
-                    }}
-                    title="Copy a link to this file"
-                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                  >
-                    Link
-                  </button>
-                )}
-                <CopyButton text={f.content} />
-              </div>
-            </div>
-            <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed">{f.content}</pre>
+        {/* Multi-file: tabs to browse one file at a time instead of a long scroll. */}
+        {multi && (
+          <div className="flex flex-wrap gap-1.5 overflow-x-auto" role="tablist" aria-label="Files">
+            {filled.map((f, i) => (
+              <button
+                key={f.path}
+                role="tab"
+                aria-selected={i === activeIdx}
+                onClick={() => setActiveFile(f.path)}
+                title={f.path}
+                className={`px-3 py-1 text-xs font-mono rounded-lg border whitespace-nowrap transition-colors ${
+                  i === activeIdx
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                {f.path}
+              </button>
+            ))}
           </div>
-        ))}
+        )}
+        {(() => {
+          const f = filled[activeIdx];
+          if (!f) return null;
+          return (
+            <div
+              key={f.path}
+              id={fileAnchorId(f.path)}
+              role={multi ? "tabpanel" : undefined}
+              className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
+                anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
+              }`}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {multi && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
+                      }}
+                      title="Copy a link to this file"
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      Link
+                    </button>
+                  )}
+                  <CopyButton text={f.content} label="Copy file" />
+                </div>
+              </div>
+              <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} /></pre>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Attachments — multimodal references (images, video, pdf, docs) an LLM can view */}
+      {(prompt.attachments?.length ?? 0) > 0 && (
+        <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            Attachments <span className="text-gray-400 font-normal">({prompt.attachments!.length})</span>
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {prompt.attachments!.map((a) => {
+              const kind = attachmentKind(a.url);
+              const label = attachmentLabel(a);
+              return (
+                <a
+                  key={a.url}
+                  href={a.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={label}
+                  className="group block rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                >
+                  {kind === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.url} alt={label} loading="lazy" className="h-24 w-full object-cover bg-gray-50 dark:bg-gray-900" />
+                  ) : (
+                    <div className="h-24 w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                      <span className="text-[10px] font-mono uppercase tracking-wide text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                        {kind}
+                      </span>
+                    </div>
+                  )}
+                  <div className="px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    {label}
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Run this prompt in an assistant (text prompts only) — below the prompt body */}
+      {!imageGen && (
+        <div className="mt-6">
+          <AssistantLinks text={allText} onOpen={recordCopy} />
+        </div>
+      )}
+
+      {/* Install box */}
+      {installRef && (
+        <div className="mt-6 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-4 py-3">
+          <code className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
+          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
+        </div>
+      )}
+
+      {/* Tested Models */}
+      {prompt.testedModels.length > 0 && (
+        <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            Tested on {prompt.testedModels.length} {prompt.testedModels.length === 1 ? "model" : "models"}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {prompt.testedModels.map((model, idx) => (
+              <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="font-medium text-gray-900 dark:text-white text-sm">{getModelName(model.modelId)}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{getModelProvider(model.modelId)}</div>
+                {model.version && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Version: {model.version}</div>}
+                {model.notes && <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 italic">{model.notes}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Paid prompt — marketplace is in preview (no live payments yet) */}
+      {isPaid(prompt.priceCents) && (
+        <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-green-800 dark:text-green-300">{formatPrice(prompt.priceCents ?? 0)}</div>
+            <div className="text-xs text-green-700/80 dark:text-green-300/70">Marketplace is in preview — payments aren’t live yet.</div>
+          </div>
+          <button
+            disabled
+            title="Payments are coming soon"
+            className="px-4 py-2 rounded-lg font-medium bg-green-600/60 text-white cursor-not-allowed"
+          >
+            Buy (coming soon)
+          </button>
+        </div>
+      )}
+
+      {/* Image-gen: quick links to each tested image model's playground */}
+      {imageGen && imageGenLinks.length > 0 && (
+        <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+          <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-300 mb-3">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Image-generation prompt — open a model to run it
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {imageGenLinks.map((l) => (
+              <a key={l.modelId} href={l.href} target="_blank" rel="noopener noreferrer"
+                className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+                Open {getModelName(l.modelId)} ↗
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Community-tested models — confirm/deny + add models */}
       <div className="mt-6">
@@ -593,13 +713,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Use via API */}
       {!prompt.isPrivate && <ApiSnippet promptId={prompt.id} />}
 
-      {!prompt.isPrivate && (
-        <div className="mt-4">
-          <Link href={`/compare?a=${prompt.id}`} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-            ⇄ Compare this prompt with another
-          </Link>
-        </div>
-      )}
 
       {/* Version history */}
       <VersionHistory
