@@ -31,6 +31,7 @@ export default function BrowsePage() {
   const [sort, setSort] = useState<"popular" | "recent" | "copied">("popular");
   const [imageOnly, setImageOnly] = useState(false);
   const [skillsOnly, setSkillsOnly] = useState(false);
+  const [useWith, setUseWith] = useState<"chat" | "agent" | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -74,6 +75,8 @@ export default function BrowsePage() {
     const query = params.get("q");
     if (query) setQ(query);
     if (params.get("skill") === "1") setSkillsOnly(true);
+    const uw = params.get("useWith");
+    if (uw === "chat" || uw === "agent") setUseWith(uw);
   }, []);
 
   const buildParams = useCallback(
@@ -83,13 +86,14 @@ export default function BrowsePage() {
       if (category) params.set("category", category);
       if (imageOnly) params.set("image", "1");
       if (skillsOnly) params.set("skill", "1");
+      if (useWith) params.set("useWith", useWith);
       if (tag) params.set("tag", tag);
       params.set("sort", sort);
       params.set("limit", String(PAGE_SIZE));
       if (offset) params.set("offset", String(offset));
       return params;
     },
-    [q, category, sort, imageOnly, skillsOnly, tag],
+    [q, category, sort, imageOnly, skillsOnly, useWith, tag],
   );
 
   const load = useCallback(async () => {
@@ -257,6 +261,28 @@ export default function BrowsePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Skills
+            </button>
+            <button
+              onClick={() => setUseWith((v) => (v === "agent" ? null : "agent"))}
+              title="Show prompts best used with a coding agent"
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                useWith === "agent"
+                  ? "bg-amber-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              🤖 For agents
+            </button>
+            <button
+              onClick={() => setUseWith((v) => (v === "chat" ? null : "chat"))}
+              title="Show prompts best used in a web chat"
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                useWith === "chat"
+                  ? "bg-amber-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              💬 For chat
             </button>
           </div>
 

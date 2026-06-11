@@ -12,7 +12,7 @@ type DraftFile = { path: string; content: string };
 export default function EditPromptPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [meta, setMeta] = useState({ name: "", description: "", category: "", image: "", isPrivate: false, isSkill: false });
+  const [meta, setMeta] = useState<{ name: string; description: string; category: string; image: string; isPrivate: boolean; isSkill: boolean; useWith: "chat" | "agent" | "both" }>({ name: "", description: "", category: "", image: "", isPrivate: false, isSkill: false, useWith: "both" });
   const [price, setPrice] = useState("0");
   const [shareWith, setShareWith] = useState("");
   const [collaborators, setCollaborators] = useState("");
@@ -31,7 +31,7 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
     fetch(`/api/prompts/${params.id}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((p) => {
-        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate, isSkill: !!p.isSkill });
+        setMeta({ name: p.name, description: p.description, category: p.category, image: p.image || "", isPrivate: p.isPrivate, isSkill: !!p.isSkill, useWith: p.useWith === "chat" || p.useWith === "agent" ? p.useWith : "both" });
         setPrice(((p.priceCents || 0) / 100).toString());
         setShareWith((p.sharedWith || []).join(", "));
         setCollaborators((p.collaborators || []).join(", "));
@@ -144,6 +144,29 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-2">
               <input type="checkbox" id="isSkill" checked={meta.isSkill} onChange={(e) => setMeta({ ...meta, isSkill: e.target.checked })} className="w-4 h-4" />
               <label htmlFor="isSkill" className="text-sm text-gray-700 dark:text-gray-300">This is a <strong>skill</strong> (reusable agent capability)</label>
+            </div>
+            <div>
+              <label className={label}>Best used with</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["both", "↔️ Chat & agents"],
+                  ["chat", "💬 Web chat"],
+                  ["agent", "🤖 Coding agents"],
+                ] as const).map(([val, lbl]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setMeta({ ...meta, useWith: val })}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      meta.useWith === val
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
             </div>
             <CoverImageField
               value={meta.image}

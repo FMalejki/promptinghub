@@ -23,6 +23,8 @@ export const newPromptSchema = z
     isPrivate: z.boolean().optional(),
     // Author flag: this prompt is a reusable "skill".
     isSkill: z.boolean().optional(),
+    // "Best used with": web chat, coding agent, or both.
+    useWith: z.enum(["chat", "agent", "both"]).optional(),
     testedModels: z.array(testedModelSchema).max(50).optional(),
     priceCents: z.number().int().min(0).max(1000000).optional(),
     tags: z.union([z.string().max(400), z.array(z.string().max(60)).max(50)]).optional(),
