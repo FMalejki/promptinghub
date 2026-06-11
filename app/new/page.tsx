@@ -308,18 +308,26 @@ export default function NewPromptPage() {
               Import from text — paste a prompt to auto-fill
             </summary>
             <p className="mt-3 text-xs text-blue-700/80 dark:text-blue-300/70">
-              Paste raw prompt text, or add a{" "}
-              <code className="font-mono">---</code> frontmatter block with{" "}
-              <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
-              <code className="font-mono">category</code>, <code className="font-mono">models</code>. We fill the form below — you review before publishing.
+              Paste your prompt — we&apos;ll fill in the title, category and the rest below for you to review.
             </p>
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               rows={5}
-              placeholder={"---\nname: My Prompt\ncategory: Coding\nmodels: gpt-4o\n---\nWrite a function that…"}
+              placeholder={"Paste your prompt here…\n\ne.g. You are an expert code reviewer. Review the diff I paste and flag bugs, security issues, and unclear naming…"}
               className={`${input} mt-3 font-mono text-sm`}
             />
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[11px] text-blue-700/70 dark:text-blue-300/60 hover:underline">
+                Advanced: set fields with frontmatter
+              </summary>
+              <p className="mt-1.5 text-[11px] text-blue-700/70 dark:text-blue-300/60">
+                Start with a <code className="font-mono">---</code> block to preset fields:{" "}
+                <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
+                <code className="font-mono">category</code>, <code className="font-mono">models</code> — then{" "}
+                <code className="font-mono">---</code> and your prompt.
+              </p>
+            </details>
             <button
               type="button"
               onClick={applyImport}
@@ -348,11 +356,16 @@ export default function NewPromptPage() {
             />
             <input
               type="password"
+              name="gh-pat"
               value={ghToken}
               onChange={(e) => setGhToken(e.target.value)}
               placeholder="Optional GitHub token (private repos / higher rate limit)"
               className={`${input} mt-2 font-mono text-sm`}
               autoComplete="off"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-bwignore="true"
+              data-form-type="other"
             />
             <button
               type="button"
