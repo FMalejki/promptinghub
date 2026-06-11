@@ -10,6 +10,7 @@ import { resolveSort, sortSpec } from "./sort";
 import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
 import { aggregateAttestations, type AttestationRow } from "./modelAttestations";
 import { summarizeCardAttestation, type CardAttestation } from "./attestations";
+import { escapeRegex } from "./search";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -268,7 +269,10 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     ]);
   }
   if (opts.q) {
-    const rx = { $regex: opts.q, $options: "i" };
+    // Escape so symbol queries (".*", "c++") match literally instead of acting
+    // as a raw regex. (The /api/prompts search path ranks in memory via
+    // rankBySearch and does NOT pass q here; this guards any other caller.)
+    const rx = { $regex: escapeRegex(opts.q), $options: "i" };
     orGroups.push([{ name: rx }, { description: rx }, { tags: rx }]);
   }
 
