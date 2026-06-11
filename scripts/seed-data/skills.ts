@@ -11,6 +11,8 @@ import type { SeedPrompt } from "../../lib/seed";
 // flagship skill byte-identical to docs/skills/autonomous-loop/*.
 const loopDir = join(process.cwd(), "docs/skills/autonomous-loop");
 const loopFile = (f: string) => readFileSync(join(loopDir, f), "utf8");
+const grillDir = join(process.cwd(), "docs/skills/grill-with-evidence");
+const grillFile = (f: string) => readFileSync(join(grillDir, f), "utf8");
 
 const AUTHORS = {
   maya: { authorEmail: "maya.kowalski@promptinghub.app", authorName: "Maya Kowalski" },
@@ -196,6 +198,22 @@ export const SKILLS: SeedPrompt[] = [
     files: [
       { path: "SKILL.md", content: loopFile("SKILL.md") },
       { path: "backoff.js", content: loopFile("backoff.js") },
+    ],
+  },
+  {
+    name: "Grill Me With Evidence",
+    description:
+      "Interview the user about a plan one decision at a time — every recommendation backed by verifiable evidence (file+line, log line, docs URL, git blame, web search), plus the strongest counter-argument. For high-stakes design, refactors, and PR-review prep.",
+    category: "Productivity",
+    tags: ["interview", "decision-making", "review", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "claude-3.5-sonnet", "gpt-4o"],
+    ...AUTHORS.liam,
+    readme:
+      "# Grill Me With Evidence\n\nA rigorous design interview: one decision at a time, and every recommended answer comes **with receipts** — a file path, a log line, a docs URL, a git-blame finding, or a web search — never just opinion. Use it before architecture calls, big refactors, infra deletions, or PR review. Builds on the public [mattpocock/skills — grill-me](https://github.com/mattpocock/skills).",
+    files: [
+      { path: "SKILL.md", content: grillFile("SKILL.md") },
+      { path: "examples.md", content: grillFile("examples.md") },
     ],
   },
 ];
