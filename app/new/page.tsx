@@ -9,6 +9,7 @@ import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
 import { CoverImageField } from "../components/CoverImageField";
 import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
+import { track } from "../components/AnalyticsBeacon";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -108,6 +109,7 @@ export default function NewPromptPage() {
         return;
       }
       const { draft } = await res.json();
+      track("import_click", "/new", { source: "paste" });
       setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
       if (Array.isArray(draft.testedModels)) {
@@ -138,6 +140,7 @@ export default function NewPromptPage() {
         return;
       }
       const d = data.draft;
+      track("import_click", "/new", { source: "github" });
       setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
       if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
       if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
