@@ -486,7 +486,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 </a>
               </>
             )}
-            <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} />
+            <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} variant="primary" />
           </div>
         </div>
         {/* Multi-file: tabs to browse one file at a time instead of a long scroll. */}
