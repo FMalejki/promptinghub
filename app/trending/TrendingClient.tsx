@@ -37,15 +37,6 @@ export default function TrendingPage() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">🔥 Trending</h1>
           <p className="text-gray-600 dark:text-gray-400">The most copied &amp; starred prompts</p>
-          <a
-            href="/feed.xml"
-            className="inline-flex items-center gap-1.5 mt-3 text-sm text-orange-600 dark:text-orange-400 hover:underline"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6.18 15.64a2.18 2.18 0 110 4.36 2.18 2.18 0 010-4.36zM4 4.44A15.56 15.56 0 0119.56 20h-2.83A12.73 12.73 0 004 7.27V4.44zm0 5.66a9.9 9.9 0 019.9 9.9h-2.83A7.07 7.07 0 004 12.93V10.1z" />
-            </svg>
-            RSS feed
-          </a>
         </div>
 
         {/* Time-window toggle */}

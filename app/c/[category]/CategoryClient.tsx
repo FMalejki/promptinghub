@@ -24,20 +24,8 @@ export function CategoryClient({ category }: { category: string }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link href="/categories" className="text-sm text-gray-500 dark:text-gray-400 hover:underline">← All categories</Link>
-          <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="mt-2">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{category}</h1>
-            <a
-              href={`/c/${encodeURIComponent(category)}/feed.xml`}
-              target="_blank"
-              rel="noreferrer"
-              title={`RSS feed for ${category}`}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 shrink-0"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6.18 15.64a2.18 2.18 0 012.18 2.18C8.36 19 7.38 20 6.18 20 5 20 4 19 4 17.82a2.18 2.18 0 012.18-2.18zM4 4.44A15.56 15.56 0 0119.56 20h-2.83A12.73 12.73 0 004 7.27zm0 5.66a9.9 9.9 0 019.9 9.9h-2.83A7.07 7.07 0 004 12.93z" />
-              </svg>
-              RSS
-            </a>
           </div>
           {loaded && (
             <p className="text-gray-600 dark:text-gray-400 mt-1">

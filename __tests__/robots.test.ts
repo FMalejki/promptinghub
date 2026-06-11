@@ -1,8 +1,7 @@
 import robots, { DISALLOW } from "../app/robots";
 
 // Public, indexable routes that must NEVER end up disallowed (and must not be
-// blocked by an over-broad prefix — the classic trap is "/feed" silently
-// blocking the public RSS at /feed.xml).
+// blocked by an over-broad prefix).
 const PUBLIC_ROUTES = [
   "/",
   "/browse",
@@ -11,7 +10,6 @@ const PUBLIC_ROUTES = [
   "/collections",
   "/creators",
   "/random",
-  "/feed.xml",
   "/sitemap.xml",
   "/llms.txt",
   "/p/ada/code-reviewer",

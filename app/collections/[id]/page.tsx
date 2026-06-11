@@ -106,18 +106,6 @@ export default function CollectionPage({ params }: { params: { id: string } }) {
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{collection.name}</h1>
                 {collection.description && <p className="mt-2 text-gray-600 dark:text-gray-400">{collection.description}</p>}
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-500">{collection.prompts.length} prompts</p>
-                <a
-                  href={`/collections/${params.id}/feed.xml`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="RSS feed of this collection"
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6.18 15.64a2.18 2.18 0 012.18 2.18C8.36 19 7.38 20 6.18 20 5 20 4 19 4 17.82a2.18 2.18 0 012.18-2.18zM4 4.44A15.56 15.56 0 0119.56 20h-2.83A12.73 12.73 0 004 7.27zm0 5.66a9.9 9.9 0 019.9 9.9h-2.83A7.07 7.07 0 004 12.93z" />
-                  </svg>
-                  RSS
-                </a>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
                 {!isOwner && <SubscribeButton id={params.id} />}

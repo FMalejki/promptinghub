@@ -20,7 +20,6 @@ export async function generateMetadata({ params }: { params: { handle: string } 
       description,
       openGraph: { title: branded, description, type: "profile", images: creator.image ? [{ url: creator.image }] : undefined },
       twitter: { card: "summary", title: branded, description },
-      alternates: { types: { "application/rss+xml": `/u/${creator.handle}/feed.xml` } },
     };
   } catch {
     return { title: "Creator" };
