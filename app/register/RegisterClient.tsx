@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { track } from "../components/AnalyticsBeacon";
 
 const inputClass =
   "w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
@@ -28,6 +29,7 @@ export default function RegisterPage() {
         setErr(error || "Couldn't create your account. Please try again.");
         return;
       }
+      track("signup_click", "/register");
       const r = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/browse" });
       if (r?.error) {
         // Account was created but auto sign-in failed — send them to log in.

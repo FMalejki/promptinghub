@@ -18,6 +18,7 @@ export const DISALLOW = [
   "/profile",
   "/moderation",
   "/curate",
+  "/admin",
 ];
 
 export default function robots(): MetadataRoute.Robots {

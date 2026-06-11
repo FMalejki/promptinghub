@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { buildAssistantLinks, type Assistant } from "@/lib/llmLinks";
+import { track } from "./AnalyticsBeacon";
 
 // "Run it" buttons that open a prompt in an external assistant. Every click
 // copies the prompt to the clipboard first (a robust fallback — prefill query
@@ -20,6 +21,7 @@ export function AssistantLinks({ text, onOpen }: { text: string; onOpen?: () => 
       /* clipboard may be unavailable (insecure context) — opening still works */
     }
     setCopiedId(a.id);
+    track("cta_click", typeof window !== "undefined" ? window.location.pathname : "/", { action: "open_in", assistant: a.id });
     onOpen?.();
     window.open(a.url, "_blank", "noopener,noreferrer");
     setTimeout(() => setCopiedId((c) => (c === a.id ? null : c)), 2500);

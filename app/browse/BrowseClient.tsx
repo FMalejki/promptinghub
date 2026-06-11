@@ -7,6 +7,7 @@ import { PromptOfDay } from "../components/PromptOfDay";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { hasActiveFilters } from "@/lib/browseFilters";
 import { isSearchFocusTrigger } from "@/lib/shortcuts";
+import { track } from "../components/AnalyticsBeacon";
 import Link from "next/link";
 
 type Author = { name: string; image: string | null; handle: string | null };
@@ -187,6 +188,9 @@ export default function BrowsePage() {
               placeholder="Search prompts..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && q.trim()) track("search", "/browse", { len: q.trim().length });
+              }}
               className="w-full px-6 py-4 pl-12 text-base border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 shadow-sm"
             />
             <svg

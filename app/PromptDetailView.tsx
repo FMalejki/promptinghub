@@ -25,6 +25,7 @@ import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
 import { AssistantLinks } from "./components/AssistantLinks";
+import { track } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 
@@ -100,6 +101,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   // Record a copy at most once per page view so the counter reflects users, not clicks.
   async function recordCopy() {
+    track("prompt_copy", typeof window !== "undefined" ? window.location.pathname : `/prompt/${prompt.id}`, { id: prompt.id });
     if (counted) return;
     setCounted(true);
     setCopyCount((c) => c + 1);
@@ -137,6 +139,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   // Record a view once per page load (soft signal, best-effort).
   useEffect(() => {
+    track("prompt_view", typeof window !== "undefined" ? window.location.pathname : `/prompt/${prompt.id}`, { id: prompt.id });
     fetch(`/api/prompts/${prompt.id}/view`, { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && typeof d.viewCount === "number" && setViewCount(d.viewCount))
