@@ -15,8 +15,6 @@ export const metadata = {
   description: "Discover and share AI prompts",
   alternates: {
     types: {
-      "application/rss+xml": [{ url: "/feed.xml", title: "PromptingHub — Trending prompts" }],
-      "application/feed+json": [{ url: "/feed.json", title: "PromptingHub — Trending prompts" }],
       "application/opensearchdescription+xml": [{ url: "/opensearch.xml", title: "PromptingHub" }],
     },
   },

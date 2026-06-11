@@ -40,7 +40,6 @@ export function Footer() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">Resources</h3>
             <ul className="space-y-2">
               <li><Link href="/feedback" className={col}>Send feedback</Link></li>
-              <li><a href="/feed.xml" className={col}>RSS feed</a></li>
               <li><Link href="/security-policy" className={col}>Security</Link></li>
               <li>
                 <a href="https://github.com/FMalejki/promptinghub" target="_blank" rel="noopener noreferrer" className={col}>
