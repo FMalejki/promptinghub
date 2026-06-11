@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Providers } from "./providers";
 import { Footer } from "./components/Footer";
+import { AnalyticsBeacon } from "./components/AnalyticsBeacon";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { siteJsonLd } from "@/lib/jsonLd";
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <Footer />
         </Providers>
+        <AnalyticsBeacon />
         <Analytics />
         <SpeedInsights />
       </body>
