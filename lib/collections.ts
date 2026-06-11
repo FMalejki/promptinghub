@@ -112,7 +112,7 @@ export type PublicCollection = {
   description: string;
   promptCount: number;
   cover: string | null;
-  owner: { email: string; name: string; handle: string | null };
+  owner: { name: string; handle: string | null };
   createdAt: Date;
 };
 
@@ -152,7 +152,7 @@ export async function listPublicCollections(db: Db, limit = 50): Promise<PublicC
       description: r.description || "",
       promptCount: ids.length,
       cover: collectionCover(ids.map((id: string) => ({ image: imageById.get(id) }))),
-      owner: { email: r.ownerEmail, name: u?.name || r.ownerEmail.split("@")[0], handle: u?.handle ?? null },
+      owner: { name: u?.name || r.ownerEmail.split("@")[0], handle: u?.handle ?? null },
       createdAt: r.createdAt,
     };
   });
