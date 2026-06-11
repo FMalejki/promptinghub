@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ogImagePath } from "./og";
+import { socialImageUrl } from "./og";
 
 export type PromptMetaInput = {
   name: string;
@@ -48,9 +48,11 @@ export function promptOgMetadata(input: PromptMetaInput | null, opts: PromptMeta
   const title = input.name;
   const branded = `${input.name} · PromptingHub`;
   const description = truncate(input.description, 200);
-  // Fall back to a generated OG card so every share has an image (resolved to an
-  // absolute URL by Next via metadataBase).
-  const images = [{ url: input.image || ogImagePath(input.name, input.description) }];
+  // Only use a real http(s) cover for the social card; a `data:` placeholder
+  // (or anything non-absolute) falls back to the generated /api/og PNG so the
+  // preview is never broken on Twitter/Discord/Slack. Resolved to absolute by
+  // Next via metadataBase.
+  const images = [{ url: socialImageUrl(input.image, input.name, input.description) }];
 
   const meta: Metadata = {
     title,

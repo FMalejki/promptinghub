@@ -1,4 +1,4 @@
-import { ogImagePath, ogTextParams } from "../lib/og";
+import { ogImagePath, ogTextParams, socialImageUrl } from "../lib/og";
 
 describe("ogTextParams", () => {
   it("clamps the title and subtitle lengths", () => {
@@ -18,5 +18,24 @@ describe("ogImagePath", () => {
     expect(p.startsWith("/api/og?")).toBe(true);
     expect(p).toContain("title=A+%26+B");
     expect(p).toContain("subtitle=say+hi");
+  });
+});
+
+describe("socialImageUrl", () => {
+  it("uses a real http(s) image as-is", () => {
+    expect(socialImageUrl("https://cdn.example.com/c.png", "Title")).toBe("https://cdn.example.com/c.png");
+    expect(socialImageUrl("http://x/y.jpg", "Title")).toBe("http://x/y.jpg");
+  });
+
+  it("falls back to the /api/og PNG for a data: URI placeholder", () => {
+    const out = socialImageUrl("data:image/svg+xml,%3Csvg/%3E", "My Prompt", "desc");
+    expect(out.startsWith("/api/og?")).toBe(true);
+    expect(out).toContain("title=My+Prompt");
+  });
+
+  it("falls back when the image is missing or relative", () => {
+    expect(socialImageUrl(null, "T").startsWith("/api/og?")).toBe(true);
+    expect(socialImageUrl("", "T").startsWith("/api/og?")).toBe(true);
+    expect(socialImageUrl("/static/x.png", "T").startsWith("/api/og?")).toBe(true);
   });
 });

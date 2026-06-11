@@ -44,6 +44,19 @@ describe("promptOgMetadata", () => {
     expect(url).toContain("title=Hello+World");
   });
 
+  it("does NOT use a data: URI placeholder cover for the social card (falls back to /api/og)", () => {
+    const m = promptOgMetadata({
+      name: "Hello World",
+      description: "a nice prompt",
+      image: "data:image/svg+xml,%3Csvg/%3E",
+    });
+    const url = (m.openGraph?.images as { url: string }[])?.[0]?.url;
+    expect(url.startsWith("data:")).toBe(false);
+    expect(url).toContain("/api/og?");
+    const tw = (m.twitter as { images?: string[] }).images?.[0];
+    expect(tw?.startsWith("data:")).toBe(false);
+  });
+
   it("falls back to a generic card when the prompt is missing/private", () => {
     const m = promptOgMetadata(null);
     expect(m.title).toBe("Prompt");

@@ -61,3 +61,26 @@ describe("scorePromptMatch — relevance refinements", () => {
     expect(scorePromptMatch("dog", p)).toBe(0);
   });
 });
+
+describe("scorePromptMatch — synonyms", () => {
+  it("matches a short form against the long form ('gpt' → ChatGPT)", () => {
+    const p = { id: "S1", name: "ChatGPT system prompt", description: "", tags: [] };
+    expect(scorePromptMatch("gpt", p)).toBeGreaterThan(0);
+  });
+
+  it("matches across image synonyms ('img' → image)", () => {
+    const p = { id: "S2", name: "Image generator", description: "", tags: [] };
+    expect(scorePromptMatch("img", p)).toBeGreaterThan(0);
+  });
+
+  it("ranks a direct name match above a synonym-only match", () => {
+    const direct = { id: "D", name: "gpt helper", description: "", tags: [] };
+    const synonym = { id: "Y", name: "ChatGPT helper", description: "", tags: [] };
+    expect(scorePromptMatch("gpt", direct)).toBeGreaterThan(scorePromptMatch("gpt", synonym));
+  });
+
+  it("still scores zero when neither the term nor a synonym appears", () => {
+    const p = { id: "Z", name: "Email writer", description: "general", tags: ["writing"] };
+    expect(scorePromptMatch("kubernetes", p)).toBe(0);
+  });
+});
