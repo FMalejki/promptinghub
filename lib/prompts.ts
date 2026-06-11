@@ -11,6 +11,7 @@ import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
 import { aggregateAttestations, type AttestationRow } from "./modelAttestations";
 import { summarizeCardAttestation, type CardAttestation } from "./attestations";
 import { escapeRegex } from "./search";
+import { VIEW_WINDOW_MS, COPY_WINDOW_MS, timeBucket, normalizeViewer } from "./idempotency";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -690,8 +691,32 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
  * Atomically bump a prompt's copy/usage counter and return the new total.
  * Returns null for a malformed or missing id.
  */
-export async function incrementCopyCount(db: Db, id: string): Promise<number | null> {
+export type CounterOpts = { viewer?: string; nowMs?: number };
+
+async function readCounter(db: Db, id: string, field: "copyCount" | "viewCount"): Promise<number | null> {
+  const p = await db.collection("prompts").findOne({ _id: new ObjectId(id) }, { projection: { [field]: 1 } });
+  if (!p) return null;
+  return ((p as Record<string, unknown>)[field] as number) || 0;
+}
+
+export async function incrementCopyCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
+  const viewer = normalizeViewer(opts.viewer);
+  const now = opts.nowMs ?? Date.now();
+
+  // Idempotent path: when we know the (anonymous) viewer, only count the first
+  // copy per viewer per window. An atomic upsert into the copyEvents ledger is
+  // the dedup gate — upsertedCount===0 means "already copied recently".
+  if (viewer) {
+    const bucket = timeBucket(now, COPY_WINDOW_MS);
+    const r = await db.collection("copyEvents").updateOne(
+      { promptId: id, viewer, bucket },
+      { $setOnInsert: { promptId: id, viewer, bucket, createdAt: new Date(now) } },
+      { upsert: true },
+    );
+    if (!r.upsertedCount) return readCounter(db, id, "copyCount");
+  }
+
   const res = await db.collection("prompts").findOneAndUpdate(
     { _id: new ObjectId(id) },
     { $inc: { copyCount: 1 } },
@@ -699,11 +724,14 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
   );
   const doc = (res as { value?: { copyCount?: number } } | null)?.value ?? (res as { copyCount?: number } | null);
   if (!doc || typeof doc.copyCount !== "number") return null;
-  // Log a copy event for over-time analytics (best-effort).
-  try {
-    await db.collection("copyEvents").insertOne({ promptId: id, createdAt: new Date() });
-  } catch {
-    /* analytics is best-effort */
+  // No viewer token → legacy behavior: still log a plain copy event (the deduped
+  // path above already recorded one via the upsert).
+  if (!viewer) {
+    try {
+      await db.collection("copyEvents").insertOne({ promptId: id, createdAt: new Date(now) });
+    } catch {
+      /* analytics is best-effort */
+    }
   }
   return doc.copyCount;
 }
@@ -712,8 +740,23 @@ export async function incrementCopyCount(db: Db, id: string): Promise<number | n
  * Bump a prompt's view counter and return the new total. A soft engagement
  * signal — public and not auth-gated. Returns null for a malformed/missing id.
  */
-export async function incrementViewCount(db: Db, id: string): Promise<number | null> {
+export async function incrementViewCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
+  const viewer = normalizeViewer(opts.viewer);
+  const now = opts.nowMs ?? Date.now();
+
+  // Idempotent path: a known viewer only counts once per window, so a refresh or
+  // re-open doesn't inflate views. The viewEvents upsert is the dedup gate.
+  if (viewer) {
+    const bucket = timeBucket(now, VIEW_WINDOW_MS);
+    const r = await db.collection("viewEvents").updateOne(
+      { promptId: id, viewer, bucket },
+      { $setOnInsert: { promptId: id, viewer, bucket, createdAt: new Date(now) } },
+      { upsert: true },
+    );
+    if (!r.upsertedCount) return readCounter(db, id, "viewCount");
+  }
+
   const res = await db.collection("prompts").findOneAndUpdate(
     { _id: new ObjectId(id) },
     { $inc: { viewCount: 1 } },
