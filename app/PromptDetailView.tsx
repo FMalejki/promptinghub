@@ -53,6 +53,7 @@ export type PromptDetail = {
   readme?: string | null;
   attachments?: { url: string; name?: string }[];
   isSkill?: boolean;
+  useWith?: "chat" | "agent" | "both";
   createdAt: string;
   updatedAt?: string | null;
   isStarred?: boolean;
@@ -267,6 +268,15 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 <Link href="/browse?skill=1" title="Browse all skills" className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   Skill
+                </Link>
+              )}
+              {prompt.useWith && prompt.useWith !== "both" && (
+                <Link
+                  href={`/browse?useWith=${prompt.useWith}`}
+                  title="Browse prompts best used here"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                >
+                  {prompt.useWith === "agent" ? "🤖 For coding agents" : "💬 For web chat"}
                 </Link>
               )}
               {prompt.isPrivate && (

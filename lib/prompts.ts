@@ -7,6 +7,7 @@ import { estimateTokens } from "./promptStats";
 import { canEditPrompt, isCollaborator as isCollab, type AuthzRow } from "./promptAuthz";
 import { normalizeAttachments, type Attachment } from "./attachments";
 import { resolveSort, sortSpec } from "./sort";
+import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -32,6 +33,8 @@ export type Prompt = {
   priceCents: number;
   tags: string[];
   isSkill?: boolean;
+  // "Best used with" target — optional on the card to avoid breaking producers.
+  useWith?: UseWith;
   createdAt: Date;
   tokens?: number; // rough length estimate for the card badge (optional)
 };
@@ -77,6 +80,8 @@ export type PromptDetail = {
   attachments: Attachment[];
   // Whether the author marked this as a reusable "skill".
   isSkill: boolean;
+  // "Best used with": web chat, coding agent, or both. Defaults to "both".
+  useWith: UseWith;
   createdAt: Date;
   updatedAt: Date | null;
   // Whether the viewer (if any) has starred this prompt — set from viewerEmail.
@@ -101,6 +106,7 @@ export type ListOpts = {
   model?: string;
   imageOnly?: boolean;
   skillsOnly?: boolean;
+  useWith?: string;
   tag?: string;
   ownerEmail?: string;
   sort?: "recent" | "popular" | "copied" | "trending" | "viewed";
@@ -133,6 +139,8 @@ export type NewPrompt = {
   attachments?: Attachment[];
   // Mark this prompt as a reusable "skill" (Claude/agent skill).
   isSkill?: boolean;
+  // "Best used with" target: "chat" | "agent" | "both" (default "both").
+  useWith?: UseWith;
   // Emails allowed to read a PRIVATE prompt (besides the owner). Accepts an
   // array or a comma/whitespace-separated string (from the share textarea).
   sharedWith?: string[] | string;
@@ -238,6 +246,10 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
 
   if (opts.ownerEmail) match.ownerEmail = opts.ownerEmail;
   if (opts.skillsOnly) match.isSkill = true;
+  if (opts.useWith) {
+    const f = useWithFilter(opts.useWith);
+    if (f) match.useWith = f;
+  }
   if (opts.category) match.category = opts.category;
   if (opts.model) match["testedModels.modelId"] = opts.model;
   if (opts.tag) {
@@ -299,6 +311,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     isSkill: !!r.isSkill,
+    useWith: resolveUseWith(r.useWith),
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
     author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
@@ -442,6 +455,7 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     readme: (data.readme || "").trim() || null,
     attachments: normalizeAttachments(data.attachments),
     isSkill: !!data.isSkill,
+    useWith: resolveUseWith(data.useWith),
     createdAt: new Date(),
   };
   if (files) doc.files = files;
@@ -513,6 +527,7 @@ export async function updatePrompt(
   if (data.readme !== undefined) set.readme = (data.readme || "").trim() || null;
   if (data.attachments !== undefined) set.attachments = normalizeAttachments(data.attachments);
   if (data.isSkill !== undefined) set.isSkill = !!data.isSkill;
+  if (data.useWith !== undefined) set.useWith = resolveUseWith(data.useWith);
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
@@ -631,6 +646,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     readme: row.readme ?? null,
     attachments: (row.attachments as Attachment[]) || [],
     isSkill: !!row.isSkill,
+    useWith: resolveUseWith(row.useWith),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
@@ -844,6 +860,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     readme: row.readme ?? null,
     attachments: (row.attachments as Attachment[]) || [],
     isSkill: !!row.isSkill,
+    useWith: resolveUseWith(row.useWith),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),

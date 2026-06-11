@@ -147,6 +147,7 @@ describe("getPromptDetail", () => {
       readme: null,
       attachments: [],
       isSkill: false,
+      useWith: "both",
       createdAt: new Date("2026-01-01"),
       updatedAt: null,
       isStarred: false,
@@ -180,6 +181,20 @@ describe("getPromptDetail", () => {
     expect(skills.map((p) => p.id)).toEqual([skill.id]);
     expect(skills[0].isSkill).toBe(true);
     expect((await getPromptDetail(db, skill.id))?.isSkill).toBe(true);
+  });
+
+  it("persists useWith (default both) and filters by it (incl. 'both')", async () => {
+    const agent = await createPrompt(db, "uw@x.com", { name: "AgentOne", description: "d", category: "Coding", body: "x", useWith: "agent" });
+    const chat = await createPrompt(db, "uw@x.com", { name: "ChatOne", description: "d", category: "Coding", body: "x", useWith: "chat" });
+    const both = await createPrompt(db, "uw@x.com", { name: "BothOne", description: "d", category: "Coding", body: "x" }); // default
+    expect((await getPromptDetail(db, both.id))?.useWith).toBe("both");
+    expect((await getPromptDetail(db, agent.id))?.useWith).toBe("agent");
+
+    const forAgents = await listPrompts(db, { ownerEmail: "uw@x.com", useWith: "agent" });
+    const ids = forAgents.map((p) => p.id).sort();
+    // "agent" filter includes agent-tagged AND both-tagged, excludes chat-only.
+    expect(ids).toEqual([agent.id, both.id].sort());
+    expect(ids).not.toContain(chat.id);
   });
 
   it("stores and returns an explicit README (trimmed; null when blank)", async () => {

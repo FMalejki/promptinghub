@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   const model = url.searchParams.get("model") || undefined;
   const imageOnly = url.searchParams.get("image") === "1";
   const skillsOnly = url.searchParams.get("skill") === "1";
+  const useWith = url.searchParams.get("useWith") || undefined;
   const tag = url.searchParams.get("tag") || undefined;
   // resolveSort maps aliases (top→popular, hot→trending, …) onto real keys so an
   // unrecognized ?sort= value ranks sensibly instead of silently becoming "recent".
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
     model,
     imageOnly,
     skillsOnly,
+    useWith,
     tag,
     sort,
     ownerEmail,

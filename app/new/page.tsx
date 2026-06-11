@@ -23,6 +23,7 @@ export default function NewPromptPage() {
     image: "",
     isPrivate: false,
     isSkill: false,
+    useWith: "both" as "chat" | "agent" | "both",
   });
   const [price, setPrice] = useState("0");
   const [readme, setReadme] = useState("");
@@ -500,6 +501,31 @@ export default function NewPromptPage() {
               <label htmlFor="isSkill" className="text-sm text-gray-700 dark:text-gray-300">
                 This is a <strong>skill</strong> (a reusable capability for an agent/assistant)
               </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Best used with</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["both", "↔️ Chat & agents"],
+                  ["chat", "💬 Web chat"],
+                  ["agent", "🤖 Coding agents"],
+                ] as const).map(([val, lbl]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setForm({ ...form, useWith: val })}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      form.useWith === val
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Where this prompt works best — a web chat UI, a coding agent, or both.</p>
             </div>
 
             <div className="flex items-center gap-2">
