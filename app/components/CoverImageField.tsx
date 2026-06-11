@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { isLikelyImageUrl } from "@/lib/imageUrl";
 import { ImageUploadButton } from "./ImageUploadButton";
 
-// Cover-image URL input with a "doesn't look like a direct image" warning and a
-// live thumbnail preview (hidden if the URL fails to load). Warns only — never
-// blocks submit; a placeholder is used downstream when the image is missing/bad.
+// Cover-image field: upload-from-device is the primary action; the raw URL input
+// is tucked behind a toggle so it doesn't dominate. A live thumbnail preview +
+// "doesn't look like a direct image" warning still apply to whatever URL is set
+// (uploaded or pasted). Warns only — never blocks submit.
 export function CoverImageField({
   value,
   onChange,
@@ -18,6 +19,7 @@ export function CoverImageField({
   labelClassName?: string;
 }) {
   const [broken, setBroken] = useState(false);
+  const [showUrl, setShowUrl] = useState(false);
   useEffect(() => setBroken(false), [value]);
 
   const trimmed = value.trim();
@@ -26,14 +28,34 @@ export function CoverImageField({
   return (
     <div>
       <label className={labelClassName}>Cover Image (optional)</label>
-      <input
-        type="url"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClassName}
-        placeholder="https://example.com/image.jpg  — or upload below"
-      />
       <ImageUploadButton kind="cover" onUploaded={onChange} />
+      {!showUrl ? (
+        <button
+          type="button"
+          onClick={() => setShowUrl(true)}
+          className="mt-2 block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          or paste an image URL
+        </button>
+      ) : (
+        <input
+          type="url"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${inputClassName} mt-2`}
+          placeholder="https://example.com/image.jpg"
+          autoFocus
+        />
+      )}
+      {trimmed && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="mt-2 ml-3 inline text-xs text-gray-400 hover:text-red-600"
+        >
+          remove
+        </button>
+      )}
       {trimmed && !looksOk && (
         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
           This doesn’t look like a direct image link (e.g. ending in .png/.jpg). Album or page URLs (like
