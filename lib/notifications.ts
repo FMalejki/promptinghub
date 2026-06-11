@@ -1,9 +1,9 @@
 import { Db, ObjectId } from "mongodb";
 
-export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention" | "collection" | "share";
+export type NotificationType = "follow" | "comment" | "fork" | "reply" | "mention" | "collection" | "share" | "collaborator";
 
 // Canonical list (drives the Settings toggles + mute validation).
-export const NOTIFICATION_TYPES: NotificationType[] = ["follow", "comment", "fork", "reply", "mention", "collection", "share"];
+export const NOTIFICATION_TYPES: NotificationType[] = ["follow", "comment", "fork", "reply", "mention", "collection", "share", "collaborator"];
 
 // Keep only valid, deduped notification types from arbitrary input (used when
 // saving a user's muted-types preference).

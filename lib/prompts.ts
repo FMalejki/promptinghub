@@ -171,13 +171,14 @@ export function normalizeEmails(input?: string[] | string | null): string[] {
 }
 
 // Notify users newly added to a prompt's share list (best-effort, never the owner).
-async function notifyNewlyShared(
+async function notifyNewlyAdded(
   db: Db,
   ownerEmail: string,
   promptId: string,
   promptName: string,
   prev: string[],
   next: string[],
+  type: "share" | "collaborator",
 ): Promise<void> {
   const before = new Set(prev || []);
   const added = (next || []).filter((e) => e && !before.has(e) && e !== ownerEmail);
@@ -189,7 +190,7 @@ async function notifyNewlyShared(
       added.map((email) =>
         addNotification(db, {
           recipientEmail: email,
-          type: "share",
+          type,
           actorEmail: ownerEmail,
           actorName: who,
           promptId,
@@ -500,8 +501,10 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
       /* notifications are best-effort */
     }
   }
-  // Notify anyone the prompt is shared with at creation time (best-effort).
-  await notifyNewlyShared(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[]);
+  // Notify anyone the prompt is shared with / added as a collaborator at
+  // creation time (best-effort).
+  await notifyNewlyAdded(db, ownerEmail, insertedId.toString(), data.name, [], doc.sharedWith as string[], "share");
+  await notifyNewlyAdded(db, ownerEmail, insertedId.toString(), data.name, [], doc.collaborators as string[], "collaborator");
   return {
     id: insertedId.toString(),
     name: data.name,
@@ -555,12 +558,14 @@ export async function updatePrompt(
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
+  let incomingCollaborators: string[] | undefined;
   if (isOwnerEdit) {
     if (data.isPrivate !== undefined) set.isPrivate = !!data.isPrivate;
     if (data.priceCents !== undefined) set.priceCents = data.priceCents || 0;
     incomingShared = data.sharedWith !== undefined ? normalizeEmails(data.sharedWith) : undefined;
     if (incomingShared !== undefined) set.sharedWith = incomingShared;
-    if (data.collaborators !== undefined) set.collaborators = normalizeEmails(data.collaborators);
+    incomingCollaborators = data.collaborators !== undefined ? normalizeEmails(data.collaborators) : undefined;
+    if (incomingCollaborators !== undefined) set.collaborators = incomingCollaborators;
   }
 
   // Compute the new plaintext content when a content edit is present.
@@ -598,9 +603,13 @@ export async function updatePrompt(
   // Already authorized above; scope the write by _id (the editor may be a
   // collaborator, not the owner, so we must not filter by ownerEmail here).
   const res = await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: set });
-  // Notify users newly added to the share list (best-effort; owner edits only).
+  // Notify users newly added to the share / collaborator lists (best-effort;
+  // owner edits only).
   if (res.matchedCount > 0 && incomingShared !== undefined) {
-    await notifyNewlyShared(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared);
+    await notifyNewlyAdded(db, current.ownerEmail as string, id, current.name as string, (current.sharedWith as string[]) || [], incomingShared, "share");
+  }
+  if (res.matchedCount > 0 && incomingCollaborators !== undefined) {
+    await notifyNewlyAdded(db, current.ownerEmail as string, id, current.name as string, (current.collaborators as string[]) || [], incomingCollaborators, "collaborator");
   }
   return res.matchedCount > 0;
 }
