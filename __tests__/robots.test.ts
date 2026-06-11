@@ -10,7 +10,6 @@ const PUBLIC_ROUTES = [
   "/categories",
   "/collections",
   "/creators",
-  "/compare",
   "/random",
   "/feed.xml",
   "/sitemap.xml",
