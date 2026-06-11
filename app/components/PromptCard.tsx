@@ -6,9 +6,29 @@ import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
 import { lengthLabel } from "@/lib/promptLength";
+import type { CardAttestation } from "@/lib/attestations";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
+
+// Community-attestation card badge styling per dominant verdict.
+const ATTEST_BADGE: Record<CardAttestation["verdict"], { label: string; cls: string; title: string }> = {
+  works: {
+    label: "✓ Works",
+    cls: "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30",
+    title: "Community confirms this works",
+  },
+  mixed: {
+    label: "~ Mixed",
+    cls: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30",
+    title: "Community reports mixed / partial results",
+  },
+  broken: {
+    label: "✗ Issues",
+    cls: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30",
+    title: "Community reports this doesn't work well",
+  },
+};
 
 type PromptCardProps = {
   id: string;
@@ -24,12 +44,14 @@ type PromptCardProps = {
   copyCount?: number;
   priceCents?: number;
   tokens?: number;
+  attestation?: CardAttestation | null;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
+  const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
 
   return (
     <Link
@@ -57,6 +79,15 @@ export function PromptCard({ id, name, description, category, author, image, sta
             <span className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded">
               {category}
             </span>
+            {attest && attestation && (
+              <span
+                title={`${attest.title} — ${attestation.works}✓ / ${attestation.mixed}~ / ${attestation.broken}✗ across ${attestation.models} model${attestation.models === 1 ? "" : "s"}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-semibold rounded ${attest.cls}`}
+              >
+                {attest.label}
+                <span className="tabular-nums font-normal opacity-70">{attestation.works + attestation.mixed + attestation.broken}</span>
+              </span>
+            )}
             {isSkill && (
               <span title="Marked as a reusable skill" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded">
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>

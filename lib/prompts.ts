@@ -8,6 +8,8 @@ import { canEditPrompt, isCollaborator as isCollab, type AuthzRow } from "./prom
 import { normalizeAttachments, type Attachment } from "./attachments";
 import { resolveSort, sortSpec } from "./sort";
 import { resolveUseWith, useWithFilter, type UseWith } from "./useWith";
+import { aggregateAttestations, type AttestationRow } from "./modelAttestations";
+import { summarizeCardAttestation, type CardAttestation } from "./attestations";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -37,6 +39,9 @@ export type Prompt = {
   useWith?: UseWith;
   createdAt: Date;
   tokens?: number; // rough length estimate for the card badge (optional)
+  // Compact community model-attestation signal (derived, read-only). Null/absent
+  // when there are no community votes. Optional so other card producers needn't set it.
+  attestation?: CardAttestation | null;
 };
 
 export type PromptWithBody = {
@@ -294,6 +299,19 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
   pipeline.push(
     { $lookup: { from: "users", localField: "ownerEmail", foreignField: "email", as: "u" } },
     { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+    // Community model attestations for the (single) page of cards. promptId is the
+    // string form of the prompt _id, so match on a stringified id. Project only the
+    // fields the fold needs to keep the join light.
+    { $addFields: { idStr: { $toString: "$_id" } } },
+    {
+      $lookup: {
+        from: "modelAttestations",
+        localField: "idStr",
+        foreignField: "promptId",
+        as: "atts",
+        pipeline: [{ $project: { _id: 0, modelId: 1, email: 1, vote: 1 } }],
+      },
+    },
   );
 
   const rows = await db.collection("prompts").aggregate(pipeline).toArray();
@@ -314,6 +332,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     useWith: resolveUseWith(r.useWith),
     createdAt: r.createdAt,
     tokens: estimateTokens(promptToText({ body: r.body, files: r.files })),
+    attestation: summarizeCardAttestation(aggregateAttestations((r.atts || []) as AttestationRow[])),
     author: { name: r.u?.name || r.ownerEmail.split("@")[0], image: r.u?.image ?? null, handle: r.u?.handle ?? null },
   }));
 }

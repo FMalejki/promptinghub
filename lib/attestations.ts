@@ -28,3 +28,35 @@ export function addNeutralModel(models: ModelSummary[], modelId: string): ModelS
   if (models.some((m) => m.modelId === modelId)) return models;
   return [...models, { modelId, works: 0, broken: 0, mixed: 0, youVoted: null }];
 }
+
+// Compact community-attestation signal for a prompt CARD (browse/list). Folds the
+// per-model summaries into one headline verdict + counts so a card can show e.g.
+// "✓ Works 4" without the full per-model widget. Pure → unit-testable + client-safe.
+export type CardAttestation = {
+  verdict: Vote; // dominant community verdict (works > mixed > broken on ties)
+  works: number;
+  mixed: number;
+  broken: number;
+  models: number; // how many distinct models have at least one vote
+};
+
+export function summarizeCardAttestation(summaries: ModelSummary[]): CardAttestation | null {
+  let works = 0;
+  let mixed = 0;
+  let broken = 0;
+  let models = 0;
+  for (const s of summaries) {
+    const total = s.works + s.mixed + s.broken;
+    if (total === 0) continue; // neutral/unvoted rows don't count
+    models++;
+    works += s.works;
+    mixed += s.mixed;
+    broken += s.broken;
+  }
+  if (works + mixed + broken === 0) return null; // no community signal at all
+  // Dominant verdict, ties favour the more positive outcome (works > mixed > broken).
+  let verdict: Vote = "works";
+  if (broken > works && broken > mixed) verdict = "broken";
+  else if (mixed > works && mixed >= broken) verdict = "mixed";
+  return { verdict, works, mixed, broken, models };
+}
