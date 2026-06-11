@@ -6,6 +6,7 @@ import { listPrompts, createPrompt } from "@/lib/prompts";
 import { newPromptSchema } from "@/lib/promptInput";
 import { rankBySearch } from "@/lib/search";
 import { parseLimit, parseOffset, nextOffset } from "@/lib/pagination";
+import { resolveSort } from "@/lib/sort";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -16,7 +17,9 @@ export async function GET(req: Request) {
   const imageOnly = url.searchParams.get("image") === "1";
   const skillsOnly = url.searchParams.get("skill") === "1";
   const tag = url.searchParams.get("tag") || undefined;
-  const sort = (url.searchParams.get("sort") as "recent" | "popular" | "copied" | "viewed") || "recent";
+  // resolveSort maps aliases (top→popular, hot→trending, …) onto real keys so an
+  // unrecognized ?sort= value ranks sensibly instead of silently becoming "recent".
+  const sort = resolveSort(url.searchParams.get("sort"));
   const ownerEmail = url.searchParams.get("owner") || undefined;
   const limit = parseLimit(url.searchParams.get("limit"));
   const offset = parseOffset(url.searchParams.get("offset"));

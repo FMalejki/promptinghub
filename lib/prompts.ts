@@ -6,6 +6,7 @@ import { promptToText } from "./promptText";
 import { estimateTokens } from "./promptStats";
 import { canEditPrompt, isCollaborator as isCollab, type AuthzRow } from "./promptAuthz";
 import { normalizeAttachments, type Attachment } from "./attachments";
+import { resolveSort, sortSpec } from "./sort";
 
 export type Author = { name: string; image: string | null; handle: string | null };
 
@@ -260,16 +261,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     match.$and = orGroups.map((g) => ({ $or: g }));
   }
 
-  const sortField =
-    opts.sort === "popular"
-      ? { stars: -1, createdAt: -1 }
-      : opts.sort === "copied"
-      ? { copyCount: -1, createdAt: -1 }
-      : opts.sort === "trending"
-      ? { trendingScore: -1, createdAt: -1 }
-      : opts.sort === "viewed"
-      ? { viewCount: -1, createdAt: -1 }
-      : { createdAt: -1, _id: -1 };
+  const sortField = sortSpec(resolveSort(opts.sort));
 
   const pipeline: Record<string, unknown>[] = [
     { $match: match },
