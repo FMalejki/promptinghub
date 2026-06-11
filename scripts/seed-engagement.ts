@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs";
 import { MongoClient, type Db } from "mongodb";
-import { engagementFor } from "../lib/engagementSeed";
+import { engagementFor, personaEmailSet, nonPersonaHandledSet, type SeedUser } from "../lib/engagementSeed";
 import { slugify } from "../lib/slug";
 
 try {
@@ -59,10 +59,25 @@ async function main() {
     const db = client.db(process.env.MONGODB_DB || "promptinghub");
     await ensureSeededAuthorsHaveHandles(db);
 
-    const personaEmails = (await db.collection("users").find({ handle: { $exists: true, $ne: null } }).project({ email: 1 }).toArray())
-      .map((u) => (u.email as string) || "")
-      .filter((e) => e && !JUNK.test(e));
-    console.log(`persona starrer pool: ${personaEmails.length}`);
+    // Build the persona pool from PASSWORDLESS, handled, non-junk accounts only.
+    // Real signups (alice@example.com, the dev's own account, …) have a password and
+    // are deliberately excluded — a bot starring a REAL prompt is fine, but seeding
+    // a real user's / test prompt (or using a real name as a starrer) looks fake.
+    const users = (await db.collection("users").find({}).project({ email: 1, handle: 1, password: 1, passwordHash: 1 }).toArray()).map(
+      (u: any): SeedUser => ({ email: u.email, handle: u.handle, hasPassword: !!(u.password || u.passwordHash) }),
+    );
+    const isJunk = (e: string) => JUNK.test(e);
+    const personas = personaEmailSet(users, isJunk); // bots that may star/copy
+    const nonPersonaHandled = nonPersonaHandledSet(users, isJunk); // real/test names that must never appear as starrers
+    const personaEmails = [...personas];
+    console.log(`persona pool: ${personaEmails.length} · non-persona handled (to scrub): ${nonPersonaHandled.size}`);
+
+    // Real copy counts from the copyEvents ledger, so scrubbed prompts fall back to
+    // their TRUE copies instead of an inflated seed value (never a guess).
+    const realCopies = new Map<string, number>();
+    for (const r of await db.collection("copyEvents").aggregate([{ $group: { _id: "$promptId", n: { $sum: 1 } } }]).toArray()) {
+      realCopies.set(String(r._id), r.n as number);
+    }
 
     const prompts = await db
       .collection("prompts")
@@ -70,31 +85,44 @@ async function main() {
       .project({ _id: 1, ownerEmail: 1, starredBy: 1, copyCount: 1 })
       .toArray();
 
-    let touched = 0;
+    let seeded = 0;
+    let scrubbed = 0;
     const ops: any[] = [];
     for (const p of prompts) {
       const owner = (p.ownerEmail as string) || "";
-      if (JUNK.test(owner)) continue; // don't inflate test-junk prompts
-      const pool = personaEmails.filter((e) => e !== owner); // can't star your own
-      const { starrers, copies } = engagementFor(p._id.toString(), pool);
-      if (!starrers.length && !copies) continue;
-      ops.push({
-        updateOne: {
-          filter: { _id: p._id },
-          update: [
-            {
-              $set: {
-                starredBy: { $setUnion: [{ $ifNull: ["$starredBy", []] }, starrers] },
-                copyCount: { $max: [{ $ifNull: ["$copyCount", 0] }, copies] },
-              },
-            },
-          ],
-        },
-      });
-      touched++;
+      const id = p._id.toString();
+      const existing: string[] = Array.isArray(p.starredBy) ? p.starredBy : [];
+      // Genuine human stars = anything that isn't a seed bot or a scrubbed real-name.
+      // (At launch real stars are 0, so this only ever removes seed-fakes.)
+      const genuine = existing.filter((e) => !personas.has(e) && !nonPersonaHandled.has(e));
+      const seedable = personas.has(owner); // only persona/curated content gets bot engagement
+
+      if (seedable) {
+        const pool = personaEmails.filter((e) => e !== owner); // can't star your own
+        const { starrers, copies } = engagementFor(id, pool);
+        const nextStars = [...new Set([...genuine, ...starrers])];
+        ops.push({
+          updateOne: {
+            filter: { _id: p._id },
+            update: { $set: { starredBy: nextStars, copyCount: Math.max(p.copyCount || 0, copies) } },
+          },
+        });
+        seeded++;
+      } else {
+        // Test / real-user / junk prompt → strip ALL bot stars + real-name stars and
+        // reset copies to the true ledger count. Only persists if something changes.
+        const realCp = realCopies.get(id) || 0;
+        const changed = genuine.length !== existing.length || (p.copyCount || 0) !== realCp;
+        if (changed) {
+          ops.push({
+            updateOne: { filter: { _id: p._id }, update: { $set: { starredBy: genuine, copyCount: realCp } } },
+          });
+          scrubbed++;
+        }
+      }
     }
     if (ops.length) await db.collection("prompts").bulkWrite(ops, { ordered: false });
-    console.log(`✓ engagement applied to ${touched}/${prompts.length} public prompts (idempotent, additive)`);
+    console.log(`✓ seeded ${seeded} persona prompt(s); scrubbed fake engagement from ${scrubbed} test/real prompt(s) (idempotent)`);
   } finally {
     await client.close();
   }

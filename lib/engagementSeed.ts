@@ -26,6 +26,41 @@ function mulberry32(seed: number): () => number {
 
 export type Engagement = { starrers: string[]; copies: number };
 
+// A user as far as seeding cares: who they are + whether they're a real signup.
+export type SeedUser = { email: string; handle?: string | null; hasPassword: boolean };
+
+// The persona/curated pool = the intentional "fake but realistic" community. These
+// are seed-created accounts: they have a handle, NO password (real signups always
+// set one), and aren't QA/test junk. Only these may star/copy, and only THEIR
+// prompts receive seeded engagement — a bot starring a REAL prompt is fine, but a
+// bot starring a test/real-user prompt looks fake, so those are excluded.
+export function personaEmailSet(users: SeedUser[], isJunk: (email: string) => boolean): Set<string> {
+  const out = new Set<string>();
+  for (const u of users) {
+    const email = (u.email || "").trim();
+    if (!email || isJunk(email)) continue;
+    if (u.hasPassword) continue; // real signup → never a persona
+    if (!u.handle || !u.handle.trim()) continue; // personas always have a handle
+    out.add(email);
+  }
+  return out;
+}
+
+// Real/test accounts that have a handle but are NOT personas (have a password, or
+// are junk). Their names must never appear as starrers anywhere — a real user
+// "alice" showing as having starred 14 prompts she never touched is exactly the
+// fake-looking signal we're removing.
+export function nonPersonaHandledSet(users: SeedUser[], isJunk: (email: string) => boolean): Set<string> {
+  const personas = personaEmailSet(users, isJunk);
+  const out = new Set<string>();
+  for (const u of users) {
+    const email = (u.email || "").trim();
+    if (!email || personas.has(email)) continue;
+    if (u.handle && u.handle.trim()) out.add(email);
+  }
+  return out;
+}
+
 /**
  * Deterministic engagement for one prompt. `nStars` is skewed low (rng*rng) so
  * most prompts get a few stars and a handful get many — a realistic long tail,

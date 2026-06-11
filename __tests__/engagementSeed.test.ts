@@ -1,6 +1,43 @@
-import { engagementFor } from "../lib/engagementSeed";
+import { engagementFor, personaEmailSet, nonPersonaHandledSet, type SeedUser } from "../lib/engagementSeed";
 
 const POOL = ["a@x.com", "b@x.com", "c@x.com", "d@x.com", "e@x.com", "f@x.com", "g@x.com", "h@x.com"];
+
+const isJunk = (e: string) => /(^|[+_-])(uxbot|rltest|sectest|ratetest)|wierzba@/i.test(e);
+
+const USERS: SeedUser[] = [
+  { email: "curated@promptinghub.app", handle: "curated", hasPassword: false }, // persona
+  { email: "ava@gmail.com", handle: "ava", hasPassword: false }, // persona (gmail but seed)
+  { email: "alice@example.com", handle: "alice", hasPassword: true }, // real signup → NOT persona
+  { email: "filipmalejki@gmail.com", handle: "filipmalejki", hasPassword: true }, // real → NOT persona
+  { email: "uxbot+1@example.com", handle: "uxbot-1", hasPassword: true }, // junk
+  { email: "nohandle@gmail.com", handle: null, hasPassword: false }, // no handle → not persona
+];
+
+describe("personaEmailSet", () => {
+  it("includes only passwordless, handled, non-junk accounts", () => {
+    const s = personaEmailSet(USERS, isJunk);
+    expect([...s].sort()).toEqual(["ava@gmail.com", "curated@promptinghub.app"]);
+  });
+  it("excludes real signups even when they have a handle", () => {
+    const s = personaEmailSet(USERS, isJunk);
+    expect(s.has("alice@example.com")).toBe(false);
+    expect(s.has("filipmalejki@gmail.com")).toBe(false);
+  });
+});
+
+describe("nonPersonaHandledSet", () => {
+  it("captures real/test accounts that have a handle but aren't personas", () => {
+    const s = nonPersonaHandledSet(USERS, isJunk);
+    expect(s.has("alice@example.com")).toBe(true);
+    expect(s.has("filipmalejki@gmail.com")).toBe(true);
+    expect(s.has("uxbot+1@example.com")).toBe(true);
+  });
+  it("does not include personas or handleless accounts", () => {
+    const s = nonPersonaHandledSet(USERS, isJunk);
+    expect(s.has("curated@promptinghub.app")).toBe(false);
+    expect(s.has("nohandle@gmail.com")).toBe(false);
+  });
+});
 
 describe("engagementFor", () => {
   it("is deterministic — same prompt id yields identical engagement", () => {
