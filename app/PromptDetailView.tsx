@@ -299,7 +299,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 {formatPrice(prompt.priceCents ?? 0)}
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">{prompt.name}</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3 break-words">{prompt.name}</h1>
             {installRef && <div className="text-sm font-mono text-gray-400 dark:text-gray-500 mb-2">{installRef}</div>}
             {prompt.forkedFrom && (
               <div className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-2">
@@ -608,8 +608,10 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Install box */}
       {installRef && (
         <div className="mt-6 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-4 py-3">
-          <code className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
-          <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
+          <code className="flex-1 min-w-0 text-sm font-mono text-gray-700 dark:text-gray-300 truncate">npx promptinghub add {installRef}</code>
+          <div className="shrink-0">
+            <CopyButton text={`npx promptinghub add ${installRef}`} label="Copy install" onCopy={recordCopy} />
+          </div>
         </div>
       )}
 
