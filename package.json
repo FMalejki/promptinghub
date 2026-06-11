@@ -9,7 +9,8 @@
     "test": "jest",
     "seed:prompts": "tsx scripts/seed-prompts.ts",
     "seed:skills": "tsx scripts/seed-skills.ts",
-    "seed:engagement": "tsx scripts/seed-engagement.ts"
+    "seed:engagement": "tsx scripts/seed-engagement.ts",
+    "seed:attestations": "tsx scripts/seed-attestations.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
