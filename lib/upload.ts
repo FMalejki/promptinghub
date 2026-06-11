@@ -14,6 +14,42 @@ export const IMAGE_MIME_EXT: Record<string, string> = {
 
 export type UploadCheck = { ok: true; ext: string } | { ok: false; error: string };
 
+// Vercel server uploads (file goes through our function, then to Blob) are
+// capped at 4.5 MB. Enforce it so a too-big file fails fast with a clear error
+// instead of a confusing platform 413 mid-stream.
+export const MAX_FILE_BYTES = 4.5 * 1024 * 1024; // 4.5 MB
+
+// Allow-list of binary attachment types an LLM might actually consume: docs,
+// data, common media. EXECUTABLES/SCRIPTS ARE INTENTIONALLY ABSENT — this is an
+// allow-list, so anything not here (e.g. .exe, .sh, .bat, .js, .html, .svg) is
+// rejected. SVG is excluded for the same stored-XSS reason as images.
+export const FILE_MIME_EXT: Record<string, string> = {
+  // raster images (same safe set as avatars/covers)
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  // documents & data
+  "application/pdf": "pdf",
+  "text/plain": "txt",
+  "text/markdown": "md",
+  "text/csv": "csv",
+  "text/tab-separated-values": "tsv",
+  "application/json": "json",
+  "text/yaml": "yaml",
+  "application/x-yaml": "yaml",
+  "application/zip": "zip",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  // media (LLMs accept audio/video too)
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+
 // Validate a proposed image upload by MIME type and size. Never trusts the
 // filename's extension — the content-type decides, and the size cap is hard.
 export function validateImageUpload(contentType: string | null | undefined, size: number): UploadCheck {
@@ -37,6 +73,31 @@ export function uploadObjectPath(kind: "avatar" | "cover", ext: string, rand: st
   const safeKind = kind === "avatar" ? "avatars" : "covers";
   const token = (rand || "x").replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || "x";
   return `${safeKind}/${token}.${ext}`;
+}
+
+// Validate a binary attachment upload by MIME type and size. Allow-list only —
+// executables/scripts/SVG are rejected by omission. Size cap is the Vercel
+// 4.5 MB server-upload limit. The filename's extension is never trusted.
+export function validateFileUpload(contentType: string | null | undefined, size: number): UploadCheck {
+  const type = (contentType || "").split(";")[0].trim().toLowerCase();
+  const ext = FILE_MIME_EXT[type];
+  if (!ext) {
+    return { ok: false, error: "Unsupported file type. Allowed: images, PDF, text/markdown/CSV/JSON/YAML, Office docs, zip, mp3/wav, mp4/webm." };
+  }
+  if (!Number.isFinite(size) || size <= 0) {
+    return { ok: false, error: "Empty file." };
+  }
+  if (size > MAX_FILE_BYTES) {
+    return { ok: false, error: `File too large (max ${Math.round(MAX_FILE_BYTES / (1024 * 1024) * 10) / 10} MB).` };
+  }
+  return { ok: true, ext };
+}
+
+// Object path for an uploaded attachment, scoped under attachments/.
+export function uploadFilePath(ext: string, rand: string): string {
+  const token = (rand || "x").replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || "x";
+  const safeExt = (ext || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
+  return `attachments/${token}.${safeExt}`;
 }
 
 // Resolve the Vercel Blob read-write token from env. When MULTIPLE blob stores

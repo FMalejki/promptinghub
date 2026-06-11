@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { put } from "@vercel/blob";
 import { authOptions } from "@/lib/auth";
-import { validateImageUpload, uploadObjectPath, resolveBlobToken } from "@/lib/upload";
+import { validateImageUpload, validateFileUpload, uploadObjectPath, uploadFilePath, resolveBlobToken } from "@/lib/upload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,14 +31,24 @@ export async function POST(req: Request) {
   }
 
   const file = form.get("file");
-  const kind = form.get("kind") === "avatar" ? "avatar" : "cover";
+  const kindRaw = form.get("kind");
   if (!(file instanceof Blob)) return NextResponse.json({ error: "No file provided." }, { status: 400 });
 
-  const check = validateImageUpload(file.type, file.size);
-  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 415 });
-
   const rand = (globalThis.crypto?.randomUUID?.() || `${session.user.email}-${file.size}`).replace(/-/g, "");
-  const path = uploadObjectPath(kind, check.ext, rand);
+
+  // Two modes: image (avatar/cover) and free-form binary attachment. Each has
+  // its own allow-list + path scope; attachments enforce the 4.5 MB Vercel cap.
+  let path: string;
+  if (kindRaw === "attachment") {
+    const check = validateFileUpload(file.type, file.size);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: 415 });
+    path = uploadFilePath(check.ext, rand);
+  } else {
+    const kind = kindRaw === "avatar" ? "avatar" : "cover";
+    const check = validateImageUpload(file.type, file.size);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: 415 });
+    path = uploadObjectPath(kind, check.ext, rand);
+  }
 
   try {
     const { url } = await put(path, file, {
@@ -47,7 +57,9 @@ export async function POST(req: Request) {
       addRandomSuffix: true,
       token,
     });
-    return NextResponse.json({ url });
+    // For attachments, echo back the original filename so the UI can label it.
+    const name = file instanceof File ? file.name : undefined;
+    return NextResponse.json(name ? { url, name } : { url });
   } catch {
     return NextResponse.json({ error: "Upload failed. Try again or paste a URL." }, { status: 502 });
   }
