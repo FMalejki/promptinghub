@@ -163,9 +163,9 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Preview</p>
             <div className="flex items-center gap-3">
               <Avatar name={form.name} image={form.image} size={56} />
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">{form.name || "Your Name"}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">{session?.user?.email}</div>
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-white truncate">{form.name || "Your Name"}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{session?.user?.email}</div>
               </div>
             </div>
           </div>
@@ -349,7 +349,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-3">
               <label className="block text-sm text-gray-700 dark:text-gray-300">
-                Type <span className="font-mono font-semibold">{session?.user?.email}</span> to confirm:
+                Type <span className="font-mono font-semibold break-all">{session?.user?.email}</span> to confirm:
               </label>
               <input
                 type="email"
