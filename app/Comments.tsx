@@ -8,6 +8,7 @@ import { MentionTextarea } from "./components/MentionTextarea";
 import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
+import { REACTION_EMOJIS } from "@/lib/reactionEmojis";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
@@ -20,6 +21,8 @@ type Comment = {
   likeCount?: number;
   liked?: boolean;
   mine?: boolean;
+  reactionCounts?: Record<string, number>;
+  myReactions?: string[];
 };
 
 // Render a plain-text segment with inline markdown (**bold**, *italic*, `code`).
@@ -158,6 +161,22 @@ export function Comments({ promptId }: { promptId: string }) {
     }
   }
 
+  async function toggleReaction(id: string, emoji: string) {
+    if (!session?.user?.email) {
+      router.push("/login");
+      return;
+    }
+    const res = await fetch(`/api/comments/${id}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    if (res.ok) {
+      const { counts, mine } = await res.json();
+      setComments((cs) => cs.map((c) => (c.id === id ? { ...c, reactionCounts: counts, myReactions: mine } : c)));
+    }
+  }
+
   // Group replies under their parent; the list arrives newest-first.
   const roots = sortRoots(comments.filter((c) => !c.parentId), sort);
   const repliesByParent = new Map<string, Comment[]>();
@@ -247,6 +266,50 @@ export function Comments({ promptId }: { promptId: string }) {
                 report
               </button>
             )}
+          </div>
+          {/* Emoji reactions */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {REACTION_EMOJIS.map((emoji) => {
+              const count = c.reactionCounts?.[emoji] ?? 0;
+              const reacted = c.myReactions?.includes(emoji) ?? false;
+              if (count === 0 && !reacted) return null;
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(c.id, emoji)}
+                  aria-pressed={reacted}
+                  title={reacted ? `Remove ${emoji}` : `React ${emoji}`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                    reacted
+                      ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
+                      : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  {count > 0 && <span className="tabular-nums">{count}</span>}
+                </button>
+              );
+            })}
+            <div className="relative group/react">
+              <button
+                aria-label="Add a reaction"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+              >
+                +
+              </button>
+              <div className="absolute left-0 bottom-full mb-1 hidden group-hover/react:flex gap-1 p-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-10">
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => toggleReaction(c.id, emoji)}
+                    title={`React ${emoji}`}
+                    className="w-7 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-base leading-none"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           {replyTo === c.id && (
             <div className="mt-2">
