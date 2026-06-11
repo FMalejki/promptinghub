@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
-import { ApiKeysManager } from "../ApiKeysManager";
 import { Avatar } from "../Avatar";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 
@@ -272,9 +271,6 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* API Keys */}
-        <ApiKeysManager />
-
         {/* Notifications */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notifications</h2>
@@ -318,7 +314,7 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Once you delete your account, there is no going back. This permanently removes your
-            prompts, collections, comments and API keys. Please be certain.
+            prompts, collections and comments. Please be certain.
           </p>
           {!confirmOpen ? (
             <button
