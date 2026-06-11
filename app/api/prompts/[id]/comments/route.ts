@@ -5,15 +5,25 @@ import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { addComment, listComments } from "@/lib/comments";
 import { getCommentLikes } from "@/lib/commentLikes";
+import { getCommentReactions } from "@/lib/commentReactions";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const db = await getDb();
   const session = await getServerSession(authOptions);
-  const comments = await listComments(db, params.id, session?.user?.email ?? undefined);
-  const likes = await getCommentLikes(db, comments.map((c) => c.id), session?.user?.email ?? undefined);
-  const withLikes = comments.map((c) => ({ ...c, likeCount: likes[c.id]?.count ?? 0, liked: likes[c.id]?.liked ?? false }));
-  return NextResponse.json({ comments: withLikes });
+  const viewer = session?.user?.email ?? undefined;
+  const comments = await listComments(db, params.id, viewer);
+  const ids = comments.map((c) => c.id);
+  const likes = await getCommentLikes(db, ids, viewer);
+  const reactions = await getCommentReactions(db, ids, viewer);
+  const withMeta = comments.map((c) => ({
+    ...c,
+    likeCount: likes[c.id]?.count ?? 0,
+    liked: likes[c.id]?.liked ?? false,
+    reactionCounts: reactions[c.id]?.counts ?? {},
+    myReactions: reactions[c.id]?.mine ?? [],
+  }));
+  return NextResponse.json({ comments: withMeta });
 }
 
 const bodySchema = z.object({ body: z.string().min(1).max(2000), parentId: z.string().optional() });
