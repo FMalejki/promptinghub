@@ -1,4 +1,4 @@
-import { validateImageUpload, uploadObjectPath, MAX_IMAGE_BYTES } from "../lib/upload";
+import { validateImageUpload, uploadObjectPath, resolveBlobToken, MAX_IMAGE_BYTES } from "../lib/upload";
 
 describe("validateImageUpload", () => {
   it("accepts png/jpeg/webp/gif under the size cap", () => {
@@ -35,5 +35,17 @@ describe("uploadObjectPath", () => {
   it("never produces an empty token", () => {
     expect(uploadObjectPath("avatar", "png", "")).toBe("avatars/x.png");
     expect(uploadObjectPath("avatar", "png", "!!!")).toBe("avatars/x.png");
+  });
+});
+
+describe("resolveBlobToken", () => {
+  it("prefers the public store's prefixed token (multiple stores connected)", () => {
+    expect(resolveBlobToken({ BLOB_PUBLIC_READ_WRITE_TOKEN: "pub", BLOB_READ_WRITE_TOKEN: "plain" })).toBe("pub");
+  });
+  it("falls back to the unprefixed token", () => {
+    expect(resolveBlobToken({ BLOB_READ_WRITE_TOKEN: "plain" })).toBe("plain");
+  });
+  it("returns empty string when neither is set (uploads disabled)", () => {
+    expect(resolveBlobToken({})).toBe("");
   });
 });
