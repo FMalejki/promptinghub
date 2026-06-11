@@ -2,19 +2,21 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { put } from "@vercel/blob";
 import { authOptions } from "@/lib/auth";
-import { validateImageUpload, uploadObjectPath } from "@/lib/upload";
+import { validateImageUpload, uploadObjectPath, resolveBlobToken } from "@/lib/upload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Image upload for avatars + covers. Env-gated on BLOB_READ_WRITE_TOKEN (Vercel
-// Blob) so it degrades cleanly to URL-only when storage isn't configured. Auth
-// required — never an open upload proxy. Returns { url } (public blob URL).
+// Image upload for avatars + covers. Env-gated on the Vercel Blob read-write
+// token (resolveBlobToken handles the per-store prefix when multiple stores are
+// connected) so it degrades cleanly to URL-only when storage isn't configured.
+// Auth required — never an open upload proxy. Returns { url } (public blob URL).
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  const token = resolveBlobToken();
+  if (!token) {
     return NextResponse.json(
       { error: "Uploads aren’t enabled on this instance. Paste an image URL instead.", configured: false },
       { status: 503 },
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
       access: "public",
       contentType: file.type,
       addRandomSuffix: true,
+      token,
     });
     return NextResponse.json({ url });
   } catch {
@@ -52,5 +55,5 @@ export async function POST(req: Request) {
 
 // Capability probe for the UI: is upload enabled?
 export async function GET() {
-  return NextResponse.json({ configured: !!process.env.BLOB_READ_WRITE_TOKEN });
+  return NextResponse.json({ configured: !!resolveBlobToken() });
 }

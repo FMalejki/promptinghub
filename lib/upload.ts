@@ -38,3 +38,13 @@ export function uploadObjectPath(kind: "avatar" | "cover", ext: string, rand: st
   const token = (rand || "x").replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || "x";
   return `${safeKind}/${token}.${ext}`;
 }
+
+// Resolve the Vercel Blob read-write token from env. When MULTIPLE blob stores
+// are connected to a Vercel project, the env vars get a per-store prefix — so a
+// Public store can surface as BLOB_PUBLIC_READ_WRITE_TOKEN rather than the
+// default BLOB_READ_WRITE_TOKEN. Prefer the *public* store's token (public
+// avatars/covers need public blobs), then fall back to the unprefixed name.
+// Returns "" when uploads aren't configured. `env` is injected for testability.
+export function resolveBlobToken(env: Record<string, string | undefined> = process.env): string {
+  return env.BLOB_PUBLIC_READ_WRITE_TOKEN || env.BLOB_READ_WRITE_TOKEN || "";
+}
