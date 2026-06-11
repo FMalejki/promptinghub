@@ -2,7 +2,15 @@
 // third party — safe to publish, no attribution needed; defaultSource is null
 // when seeded). Each is multi-file (SKILL.md + a helper) and isSkill=true, so the
 // /browse?skill=1 filter has real content. category MUST be in PROMPT_CATEGORIES.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { SeedPrompt } from "../../lib/seed";
+
+// Script-only module (imported solely by scripts/seed-skills.ts, never by the
+// Next app), so reading the shipped artifact files is safe and keeps the seeded
+// flagship skill byte-identical to docs/skills/autonomous-loop/*.
+const loopDir = join(process.cwd(), "docs/skills/autonomous-loop");
+const loopFile = (f: string) => readFileSync(join(loopDir, f), "utf8");
 
 const AUTHORS = {
   maya: { authorEmail: "maya.kowalski@promptinghub.app", authorName: "Maya Kowalski" },
@@ -172,6 +180,22 @@ export const SKILLS: SeedPrompt[] = [
         content:
           "## Before → after\n**Before:** 'I hope this finds you well! We're a revolutionary platform that leverages AI to synergize your workflows. Would love to hop on a call to explore synergies!'\n\n**After:**\nSubject: question about your onboarding flow\n\n> Saw your team doubled headcount this quarter — congrats. We help support teams cut first-response time ~30% without adding tools. Worth a 15-min look next week? If not you, who owns this?",
       },
+    ],
+  },
+  {
+    name: "Anti-interruption Autonomous Loop",
+    description:
+      "Run a long unattended build/QA session as a self-re-arming /loop: one bounded PR per iteration, exponential backoff when usage runs out, a clock-bounded stop, and a single end-of-run summary.",
+    category: "Coding",
+    tags: ["agent", "automation", "loop", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "claude-3.5-sonnet", "gpt-4o"],
+    ...AUTHORS.devin,
+    readme:
+      "# Anti-interruption Autonomous Loop\n\nA reusable pattern for **unattended, multi-hour** agent work (overnight builds, long QA grinds). The whole point: **never go silent**. Each iteration does one bounded unit of work and re-arms the next wake, so a stall, a rate-limit, or an idle stop can't kill the run. Includes exact, drop-in exponential-backoff math (`backoff.js`).",
+    files: [
+      { path: "SKILL.md", content: loopFile("SKILL.md") },
+      { path: "backoff.js", content: loopFile("backoff.js") },
     ],
   },
 ];
