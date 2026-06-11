@@ -137,6 +137,7 @@ export default function SettingsPage() {
     { type: "mention", label: "Mentions of you" },
     { type: "fork", label: "Forks of your prompts" },
     { type: "share", label: "Prompts shared with you" },
+    { type: "collaborator", label: "Added as a collaborator" },
     { type: "collection", label: "Updates to collections you follow" },
   ];
 

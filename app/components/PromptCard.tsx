@@ -7,6 +7,7 @@ import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
 import { lengthLabel } from "@/lib/promptLength";
 import type { CardAttestation } from "@/lib/attestations";
+import { useWithBadge, type UseWith } from "@/lib/useWith";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -45,13 +46,15 @@ type PromptCardProps = {
   priceCents?: number;
   tokens?: number;
   attestation?: CardAttestation | null;
+  useWith?: UseWith;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = lengthLabel(tokens);
   const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
+  const useWithChip = useWithBadge(useWith);
 
   return (
     <Link
@@ -86,6 +89,15 @@ export function PromptCard({ id, name, description, category, author, image, sta
               >
                 {attest.label}
                 <span className="tabular-nums font-normal opacity-70">{attestation.works + attestation.mixed + attestation.broken}</span>
+              </span>
+            )}
+            {useWithChip && (
+              <span
+                title={`Best used with ${useWithChip.label === "Chat" ? "a web chat UI" : "coding agents"}`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700/60 rounded"
+              >
+                <span aria-hidden>{useWithChip.emoji}</span>
+                {useWithChip.label}
               </span>
             )}
             {isSkill && (
