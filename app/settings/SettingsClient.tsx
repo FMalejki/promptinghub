@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
 import { ApiKeysManager } from "../ApiKeysManager";
 import { Avatar } from "../Avatar";
+import { ImageUploadButton } from "../components/ImageUploadButton";
 
 export default function SettingsPage() {
   const { status, data: session, update } = useSession();
@@ -186,7 +187,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className={label}>Profile Picture URL</label>
+              <label className={label}>Profile Picture</label>
               <input
                 type="url"
                 value={form.image}
@@ -194,8 +195,9 @@ export default function SettingsPage() {
                 className={input}
                 placeholder="https://example.com/avatar.jpg"
               />
+              <ImageUploadButton kind="avatar" onUploaded={(url) => setForm((f) => ({ ...f, image: url }))} />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Enter a URL to an image for your profile picture
+                Paste an image URL, or upload one from your device.
               </p>
             </div>
 

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { isLikelyImageUrl } from "@/lib/imageUrl";
+import { ImageUploadButton } from "./ImageUploadButton";
 
 // Cover-image URL input with a "doesn't look like a direct image" warning and a
 // live thumbnail preview (hidden if the URL fails to load). Warns only — never
@@ -24,14 +25,15 @@ export function CoverImageField({
 
   return (
     <div>
-      <label className={labelClassName}>Cover Image URL (optional)</label>
+      <label className={labelClassName}>Cover Image (optional)</label>
       <input
         type="url"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={inputClassName}
-        placeholder="https://example.com/image.jpg"
+        placeholder="https://example.com/image.jpg  — or upload below"
       />
+      <ImageUploadButton kind="cover" onUploaded={onChange} />
       {trimmed && !looksOk && (
         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
           This doesn’t look like a direct image link (e.g. ending in .png/.jpg). Album or page URLs (like
