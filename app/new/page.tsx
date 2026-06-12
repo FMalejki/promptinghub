@@ -71,6 +71,8 @@ export default function NewPromptPage() {
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
   const [ghUrl, setGhUrl] = useState("");
   const [ghToken, setGhToken] = useState("");
   const [ghImporting, setGhImporting] = useState(false);
@@ -99,6 +101,8 @@ export default function NewPromptPage() {
     if (!importText.trim()) return;
     setImporting(true);
     setError(null);
+    setImportNote(null);
+    setImportErr(null);
     try {
       const res = await fetch("/api/import", {
         method: "POST",
@@ -106,11 +110,12 @@ export default function NewPromptPage() {
         body: JSON.stringify({ text: importText, source: "paste" }),
       });
       if (!res.ok) {
-        setError("Could not parse that text.");
+        setImportErr("Could not parse that text — paste the prompt and try again.");
         return;
       }
-      const { draft } = await res.json();
+      const { draft, via } = await res.json();
       track("import_click", "/new", { source: "paste" });
+      setImportNote(via === "ai" ? "Filled in with AI — review and edit below before publishing." : "Filled in below — review and edit before publishing.");
       setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
       if (Array.isArray(draft.tags) && draft.tags.length) setTags(draft.tags.join(", "));
@@ -343,6 +348,8 @@ export default function NewPromptPage() {
             >
               {importing ? "Parsing…" : "Fill form from text"}
             </button>
+            {importNote && <p className="mt-3 text-xs text-green-400">{importNote}</p>}
+            {importErr && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{importErr}</p>}
           </details>
 
           {/* Import a whole public GitHub repo as a multi-file prompt */}
