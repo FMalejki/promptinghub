@@ -75,6 +75,7 @@ export default function NewPromptPage() {
   const [ghToken, setGhToken] = useState("");
   const [ghImporting, setGhImporting] = useState(false);
   const [ghNote, setGhNote] = useState<string | null>(null);
+  const [ghError, setGhError] = useState<string | null>(null);
 
   // Debounced check for existing prompts with a similar name (duplicate warning).
   useEffect(() => {
@@ -129,6 +130,7 @@ export default function NewPromptPage() {
     setGhImporting(true);
     setError(null);
     setGhNote(null);
+    setGhError(null);
     try {
       const res = await fetch("/api/import/github", {
         method: "POST",
@@ -137,7 +139,8 @@ export default function NewPromptPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "GitHub import failed.");
+        // Show the error right here at the import box — not only at the far bottom of the form.
+        setGhError(data.error || "GitHub import failed.");
         return;
       }
       const d = data.draft;
@@ -150,7 +153,7 @@ export default function NewPromptPage() {
       setGhUrl("");
       setGhToken("");
     } catch {
-      setError("GitHub import failed.");
+      setGhError("GitHub import failed — check the URL and your connection.");
     } finally {
       setGhImporting(false);
     }
@@ -397,6 +400,7 @@ export default function NewPromptPage() {
               {ghImporting ? "Importing…" : "Import repo"}
             </button>
             {ghNote && <p className="mt-3 text-xs text-green-400">{ghNote}</p>}
+            {ghError && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{ghError}</p>}
           </details>
 
           {/* Basic Info */}
