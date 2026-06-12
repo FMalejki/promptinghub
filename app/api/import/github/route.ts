@@ -52,7 +52,12 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as { url?: string; token?: string } | null;
   const ref: RepoRef | null = parseRepoRef(body?.url || "");
   if (!ref) return NextResponse.json({ error: "Not a valid GitHub repo URL." }, { status: 400 });
-  const token = typeof body?.token === "string" && body.token.trim() ? body.token.trim() : undefined;
+  // User-supplied token wins; otherwise fall back to a server token (GITHUB_TOKEN)
+  // so imports don't die on GitHub's 60-req/hr unauthenticated limit (Vercel's
+  // shared egress IP burns through it fast), and private repos work when the
+  // server token has access.
+  const userToken = typeof body?.token === "string" && body.token.trim() ? body.token.trim() : undefined;
+  const token = userToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || undefined;
 
   try {
     // 1) Repo meta → default branch, description, language.
