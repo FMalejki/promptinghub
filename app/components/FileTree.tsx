@@ -9,10 +9,14 @@ export function FileTree({
   paths,
   activePath,
   onSelect,
+  onDeleteFolder,
 }: {
   paths: string[];
   activePath: string | null;
   onSelect: (path: string) => void;
+  // Editor-only: when provided, each folder shows a delete control that removes
+  // the folder and every file under it. Omitted on the read-only detail view.
+  onDeleteFolder?: (dirPath: string) => void;
 }) {
   const tree = useMemo(() => buildFileTree(paths), [paths]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -28,7 +32,7 @@ export function FileTree({
   return (
     <div className="text-sm" role="tree" aria-label="Files">
       {tree.map((n) => (
-        <TreeRow key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} />
+        <TreeRow key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} />
       ))}
     </div>
   );
@@ -41,6 +45,7 @@ function TreeRow({
   toggle,
   activePath,
   onSelect,
+  onDeleteFolder,
 }: {
   node: TreeNode;
   depth: number;
@@ -48,6 +53,7 @@ function TreeRow({
   toggle: (dir: string) => void;
   activePath: string | null;
   onSelect: (path: string) => void;
+  onDeleteFolder?: (dirPath: string) => void;
 }) {
   const pad = { paddingLeft: `${depth * 12 + 8}px` };
 
@@ -55,23 +61,38 @@ function TreeRow({
     const isOpen = !collapsed.has(node.path);
     return (
       <div>
-        <button
-          type="button"
-          onClick={() => toggle(node.path)}
-          style={pad}
-          className="flex w-full items-center gap-1.5 py-1 pr-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded"
-          aria-expanded={isOpen}
-        >
-          <svg className={`w-3 h-3 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <svg className="w-3.5 h-3.5 shrink-0 text-blue-500/80" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-          </svg>
-          <span className="truncate font-medium">{node.name}</span>
-        </button>
+        <div className="group flex w-full items-center rounded hover:bg-gray-100 dark:hover:bg-gray-700/50">
+          <button
+            type="button"
+            onClick={() => toggle(node.path)}
+            style={pad}
+            className="flex flex-1 min-w-0 items-center gap-1.5 py-1 pr-1 text-left text-gray-700 dark:text-gray-300"
+            aria-expanded={isOpen}
+          >
+            <svg className={`w-3 h-3 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <svg className="w-3.5 h-3.5 shrink-0 text-blue-500/80" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+            </svg>
+            <span className="truncate font-medium">{node.name}</span>
+          </button>
+          {onDeleteFolder && (
+            <button
+              type="button"
+              onClick={() => onDeleteFolder(node.path)}
+              title={`Delete folder "${node.name}" and its files`}
+              aria-label={`Delete folder ${node.name}`}
+              className="shrink-0 px-1.5 py-1 text-gray-300 dark:text-gray-600 hover:text-red-600 dark:hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+        </div>
         {isOpen && node.children.map((c) => (
-          <TreeRow key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} />
+          <TreeRow key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} />
         ))}
       </div>
     );

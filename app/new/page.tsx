@@ -238,6 +238,19 @@ export default function NewPromptPage() {
   function removeFile(i: number) {
     setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
   }
+  // Delete a folder and every file under it. If that would empty the prompt,
+  // fall back to a single blank prompt.txt (same as "Remove all").
+  function removeFolder(dirPath: string) {
+    const prefix = dirPath.replace(/\/+$/, "") + "/";
+    const count = files.filter((f) => f.path.startsWith(prefix)).length;
+    if (!count) return;
+    if (!confirm(`Delete folder "${dirPath}" and its ${count} file${count === 1 ? "" : "s"}? This can't be undone.`)) return;
+    setFiles((cur) => {
+      const kept = cur.filter((f) => !f.path.startsWith(prefix));
+      return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
+    });
+    setActiveEditIdx(0);
+  }
   // Create a folder by adding a starter file inside it — folders here are just
   // path prefixes (e.g. "src/utils/"), so an empty one can't exist on its own.
   function addFolder() {
@@ -689,6 +702,7 @@ export default function NewPromptPage() {
                           paths={files.map((x) => x.path)}
                           activePath={f?.path ?? null}
                           onSelect={(p) => { const i = files.findIndex((x) => x.path === p); if (i >= 0) setActiveEditIdx(i); }}
+                          onDeleteFolder={removeFolder}
                         />
                       </div>
                       <div className="mt-2 flex items-center gap-3">
