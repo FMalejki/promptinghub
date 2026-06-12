@@ -12,7 +12,10 @@ export type InlineSegment =
 export type Block =
   | { type: "heading"; level: number; text: string }
   | { type: "code"; lang: string; text: string }
-  | { type: "list"; items: string[] }
+  | { type: "list"; items: string[]; ordered?: boolean }
+  | { type: "quote"; text: string }
+  | { type: "image"; alt: string; src: string }
+  | { type: "hr" }
   | { type: "paragraph"; text: string };
 
 export function pickReadme(files: { path: string; content: string }[]): string | null {
@@ -38,6 +41,8 @@ export function parseBlocks(src: string): Block[] {
   let i = 0;
   let para: string[] = [];
   let list: string[] = [];
+  let listOrdered = false;
+  let quote: string[] = [];
 
   const flushPara = () => {
     if (para.length) {
@@ -47,8 +52,15 @@ export function parseBlocks(src: string): Block[] {
   };
   const flushList = () => {
     if (list.length) {
-      blocks.push({ type: "list", items: list });
+      blocks.push(listOrdered ? { type: "list", items: list, ordered: true } : { type: "list", items: list });
       list = [];
+      listOrdered = false;
+    }
+  };
+  const flushQuote = () => {
+    if (quote.length) {
+      blocks.push({ type: "quote", text: quote.join(" ").trim() });
+      quote = [];
     }
   };
 
@@ -60,6 +72,7 @@ export function parseBlocks(src: string): Block[] {
     if (fence) {
       flushPara();
       flushList();
+      flushQuote();
       const lang = fence[1] || "";
       const buf: string[] = [];
       i++;
@@ -73,7 +86,50 @@ export function parseBlocks(src: string): Block[] {
     if (heading) {
       flushPara();
       flushList();
+      flushQuote();
       blocks.push({ type: "heading", level: heading[1].length, text: heading[2].trim() });
+      i++;
+      continue;
+    }
+
+    // Horizontal rule (---, ***, ___) — a line of 3+ of the same marker.
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      flushPara();
+      flushList();
+      flushQuote();
+      blocks.push({ type: "hr" });
+      i++;
+      continue;
+    }
+
+    // Standalone image line: ![alt](http(s)://…)
+    const img = line.trim().match(/^!\[([^\]]*)\]\((https?:\/\/[^)]+)\)$/);
+    if (img) {
+      flushPara();
+      flushList();
+      flushQuote();
+      blocks.push({ type: "image", alt: img[1].trim(), src: img[2] });
+      i++;
+      continue;
+    }
+
+    // Blockquote: one or more "> " lines collapsed into a single quote block.
+    const quoteLine = line.match(/^\s*>\s?(.*)$/);
+    if (quoteLine) {
+      flushPara();
+      flushList();
+      quote.push(quoteLine[1].trim());
+      i++;
+      continue;
+    }
+
+    const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ordered) {
+      flushPara();
+      flushQuote();
+      if (list.length && !listOrdered) flushList();
+      listOrdered = true;
+      list.push(ordered[1].trim());
       i++;
       continue;
     }
@@ -81,6 +137,8 @@ export function parseBlocks(src: string): Block[] {
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     if (bullet) {
       flushPara();
+      flushQuote();
+      if (list.length && listOrdered) flushList();
       list.push(bullet[1].trim());
       i++;
       continue;
@@ -89,16 +147,19 @@ export function parseBlocks(src: string): Block[] {
     if (line.trim() === "") {
       flushPara();
       flushList();
+      flushQuote();
       i++;
       continue;
     }
 
     flushList();
+    flushQuote();
     para.push(line.trim());
     i++;
   }
   flushPara();
   flushList();
+  flushQuote();
   return blocks;
 }
 

@@ -6,6 +6,7 @@ import { Navbar } from "../../../components/Navbar";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { CoverImageField } from "../../../components/CoverImageField";
 import { AttachmentsField, type DraftAttachment } from "../../../components/AttachmentsField";
+import { MarkdownField } from "../../../components/MarkdownField";
 
 type DraftFile = { path: string; content: string };
 
@@ -129,16 +130,13 @@ export default function EditPromptPage({ params }: { params: { id: string } }) {
             </div>
             <div>
               <label className={label} htmlFor="readme">README (optional)</label>
-              <textarea
-                id="readme"
-                className={`${input} font-mono min-h-[120px]`}
+              <MarkdownField
                 value={readme}
-                onChange={(e) => setReadme(e.target.value)}
-                rows={6}
-                maxLength={20000}
+                onChange={setReadme}
+                inputClassName={input}
                 placeholder={"# How to use this prompt\n\nMarkdown supported."}
               />
-              <p className="mt-1 text-xs text-gray-400">Shown at the top of the prompt page. Markdown supported.</p>
+              <p className="mt-1 text-xs text-gray-400">Shown at the top of the prompt page. Markdown supported — hit <span className="font-medium">Preview</span> to see it rendered.</p>
             </div>
             <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
             <div className="flex items-center gap-2">

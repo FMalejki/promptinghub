@@ -52,6 +52,40 @@ describe("parseBlocks", () => {
       { type: "paragraph", text: "second para" },
     ]);
   });
+  it("keeps bullet lists in their original shape (no ordered key)", () => {
+    expect(parseBlocks("- a\n- b")).toEqual([{ type: "list", items: ["a", "b"] }]);
+  });
+  it("parses ordered (numbered) lists with an ordered flag", () => {
+    expect(parseBlocks("1. first\n2. second\n3. third")).toEqual([
+      { type: "list", ordered: true, items: ["first", "second", "third"] },
+    ]);
+  });
+  it("splits an ordered list and a following bullet list into two blocks", () => {
+    const b = parseBlocks("1. one\n2. two\n\n- a\n- b");
+    expect(b).toEqual([
+      { type: "list", ordered: true, items: ["one", "two"] },
+      { type: "list", items: ["a", "b"] },
+    ]);
+  });
+  it("parses a blockquote, collapsing consecutive > lines", () => {
+    expect(parseBlocks("> quoted line\n> still quoted")).toEqual([
+      { type: "quote", text: "quoted line still quoted" },
+    ]);
+  });
+  it("parses horizontal rules (---, ***, ___)", () => {
+    expect(parseBlocks("---")).toEqual([{ type: "hr" }]);
+    expect(parseBlocks("***")).toEqual([{ type: "hr" }]);
+    expect(parseBlocks("___")).toEqual([{ type: "hr" }]);
+  });
+  it("parses a standalone http(s) image line", () => {
+    expect(parseBlocks("![logo](https://x.com/a.png)")).toEqual([
+      { type: "image", alt: "logo", src: "https://x.com/a.png" },
+    ]);
+  });
+  it("does not treat a non-http image as a block image", () => {
+    const b = parseBlocks("![x](/local.png)");
+    expect(b[0].type).not.toBe("image");
+  });
 });
 
 describe("parseInline", () => {

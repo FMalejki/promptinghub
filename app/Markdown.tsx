@@ -49,14 +49,24 @@ export function Markdown({ src }: { src: string }) {
               <code className="text-sm font-mono text-gray-100">{b.text}</code>
             </pre>
           );
-        if (b.type === "list")
-          return (
-            <ul key={i} className="my-3 ml-5 list-disc space-y-1">
-              {b.items.map((it, j) => (
-                <li key={j}><Inline text={it} /></li>
-              ))}
-            </ul>
+        if (b.type === "list") {
+          const items = b.items.map((it, j) => <li key={j}><Inline text={it} /></li>);
+          return b.ordered ? (
+            <ol key={i} className="my-3 ml-5 list-decimal space-y-1">{items}</ol>
+          ) : (
+            <ul key={i} className="my-3 ml-5 list-disc space-y-1">{items}</ul>
           );
+        }
+        if (b.type === "quote")
+          return (
+            <blockquote key={i} className="my-3 border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400">
+              <Inline text={b.text} />
+            </blockquote>
+          );
+        if (b.type === "hr") return <hr key={i} className="my-5 border-gray-200 dark:border-gray-700" />;
+        if (b.type === "image")
+          // eslint-disable-next-line @next/next/no-img-element
+          return <img key={i} src={b.src} alt={b.alt} className="my-3 max-w-full rounded-lg border border-gray-200 dark:border-gray-700" loading="lazy" />;
         return <p key={i} className="my-3"><Inline text={b.text} /></p>;
       })}
     </div>
