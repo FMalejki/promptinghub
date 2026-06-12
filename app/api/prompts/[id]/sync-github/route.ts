@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { updatePrompt } from "@/lib/prompts";
 import { parseRepoRef } from "@/lib/githubImport";
 import { importRepo, serverGithubToken } from "@/lib/githubFetch";
+import { enforceRateLimit, MIN } from "@/lib/apiRateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Sync also fans out to GitHub — throttle per user.
+  const limited = await enforceRateLimit(req, "gh-sync", 20, 10 * MIN, email);
+  if (limited) return limited;
 
   const { id } = params;
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Not found." }, { status: 404 });

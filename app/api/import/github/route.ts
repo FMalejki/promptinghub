@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { parseRepoRef, type RepoRef } from "@/lib/githubImport";
 import { importRepo, serverGithubToken } from "@/lib/githubFetch";
+import { enforceRateLimit, MIN } from "@/lib/apiRateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,11 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Each import fans out to many GitHub API + raw fetches — throttle hard so it
+  // can't be used to hammer GitHub (or our own functions) through us.
+  const limited = await enforceRateLimit(req, "gh-import", 15, 10 * MIN, session.user.email);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => null)) as { url?: string; token?: string } | null;
   const ref: RepoRef | null = parseRepoRef(body?.url || "");

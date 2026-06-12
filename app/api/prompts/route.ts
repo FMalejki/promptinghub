@@ -7,6 +7,7 @@ import { newPromptSchema } from "@/lib/promptInput";
 import { rankBySearch } from "@/lib/search";
 import { parseLimit, parseOffset, nextOffset } from "@/lib/pagination";
 import { resolveSort } from "@/lib/sort";
+import { enforceRateLimit, MIN } from "@/lib/apiRateLimit";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -56,6 +57,9 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Throttle prompt creation to curb spam/flooding (per signed-in user).
+  const limited = await enforceRateLimit(req, "prompt-create", 30, 10 * MIN, email);
+  if (limited) return limited;
   const parsed = newPromptSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   try {
