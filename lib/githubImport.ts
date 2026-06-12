@@ -96,7 +96,10 @@ export function isImportablePath(path: string): boolean {
 
 export type TreeBlob = { path: string; size: number };
 export type ImportCaps = { maxFiles: number; maxFileBytes: number; maxTotalBytes: number };
-export const DEFAULT_CAPS: ImportCaps = { maxFiles: 40, maxFileBytes: 96 * 1024, maxTotalBytes: 1_500_000 };
+// Generous enough that ordinary repos/skills import whole (the old maxFiles:40
+// truncated real repos). The total-bytes guard is the real safety limit — it keeps
+// the resulting single prompt doc well under Mongo's 16 MB ceiling.
+export const DEFAULT_CAPS: ImportCaps = { maxFiles: 500, maxFileBytes: 128 * 1024, maxTotalBytes: 4_000_000 };
 
 export type Selection = { selected: TreeBlob[]; skipped: number; truncated: boolean };
 
