@@ -5,7 +5,7 @@ import { Avatar } from "../Avatar";
 import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
-import { lengthLabel } from "@/lib/promptLength";
+import { cardLengthBadge } from "@/lib/promptLength";
 import type { CardAttestation } from "@/lib/attestations";
 import { useWithBadge, type UseWith } from "@/lib/useWith";
 
@@ -52,7 +52,7 @@ type PromptCardProps = {
 export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
-  const length = lengthLabel(tokens);
+  const length = cardLengthBadge(tokens);
   const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
   const useWithChip = useWithBadge(useWith);
 

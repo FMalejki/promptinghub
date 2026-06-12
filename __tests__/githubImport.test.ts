@@ -68,6 +68,14 @@ describe("selectFiles", () => {
     const sel = selectFiles([{ path: "big.ts", size: 999999 }], { ...DEFAULT_CAPS, maxFileBytes: 1000 });
     expect(sel.selected).toHaveLength(0);
   });
+  it("imports a realistic repo (74 small text files) fully under the default caps", () => {
+    // Owner hit truncation on a ~74-file repo with the old maxFiles:40 cap. The
+    // default caps must be generous enough that ordinary repos import whole.
+    const many: TreeBlob[] = Array.from({ length: 74 }, (_, i) => ({ path: `src/file-${i}.ts`, size: 1200 }));
+    const sel = selectFiles(many);
+    expect(sel.selected).toHaveLength(74);
+    expect(sel.truncated).toBe(false);
+  });
 });
 
 describe("buildDraft", () => {
