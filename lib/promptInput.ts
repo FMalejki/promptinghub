@@ -2,7 +2,9 @@ import { z } from "zod";
 
 const fileSchema = z.object({
   path: z.string().min(1).max(200),
-  content: z.string().max(50000),
+  // Matches the GitHub importer's per-file cap (128 KB); generous headroom so
+  // imported source files aren't rejected at publish time.
+  content: z.string().max(200000),
   language: z.string().max(40).optional(),
 });
 
@@ -18,7 +20,7 @@ export const newPromptSchema = z
     description: z.string().min(1).max(300),
     category: z.string().min(1).max(40),
     body: z.string().max(50000).optional(),
-    files: z.array(fileSchema).max(50).optional(),
+    files: z.array(fileSchema).max(500).optional(),
     image: z.string().url().or(z.literal("")).optional(),
     isPrivate: z.boolean().optional(),
     // Author flag: this prompt is a reusable "skill".
