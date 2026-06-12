@@ -44,4 +44,20 @@ describe("topTags", () => {
     await createPrompt(db, "a@x.com", { name: "no tags", description: "d", category: "Writing", body: "x" });
     expect(await topTags(db)).toEqual([]);
   });
+
+  it("paginates with offset (stable rank order across pages)", async () => {
+    // Five tags with strictly descending usage so the rank order is deterministic.
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j <= i; j++) {
+        await createPrompt(db, "a@x.com", { name: `p${i}-${j}`, description: "d", category: "Writing", body: "x", tags: [`tag${4 - i}`] });
+      }
+    }
+    // tag0 used 5×, tag1 4×, …, tag4 1×.
+    const page1 = await topTags(db, 2, 0);
+    const page2 = await topTags(db, 2, 2);
+    const page3 = await topTags(db, 2, 4);
+    expect(page1.map((t) => t.tag)).toEqual(["tag0", "tag1"]);
+    expect(page2.map((t) => t.tag)).toEqual(["tag2", "tag3"]);
+    expect(page3.map((t) => t.tag)).toEqual(["tag4"]);
+  });
 });
