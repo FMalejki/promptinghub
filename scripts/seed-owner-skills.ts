@@ -100,6 +100,78 @@ const OWNER_SKILLS: SeedPrompt[] = [
       },
     ],
   },
+  {
+    name: "Audit & Prune Unused Agent Tooling",
+    description:
+      "Track which installed skills, MCP servers, and subagents your agent actually USES per session, produce a periodic report of never-used ones, and rank tools by context cost so you can archive the dead weight reversibly.",
+    category: "Productivity",
+    tags: ["agents", "mcp", "context", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "gpt-4o", "gemini-2.5-pro"],
+    readme:
+      "# Audit & Prune Unused Agent Tooling\n\nEvery installed skill, MCP server, and subagent adds tool definitions to your agent's context on every session — whether or not you ever use it. Over time that's a silent tax on speed and cost. This skill tracks installed-vs-actually-used and tells you what to remove.",
+    files: [
+      {
+        path: "SKILL.md",
+        content:
+          "# Skill: Audit & Prune Unused Agent Tooling\n\nKeep the agent's tool surface lean by measuring what is actually used and archiving the rest — reversibly.\n\n## Instrument (two hooks)\n- **On every tool call** (post-tool hook): append one line — `{session, tool, server}` — to a usage log.\n- **On session start**: snapshot the installed inventory (skills, MCP servers, subagents, memory entries) to an inventory log.\n\n## Report (periodically)\nJoin the two logs and emit a report with removal candidates:\n1. **Skills** installed but never invoked in the window.\n2. **MCP servers** configured but never called.\n3. **Subagents** installed but never spawned.\n4. **Stale memory** entries untouched for > N days.\n\n## Rank by context cost\nFor each MCP server / connector seen: `est_tokens ≈ tool_count × ~200`. Rank by `est_tokens × (1 / usage_rate)` — the expensive-and-unused ones float to the top. Also flag:\n- **Duplicate scopes** — the same coverage registered under two ids (pick one, disconnect the other).\n- **Zero-use non-essentials** — no calls in the window and not marked essential → top removal candidates.\n\n## Apply — reversibly\nArchive (don't delete) each removed item into an `archived/` area with a manifest recording what/when/where-to-restore. Offer `--dry-run`, `--semi-auto` (low-risk only), `--interactive`, and `--restore <name>`. Never touch the live MCP config automatically — surface those for manual disable.\n\n## Why\nUnused tools don't just sit there — they crowd context every single session. Measuring usage turns 'I think I need all this' into a ranked, reversible cleanup.",
+      },
+    ],
+  },
+  {
+    name: "Auto-Extract Lessons from Each Session",
+    description:
+      "On session end, distill the durable lessons from the transcript into your project's long-term memory automatically — so the next session starts smarter instead of relearning what already went wrong.",
+    category: "Productivity",
+    tags: ["agents", "memory", "workflow", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "gpt-4o", "o3-mini"],
+    readme:
+      "# Auto-Extract Lessons from Each Session\n\nThe knowledge an agent earns in a session — a gotcha, a corrected assumption, a preference the user stated — evaporates when the session ends. This skill captures it on the way out, as structured memory, with zero manual effort.",
+    files: [
+      {
+        path: "SKILL.md",
+        content:
+          "# Skill: Auto-Extract Lessons from Each Session\n\nAt session end, mine the transcript for durable lessons and append them to per-project memory — detached so it never blocks exit.\n\n## When to run\nA session-end hook. Gate hard to avoid noise:\n- Skip if the project has no memory store.\n- Skip if the transcript is tiny (< ~20 turns — nothing learned) or enormous (cap the byte size).\n- Skip if THIS run is the extractor itself re-firing (guard with an env flag) so it can't recurse.\n\n## What to extract\nOnly things that change FUTURE behavior:\n- A correction the user made ('don't do X, do Y') + the why.\n- A non-obvious fact about the system that cost time to discover.\n- A stated preference or constraint not visible in the code.\nSkip restating the code, the git history, or one-off conversational detail.\n\n## Shape\nOne lesson = one small memory entry: a one-line summary, then **Why** and **How to apply**. Dedupe against existing entries — update the matching one instead of creating a near-duplicate.\n\n## Why\nAgents that don't capture lessons relearn the same mistakes every session. A 10-second end-of-session distillation compounds into an agent that actually gets better at YOUR project over time.",
+      },
+    ],
+  },
+  {
+    name: "Guardrails: Block Destructive Commands Unattended",
+    description:
+      "A pre-execution gate that denies the handful of commands that are almost always a mistake when an agent runs unattended — force-push to main, hard-reset to origin, rm -rf / — while leaving their legitimate variants alone.",
+    category: "Coding",
+    tags: ["safety", "devops", "agents", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "gpt-4o", "gemini-2.0-flash"],
+    readme:
+      "# Guardrails: Block Destructive Commands Unattended\n\nAn autonomous agent with shell access is one bad command away from an unrecoverable mess. This skill is a narrow, surgical pre-execution check: it blocks only the almost-always-wrong commands and stays silent on everything else, so it protects without getting in the way.",
+    files: [
+      {
+        path: "SKILL.md",
+        content:
+          "# Skill: Guardrails — Block Destructive Commands Unattended\n\nBefore a shell command runs, inspect it and DENY the small set that is almost never right to run unattended. Stay silent (allow) on everything else — a guardrail that cries wolf gets disabled.\n\n## Block (deny + explain)\n- `git push --force` / `-f` to **main/master** on any remote.\n- `git reset --hard origin/main` (or master).\n- `git push --no-verify`.\n- `rm -rf /` (or `~` / `$HOME`) at top level.\n- `chmod -R 777` on `$HOME`.\nTolerate an explicit `-C <dir>` between `git` and the subcommand so the rules don't miss that form.\n\n## Do NOT block (intentional)\n- Force-push on a **feature branch** (normal during rebase).\n- `rm -rf` inside a project subdir (normal cleanup).\n- Destructive ops inside a sandbox/worktree dir (isolated by definition).\n\n## How\nMatch the normalized command; on a hit, return a deny decision with a one-line reason and log it. No match → exit silently so the normal permission flow continues.\n\n## Why\nYou want autonomy without catastrophe. Blocking five specific footguns — and nothing else — buys most of the safety with almost none of the friction.",
+      },
+    ],
+  },
+  {
+    name: "Size the Compaction Window to the Model",
+    description:
+      "Set your agent's auto-compaction threshold as a fraction of the ACTIVE model's context window at session start — big-context models compact later, small ones sooner — instead of one fixed number that's wrong for half your models.",
+    category: "Productivity",
+    tags: ["agents", "context", "configuration", "skill"],
+    isSkill: true,
+    testedModels: ["claude-3.7-sonnet", "gpt-4o", "gemini-2.5-pro"],
+    readme:
+      "# Size the Compaction Window to the Model\n\nA fixed auto-compaction threshold is wrong for half your models: too eager on a large-context model (you compact away useful history), too late on a small one (you overflow). This skill makes the threshold track the model you're actually running.",
+    files: [
+      {
+        path: "SKILL.md",
+        content:
+          "# Skill: Size the Compaction Window to the Model\n\nAt session start, set the auto-compaction threshold to a fixed FRACTION (~50%) of the active model's context window, not a hard-coded constant.\n\n## How\n1. On session start, read the active model id/name from the session payload.\n2. Map it to its context window (e.g. a 1M-context variant → much larger than a standard one).\n3. Set the compaction threshold to ~50% of that window. Unknown model → leave the setting untouched and just log it.\n4. Write the value before the session does real work, so it's correct from the first turn.\n\n## Why ~50%\nIt leaves head-room to both keep recent context AND fit the running summary, on whatever model is loaded. Tune the fraction to taste — the point is that it SCALES with the window instead of being a single number that's wrong half the time.\n\n## Why\nModels you switch between can differ 10× in context size. One static threshold can't serve them all; a proportional one does.",
+      },
+    ],
+  },
 ];
 
 async function main() {
