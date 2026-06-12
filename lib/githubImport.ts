@@ -37,37 +37,22 @@ export function parseRepoRef(input: string): RepoRef | null {
   return { owner, repo };
 }
 
-// Allowlist of text/source extensions worth importing as prompt files.
-const TEXT_EXT = new Set([
-  "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "kts",
-  "swift", "c", "h", "cc", "cpp", "hpp", "cs", "php", "sh", "bash", "zsh", "fish",
-  "sql", "graphql", "gql", "proto", "yaml", "yml", "toml", "ini", "cfg", "conf",
-  "json", "jsonc", "md", "mdx", "markdown", "txt", "rst", "html", "htm", "css",
-  "scss", "sass", "less", "vue", "svelte", "astro", "tf", "tfvars", "hcl", "r",
-  "jl", "lua", "pl", "pm", "ex", "exs", "erl", "clj", "cljs", "scala", "dart",
-  "gradle", "groovy", "xml", "csv", "tsv", "env", "example", "lock", "properties",
-  "make", "mk", "cmake", "nix", "vim", "el", "tex", "bib", "ipynb",
-]);
-
-// Files with no/odd extension that are still worth importing.
-const SPECIAL_NAMES = new Set([
-  "dockerfile", "makefile", "readme", "license", "licence", "changelog",
-  "contributing", ".gitignore", ".dockerignore", ".env.example", ".editorconfig",
-  ".eslintrc", ".prettierrc", ".npmrc", "procfile", "rakefile", "gemfile", "brewfile",
-]);
-
 const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", "out", "vendor", "coverage",
   ".venv", "venv", "__pycache__", "target", ".turbo", "bin", "obj", ".cache",
   ".idea", ".vscode", "tmp", "temp", ".gradle", "pkg", ".terraform",
 ]);
 
-// Definitely-binary or noise extensions we never import.
+// Definitely-binary or noise extensions we never import. Everything NOT on this
+// list (and not in a skip dir) is treated as importable text — the route layer's
+// null-byte guard drops anything that turns out to be binary at fetch time.
 const BINARY_EXT = new Set([
-  "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "tiff", "svg", "pdf", "zip",
-  "gz", "tgz", "tar", "rar", "7z", "woff", "woff2", "ttf", "otf", "eot", "mp4",
-  "mp3", "wav", "mov", "avi", "webm", "wasm", "so", "dll", "dylib", "exe", "bin",
-  "class", "jar", "o", "a", "node", "pyc", "min.js", "min.css", "map",
+  "png", "jpg", "jpeg", "gif", "webp", "ico", "icns", "bmp", "tiff", "heic", "heif",
+  "avif", "jfif", "psd", "ai", "xcf", "sketch", "fig", "svg", "pdf", "zip", "gz",
+  "tgz", "bz2", "xz", "tar", "rar", "7z", "woff", "woff2", "ttf", "ttc", "otf",
+  "eot", "mp4", "mp3", "wav", "flac", "ogg", "mov", "avi", "mkv", "webm", "wasm",
+  "so", "dll", "dylib", "exe", "bin", "dat", "db", "sqlite", "class", "jar", "o",
+  "a", "node", "pyc", "pyo", "glb", "gltf", "fbx", "stl", "blend", "map",
 ]);
 
 function basename(path: string): string {
@@ -89,9 +74,10 @@ export function isImportablePath(path: string): boolean {
   if (name.endsWith(".min.js") || name.endsWith(".min.css")) return false;
   const ext = extOf(name);
   if (ext && BINARY_EXT.has(ext)) return false;
-  if (SPECIAL_NAMES.has(name)) return true;
-  if (!ext) return false; // unknown, no extension, not special → skip
-  return TEXT_EXT.has(ext);
+  // Permissive by design: anything that isn't in a skip dir and isn't a known
+  // binary is importable text — including unknown/no extension (configs, dotfiles,
+  // scripts). The route's null-byte guard drops anything binary at fetch time.
+  return true;
 }
 
 export type TreeBlob = { path: string; size: number };

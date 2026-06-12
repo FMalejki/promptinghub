@@ -359,7 +359,7 @@ export default function NewPromptPage() {
               Import from GitHub — paste a public repo URL
             </summary>
             <p className="mt-3 text-xs text-gray-400">
-              Pulls the repo&apos;s text/source files into a multi-file prompt (skips binaries &amp; build dirs; up to 40 files / 1.5 MB). Review before publishing.
+              Pulls the repo&apos;s files into a multi-file prompt, keeping the folder structure (skips binaries &amp; build dirs; up to 500 files / 4 MB). Review before publishing.
             </p>
             <input
               type="text"
@@ -608,7 +608,21 @@ export default function NewPromptPage() {
 
           {/* Prompt Files */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Prompt Files</h2>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Prompt Files
+                {files.length > 1 && <span className="ml-2 text-sm font-normal text-gray-400">{files.length} files</span>}
+              </h2>
+              {files.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => { if (confirm(`Remove all ${files.length} files?`)) setFiles([{ path: "prompt.txt", content: "" }]); }}
+                  className="shrink-0 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                >
+                  Remove all
+                </button>
+              )}
+            </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               A prompt can be one file or a whole package (.md .py .yaml .ts …). Use{" "}
               <code className="text-gray-800 dark:text-gray-200">{"{{variable}}"}</code> or{" "}

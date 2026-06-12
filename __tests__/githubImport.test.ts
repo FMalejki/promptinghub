@@ -44,6 +44,13 @@ describe("isImportablePath", () => {
       expect(isImportablePath(p)).toBe(false);
     }
   });
+  it("keeps text files with unknown or no extension (permissive — only binaries are skipped)", () => {
+    // The old allowlist dropped these; an import feature should pull any text file.
+    // Real binaries are caught at fetch time by the null-byte guard.
+    for (const p of [".cursorrules", "scripts/deploy", "app.config", "SKILL", "prompts/agent.mdc", "Justfile"]) {
+      expect(isImportablePath(p)).toBe(true);
+    }
+  });
 });
 
 describe("selectFiles", () => {
