@@ -83,4 +83,10 @@ describe("scorePromptMatch — synonyms", () => {
     const p = { id: "Z", name: "Email writer", description: "general", tags: ["writing"] };
     expect(scorePromptMatch("kubernetes", p)).toBe(0);
   });
+
+  it("matches prompt-domain intent synonyms ('summarize' → Summary, 'debug' → fix)", () => {
+    expect(scorePromptMatch("summarize", { id: "S3", name: "Summary generator", description: "", tags: [] })).toBeGreaterThan(0);
+    expect(scorePromptMatch("debug", { id: "S4", name: "Bug fix helper", description: "", tags: [] })).toBeGreaterThan(0);
+    expect(scorePromptMatch("translate", { id: "S5", name: "Translation tool", description: "", tags: [] })).toBeGreaterThan(0);
+  });
 });

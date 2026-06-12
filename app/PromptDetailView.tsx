@@ -274,8 +274,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           Back to browse
         </Link>
 
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
+        <div>
+          <div>
             <div className="flex items-center gap-3 mb-2">
               <Link href={`/c/${encodeURIComponent(prompt.category)}`} className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
                 {prompt.category}
@@ -352,7 +352,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 mt-6 pt-5 border-t border-gray-100 dark:border-gray-800">
             <button
               onClick={toggleStar}
               aria-pressed={isStarred}

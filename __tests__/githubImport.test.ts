@@ -116,6 +116,27 @@ describe("buildDraft", () => {
     const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "a.md", content: "x" }], { skipped: 0, truncated: false });
     expect(draft.source).toBeUndefined();
   });
+
+  it("surfaces a README.md into the first-class readme field", () => {
+    const draft = buildDraft(
+      { owner: "o", repo: "r" },
+      {},
+      [{ path: "prompt.txt", content: "p" }, { path: "README.md", content: "# Hello\n\nUse it like this." }],
+      { skipped: 0, truncated: false },
+    );
+    expect(draft.readme).toBe("# Hello\n\nUse it like this.");
+  });
+
+  it("omits readme when there is no README file", () => {
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "main.py", content: "x" }], { skipped: 0, truncated: false });
+    expect(draft.readme).toBeUndefined();
+  });
+
+  it("truncates a very long README to the 20k publish cap", () => {
+    const long = "a".repeat(25000);
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "README.md", content: long }], { skipped: 0, truncated: false });
+    expect(draft.readme).toHaveLength(20000);
+  });
 });
 
 describe("repoUrl", () => {

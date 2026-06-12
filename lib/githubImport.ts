@@ -2,6 +2,7 @@
 // (infrastructure-as-a-prompt). The route layer does the actual fetching and
 // injects results here. Keeping parse + filtering pure makes it unit-testable.
 import { looksLikeSkill } from "./import";
+import { pickReadme } from "./markdown";
 
 export type RepoRef = { owner: string; repo: string; ref?: string; subpath?: string };
 
@@ -132,6 +133,9 @@ export type ImportDraft = {
   isSkill?: boolean;
   // The linked repo, for click-to-sync.
   source?: ImportSource;
+  // The repo's README.md content (if any), surfaced into the prompt's first-class
+  // README field so it renders as markdown above the files (like GitHub).
+  readme?: string;
 };
 
 // Canonical GitHub URL for a parsed ref + resolved branch.
@@ -153,6 +157,10 @@ export function buildDraft(
     (meta.description && meta.description.trim()) ||
     `Imported from github.com/${ref.owner}/${ref.repo}`;
   const isSkill = looksLikeSkill({ files });
+  // The prompt's README field caps at 20 000 chars (newPromptSchema); truncate so
+  // a long repo README never blocks publishing.
+  const readmeRaw = pickReadme(files);
+  const readme = readmeRaw ? readmeRaw.slice(0, 20000) : null;
   return {
     name: ref.repo,
     description: `${desc} — github.com/${ref.owner}/${ref.repo}`.slice(0, 280),
@@ -162,5 +170,6 @@ export function buildDraft(
     notes: { skipped: selection.skipped, truncated: selection.truncated, imported: files.length },
     ...(isSkill ? { isSkill: true } : {}),
     ...(source ? { source: { url: repoUrl(ref, source.branch), ref: source.branch, commit: source.commit } } : {}),
+    ...(readme ? { readme } : {}),
   };
 }

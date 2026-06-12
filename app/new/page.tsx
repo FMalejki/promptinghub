@@ -10,6 +10,7 @@ import { getTemplate } from "@/lib/templates";
 import { CoverImageField } from "../components/CoverImageField";
 import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
 import { FileTree } from "../components/FileTree";
+import { MarkdownField } from "../components/MarkdownField";
 import { track } from "../components/AnalyticsBeacon";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -158,6 +159,7 @@ export default function NewPromptPage() {
       setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
       if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
       if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
+      if (typeof d.readme === "string" && d.readme.trim()) setReadme(d.readme);
       setGhSource(d.source || null);
       const n = d.notes || {};
       setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
@@ -235,6 +237,20 @@ export default function NewPromptPage() {
   }
   function removeFile(i: number) {
     setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
+  }
+  // Create a folder by adding a starter file inside it — folders here are just
+  // path prefixes (e.g. "src/utils/"), so an empty one can't exist on its own.
+  function addFolder() {
+    const raw = window.prompt("New folder name (e.g. src or src/utils):");
+    if (raw === null) return;
+    const folder = raw.trim().replace(/^\/+|\/+$/g, "").replace(/\/{2,}/g, "/");
+    if (!folder) return;
+    const base = `${folder}/new-file.txt`;
+    const taken = new Set(files.map((f) => f.path));
+    let path = base;
+    for (let n = 1; taken.has(path); n++) path = `${folder}/new-file-${n}.txt`;
+    addFiles([{ path, content: "" }]);
+    setActiveEditIdx(files.length);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -511,15 +527,13 @@ export default function NewPromptPage() {
 
             <div>
               <label className={label}>README (optional)</label>
-              <textarea
+              <MarkdownField
                 value={readme}
-                onChange={(e) => setReadme(e.target.value)}
-                className={`${input} font-mono min-h-[120px]`}
+                onChange={setReadme}
+                inputClassName={input}
                 placeholder={"# How to use this prompt\n\nExplain what it does, when to use it, and any setup. Markdown supported."}
-                maxLength={20000}
-                rows={6}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, code, links).</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, ordered lists, quotes, code, links, images). Hit <span className="font-medium">Preview</span> to see it rendered.</p>
             </div>
 
             <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
@@ -677,13 +691,22 @@ export default function NewPromptPage() {
                           onSelect={(p) => { const i = files.findIndex((x) => x.path === p); if (i >= 0) setActiveEditIdx(i); }}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
-                        className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        + Add file
-                      </button>
+                      <div className="mt-2 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          + Add file
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addFolder}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          + New folder
+                        </button>
+                      </div>
                     </div>
                     <div className="min-w-0 flex-1 w-full border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                       <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
@@ -731,13 +754,22 @@ export default function NewPromptPage() {
                     onChange={(e) => updateFile(0, { content: e.target.value })}
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
-                  className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  + Add file
-                </button>
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + Add file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addFolder}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + New folder
+                  </button>
+                </div>
               </>
             )}
           </div>

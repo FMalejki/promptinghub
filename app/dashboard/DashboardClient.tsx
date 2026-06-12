@@ -69,6 +69,35 @@ export default function DashboardPage() {
   const { status } = useSession();
   const [data, setData] = useState<Analytics | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "anon" | "error">("loading");
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Delete one of your own prompts straight from the dashboard (no need to open
+  // the editor). Confirms first; on success drops the row + decrements the count.
+  async function deletePrompt(row: Row) {
+    if (deleting) return;
+    if (!confirm(`Delete "${row.name}"? This cannot be undone.`)) return;
+    setDeleting(row.id);
+    try {
+      const res = await fetch(`/api/prompts/${row.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Couldn't delete that prompt. Please try again.");
+        return;
+      }
+      setData((d) =>
+        d
+          ? {
+              ...d,
+              totals: { ...d.totals, prompts: Math.max(0, d.totals.prompts - 1) },
+              perPrompt: d.perPrompt.filter((p) => p.id !== row.id),
+            }
+          : d,
+      );
+    } catch {
+      alert("Couldn't delete that prompt. Check your connection.");
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const load = useCallback(() => {
     setState("loading");
@@ -143,6 +172,7 @@ export default function DashboardPage() {
                       <th className="px-4 py-3 font-medium text-right">Copies</th>
                       <th className="px-4 py-3 font-medium text-right">Stars</th>
                       <th className="px-4 py-3 font-medium text-right">Forks</th>
+                      <th className="px-4 py-3 font-medium text-right sr-only">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,6 +187,25 @@ export default function DashboardPage() {
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.copyCount}</td>
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.stars}</td>
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.forkCount}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <Link
+                              href={`/prompt/${r.id}/edit`}
+                              className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              onClick={() => deletePrompt(r)}
+                              disabled={deleting === r.id}
+                              title="Delete this prompt"
+                              aria-label={`Delete ${r.name}`}
+                              className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                            >
+                              {deleting === r.id ? "Deleting…" : "Delete"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
