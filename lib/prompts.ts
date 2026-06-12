@@ -303,6 +303,15 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         viewCount: { $ifNull: ["$viewCount", 0] },
         // Trending = copies + stars (recency breaks ties via the $sort below).
         trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
+        // Popular = weighted total engagement: stars (strongest intent) ×3,
+        // copies ×2, views ×1. Recency breaks ties.
+        engagementScore: {
+          $add: [
+            { $multiply: [{ $size: { $ifNull: ["$starredBy", []] } }, 3] },
+            { $multiply: [{ $ifNull: ["$copyCount", 0] }, 2] },
+            { $ifNull: ["$viewCount", 0] },
+          ],
+        },
       },
     },
     { $sort: sortField },

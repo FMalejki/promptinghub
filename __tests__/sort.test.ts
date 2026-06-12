@@ -28,8 +28,8 @@ describe("resolveSort", () => {
 });
 
 describe("sortSpec", () => {
-  it("ranks popular by stars, not creation date alone", () => {
-    expect(sortSpec("popular")).toEqual({ stars: -1, createdAt: -1 });
+  it("ranks popular by combined engagementScore, not creation date alone", () => {
+    expect(sortSpec("popular")).toEqual({ engagementScore: -1, createdAt: -1 });
   });
   it("ranks copied/trending/viewed by their counters", () => {
     expect(sortSpec("copied")).toEqual({ copyCount: -1, createdAt: -1 });
@@ -40,6 +40,6 @@ describe("sortSpec", () => {
     expect(sortSpec("recent")).toEqual({ createdAt: -1, _id: -1 });
   });
   it("composes with resolveSort so an alias actually ranks", () => {
-    expect(sortSpec(resolveSort("top"))).toEqual({ stars: -1, createdAt: -1 });
+    expect(sortSpec(resolveSort("top"))).toEqual({ engagementScore: -1, createdAt: -1 });
   });
 });
