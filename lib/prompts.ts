@@ -103,6 +103,10 @@ export type PromptDetail = {
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
+  // Linked GitHub repo (when imported from one) — powers the Sync button.
+  sourceUrl?: string;
+  sourceRef?: string | null;
+  sourceCommit?: string | null;
 };
 
 export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: string };
@@ -154,6 +158,10 @@ export type NewPrompt = {
   // Emails granted EDIT access (collaborators). Same accepted shapes as
   // sharedWith. Owner-only to set; collaborators cannot change this list.
   collaborators?: string[] | string;
+  // Linked GitHub repo (set by the importer) for click-to-sync.
+  sourceUrl?: string;
+  sourceRef?: string;
+  sourceCommit?: string;
 };
 
 // Normalize a share list (array or comma/newline-separated string) into a clean,
@@ -486,6 +494,14 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     createdAt: new Date(),
   };
   if (files) doc.files = files;
+  // Link to the originating GitHub repo so the owner can re-sync later.
+  if (data.sourceUrl && /^https:\/\/github\.com\//i.test(data.sourceUrl)) {
+    doc.source = "github";
+    doc.sourceUrl = data.sourceUrl;
+    if (data.sourceRef) doc.sourceRef = data.sourceRef;
+    if (data.sourceCommit) doc.sourceCommit = data.sourceCommit;
+    doc.sourceSyncedAt = new Date();
+  }
   const { insertedId } = await db.collection("prompts").insertOne(doc);
   // Notify the source owner when their prompt is forked (best-effort, no self-notify).
   if (forkSource) {
@@ -557,6 +573,11 @@ export async function updatePrompt(
   if (data.attachments !== undefined) set.attachments = normalizeAttachments(data.attachments);
   if (data.isSkill !== undefined) set.isSkill = !!data.isSkill;
   if (data.useWith !== undefined) set.useWith = resolveUseWith(data.useWith);
+  // Sync-from-GitHub bookkeeping: record the commit we synced to + when.
+  if (data.sourceCommit !== undefined) {
+    set.sourceCommit = data.sourceCommit;
+    set.sourceSyncedAt = new Date();
+  }
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
@@ -685,6 +706,8 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    // Linked GitHub repo (public info — safe for any viewer; powers the Sync button).
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl as string, sourceRef: (row.sourceRef as string) ?? null, sourceCommit: (row.sourceCommit as string) ?? null } : {}),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
     canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
@@ -941,6 +964,8 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    // Linked GitHub repo (public info — safe for any viewer; powers the Sync button).
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl as string, sourceRef: (row.sourceRef as string) ?? null, sourceCommit: (row.sourceCommit as string) ?? null } : {}),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
     canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),

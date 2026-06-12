@@ -46,6 +46,10 @@ export const newPromptSchema = z
     collaborators: z.union([z.string().max(4000), z.array(z.string().max(200)).max(200)]).optional(),
     // Optional "commit message" describing an edit (used on update, ignored on create).
     message: z.string().max(200).optional(),
+    // Linked GitHub repo (set by the importer) so the prompt can be re-synced.
+    sourceUrl: z.string().max(400).optional(),
+    sourceRef: z.string().max(200).optional(),
+    sourceCommit: z.string().max(64).optional(),
   })
   .refine((d) => Boolean(d.body && d.body.trim().length) || Boolean(d.files && d.files.length), {
     message: "Provide a prompt body or at least one file",
