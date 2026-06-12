@@ -64,6 +64,10 @@ export type PromptDetail = {
   canEdit?: boolean;
   handle?: string;
   slug?: string;
+  // Linked GitHub repo (when imported) — shown as a "Linked to …" row.
+  sourceUrl?: string;
+  sourceRef?: string | null;
+  sourceCommit?: string | null;
 };
 
 // Render prompt text with {{variables}} resolved to their values, and any
@@ -501,6 +505,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} variant="primary" />
           </div>
         </div>
+        {prompt.sourceUrl && (
+          <GithubLink id={prompt.id} url={prompt.sourceUrl} commit={prompt.sourceCommit ?? null} isOwner={!!prompt.isOwner} />
+        )}
         {/* Multi-file: a clickable folder tree (left) + the selected file (right),
             mirroring the repo's real directory structure. Single-file prompts skip
             the tree and just render the one panel. */}
@@ -737,5 +744,75 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Report */}
       {!canEdit && <ReportButton promptId={prompt.id} />}
     </main>
+  );
+}
+
+// "Linked to github.com/owner/repo @ sha" with an owner-only "Sync from GitHub"
+// button that re-pulls the repo's latest commit into this prompt's files.
+function GithubLink({ id, url, commit, isOwner }: { id: string; url: string; commit: string | null; isOwner: boolean }) {
+  const [syncing, setSyncing] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+  const repoLabel = url.replace(/^https:\/\/github\.com\//i, "");
+  const short = commit ? commit.slice(0, 7) : null;
+
+  async function sync() {
+    setSyncing(true);
+    setMsg(null);
+    setOk(false);
+    try {
+      const r = await fetch(`/api/prompts/${id}/sync-github`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setMsg(d.error || "Sync failed.");
+        setSyncing(false);
+        return;
+      }
+      if (d.alreadyCurrent) {
+        setOk(true);
+        setMsg("Already up to date with the latest commit.");
+        setSyncing(false);
+        return;
+      }
+      setOk(true);
+      setMsg(`Synced ${d.imported} file${d.imported === 1 ? "" : "s"}${d.commit ? ` @ ${String(d.commit).slice(0, 7)}` : ""}. Reloading…`);
+      setTimeout(() => window.location.reload(), 700);
+    } catch {
+      setMsg("Sync failed — check your connection.");
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 min-w-0"
+        title={url}
+      >
+        <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+        <span className="truncate">Linked to {repoLabel}{short && <span className="text-gray-400"> @ {short}</span>}</span>
+      </a>
+      {isOwner && (
+        <button
+          onClick={sync}
+          disabled={syncing}
+          className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-60 transition-colors"
+          title="Re-pull the latest commit's files from GitHub"
+        >
+          <svg className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          {syncing ? "Syncing…" : "Sync from GitHub"}
+        </button>
+      )}
+      {msg && (
+        <span className={`w-full text-xs ${ok ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>{msg}</span>
+      )}
+    </div>
   );
 }

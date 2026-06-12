@@ -116,6 +116,11 @@ export function selectFiles(blobs: TreeBlob[], caps: ImportCaps = DEFAULT_CAPS):
 
 export type RepoMeta = { description?: string | null; language?: string | null; stars?: number };
 
+// The GitHub repo a prompt is linked to, so it can be re-synced later. `url` is
+// the canonical repo (with /tree/<ref>/<subpath> when scoped), `ref` the branch,
+// `commit` the HEAD SHA at import time (used to detect new commits).
+export type ImportSource = { url: string; ref: string; commit?: string };
+
 export type ImportDraft = {
   name: string;
   description: string;
@@ -125,13 +130,22 @@ export type ImportDraft = {
   notes: { skipped: number; truncated: boolean; imported: number };
   // True when the repo looks like an agent skill (e.g. contains a SKILL.md).
   isSkill?: boolean;
+  // The linked repo, for click-to-sync.
+  source?: ImportSource;
 };
+
+// Canonical GitHub URL for a parsed ref + resolved branch.
+export function repoUrl(ref: RepoRef, branch: string): string {
+  const base = `https://github.com/${ref.owner}/${ref.repo}`;
+  return ref.subpath ? `${base}/tree/${branch}/${ref.subpath}` : base;
+}
 
 export function buildDraft(
   ref: RepoRef,
   meta: RepoMeta,
   files: { path: string; content: string }[],
   selection: Pick<Selection, "skipped" | "truncated">,
+  source?: { branch: string; commit?: string },
 ): ImportDraft {
   const tags = [ref.repo.toLowerCase(), "github"];
   if (meta.language) tags.push(meta.language.toLowerCase());
@@ -147,5 +161,6 @@ export function buildDraft(
     files,
     notes: { skipped: selection.skipped, truncated: selection.truncated, imported: files.length },
     ...(isSkill ? { isSkill: true } : {}),
+    ...(source ? { source: { url: repoUrl(ref, source.branch), ref: source.branch, commit: source.commit } } : {}),
   };
 }

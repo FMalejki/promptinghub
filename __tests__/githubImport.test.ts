@@ -3,6 +3,7 @@ import {
   isImportablePath,
   selectFiles,
   buildDraft,
+  repoUrl,
   DEFAULT_CAPS,
   type TreeBlob,
 } from "../lib/githubImport";
@@ -98,5 +99,32 @@ describe("buildDraft", () => {
     expect(draft.tags).toEqual(expect.arrayContaining(["micrograd", "github", "python"]));
     expect(draft.description).toContain("github.com/karpathy/micrograd");
     expect(draft.notes).toEqual({ skipped: 3, truncated: false, imported: 1 });
+  });
+
+  it("attaches the linked source (repo url + branch + commit) when provided", () => {
+    const draft = buildDraft(
+      { owner: "o", repo: "r" },
+      {},
+      [{ path: "a.md", content: "x" }],
+      { skipped: 0, truncated: false },
+      { branch: "main", commit: "abc1234def" },
+    );
+    expect(draft.source).toEqual({ url: "https://github.com/o/r", ref: "main", commit: "abc1234def" });
+  });
+
+  it("omits source when not provided", () => {
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "a.md", content: "x" }], { skipped: 0, truncated: false });
+    expect(draft.source).toBeUndefined();
+  });
+});
+
+describe("repoUrl", () => {
+  it("builds a plain repo url", () => {
+    expect(repoUrl({ owner: "karpathy", repo: "nanoGPT" }, "master")).toBe("https://github.com/karpathy/nanoGPT");
+  });
+  it("includes /tree/<branch>/<subpath> when scoped", () => {
+    expect(repoUrl({ owner: "vercel", repo: "next.js", subpath: "packages/next" }, "canary")).toBe(
+      "https://github.com/vercel/next.js/tree/canary/packages/next",
+    );
   });
 });

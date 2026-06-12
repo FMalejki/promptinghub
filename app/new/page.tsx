@@ -63,6 +63,8 @@ export default function NewPromptPage() {
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
   // Which file the multi-file editor is focused on (tree-nav, one file at a time).
   const [activeEditIdx, setActiveEditIdx] = useState(0);
+  // GitHub repo this draft was imported from (persisted so it can be re-synced).
+  const [ghSource, setGhSource] = useState<{ url: string; ref?: string; commit?: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
   const AI_MODELS = useModels();
@@ -156,6 +158,7 @@ export default function NewPromptPage() {
       setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
       if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
       if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
+      setGhSource(d.source || null);
       const n = d.notes || {};
       setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
       setGhUrl("");
@@ -264,6 +267,10 @@ export default function NewPromptPage() {
       readme: readme.trim() ? readme : undefined,
       attachments: attachments.filter((a) => a.url.trim()).length ? attachments.filter((a) => a.url.trim()) : undefined,
       sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
+      // Persist the GitHub link (if imported) so the prompt can be re-synced later.
+      sourceUrl: ghSource?.url,
+      sourceRef: ghSource?.ref,
+      sourceCommit: ghSource?.commit,
     };
 
     try {
