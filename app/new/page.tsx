@@ -112,6 +112,7 @@ export default function NewPromptPage() {
       track("import_click", "/new", { source: "paste" });
       setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
+      if (Array.isArray(draft.tags) && draft.tags.length) setTags(draft.tags.join(", "));
       if (Array.isArray(draft.testedModels)) {
         setSelectedModels(new Set(draft.testedModels.map((m: TestedModel) => m.modelId)));
         setTestedModels(draft.testedModels);
@@ -311,7 +312,7 @@ export default function NewPromptPage() {
               Import from text — paste a prompt to auto-fill
             </summary>
             <p className="mt-3 text-xs text-blue-700/80 dark:text-blue-300/70">
-              Paste your prompt — we&apos;ll fill in the title, category and the rest below for you to review.
+              Paste your prompt — we&apos;ll fill in the title, description, category and tags below for you to review.
             </p>
             <textarea
               value={importText}
