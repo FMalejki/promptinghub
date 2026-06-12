@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { topTags, trendingTags } from "@/lib/prompts";
+import { nextOffset } from "@/lib/pagination";
 import { Navbar } from "../components/Navbar";
+import { TagCloud } from "./TagCloud";
 
 export const metadata: Metadata = {
   title: "Tags",
@@ -11,25 +13,19 @@ export const metadata: Metadata = {
 
 export const revalidate = 300; // refresh every 5 min
 
-// Scale a tag's font size by how common it is, relative to the most-used tag.
-function sizeClass(count: number, max: number): string {
-  const r = max > 0 ? count / max : 0;
-  if (r > 0.66) return "text-2xl font-bold";
-  if (r > 0.33) return "text-xl font-semibold";
-  if (r > 0.15) return "text-lg";
-  return "text-base";
-}
+const PAGE_SIZE = 80;
 
 export default async function TagsPage() {
   let tags: { tag: string; count: number }[] = [];
   let trending: { tag: string; score: number }[] = [];
   try {
     const db = await getDb();
-    [tags, trending] = await Promise.all([topTags(db, 100), trendingTags(db, { days: 7, limit: 12 })]);
+    [tags, trending] = await Promise.all([topTags(db, PAGE_SIZE, 0), trendingTags(db, { days: 7, limit: 12 })]);
   } catch {
     // DB unavailable — render the empty state.
   }
   const max = tags.length ? tags[0].count : 0;
+  const initialNextOffset = nextOffset(tags.length, PAGE_SIZE, 0);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -63,23 +59,7 @@ export default async function TagsPage() {
           </div>
         )}
 
-        {tags.length === 0 ? (
-          <div className="text-center py-16 text-gray-500 dark:text-gray-400">No tags yet.</div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
-            {tags.map((t) => (
-              <Link
-                key={t.tag}
-                href={`/t/${encodeURIComponent(t.tag)}`}
-                className={`${sizeClass(t.count, max)} text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors`}
-              >
-                <span className="text-blue-400">#</span>
-                {t.tag}
-                <span className="ml-1 text-xs text-gray-400 align-top">{t.count}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        <TagCloud initial={tags} initialNextOffset={initialNextOffset} max={max} pageSize={PAGE_SIZE} />
       </main>
     </div>
   );

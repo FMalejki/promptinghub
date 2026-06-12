@@ -361,7 +361,8 @@ export async function topCategories(db: Db): Promise<{ category: string; count: 
 }
 
 /** Most-used tags across public prompts, descending by count. */
-export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count: number }[]> {
+export async function topTags(db: Db, limit = 30, offset = 0): Promise<{ tag: string; count: number }[]> {
+  const skip = Math.max(0, Math.floor(offset));
   const rows = await db
     .collection("prompts")
     .aggregate([
@@ -369,6 +370,7 @@ export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count:
       { $unwind: "$tags" },
       { $group: { _id: "$tags", count: { $sum: 1 } } },
       { $sort: { count: -1, _id: 1 } },
+      ...(skip > 0 ? [{ $skip: skip }] : []),
       { $limit: limit },
     ])
     .toArray();

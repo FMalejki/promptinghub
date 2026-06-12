@@ -96,7 +96,7 @@ export type TopCreator = {
 };
 
 // Leaderboard of creators (must have a handle), ranked by followers*3 + stars + prompts.
-export async function topCreators(db: Db, limit = 20): Promise<TopCreator[]> {
+export async function topCreators(db: Db, limit = 20, offset = 0): Promise<TopCreator[]> {
   // Public prompt counts + star sums per owner.
   const promptAgg = await db
     .collection("prompts")
@@ -132,7 +132,9 @@ export async function topCreators(db: Db, limit = 20): Promise<TopCreator[]> {
   }
 
   const score = (c: TopCreator) => c.followers * 3 + c.stars + c.prompts;
-  return creators.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name)).slice(0, limit);
+  const ranked = creators.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  const start = Math.max(0, Math.floor(offset));
+  return ranked.slice(start, start + limit);
 }
 
 // True only when the account's handle is a verified one (used to gate curation).

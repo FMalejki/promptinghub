@@ -51,4 +51,23 @@ describe("topCreators", () => {
     await createPrompt(db, "nohandle@x.com", { name: "X", description: "d", category: "Writing", body: "x" });
     expect(await topCreators(db, 10)).toEqual([]);
   });
+
+  it("paginates with offset over the ranked list without overlap", async () => {
+    // Six creators each with a distinct prompt count → strict descending rank.
+    for (let i = 0; i < 6; i++) {
+      const email = `c${i}@x.com`;
+      await createUser(db, email, "pw", `Creator${i}`);
+      await ensureHandle(db, email);
+      for (let j = 0; j <= 5 - i; j++) {
+        await createPrompt(db, email, { name: `c${i}-${j}`, description: "d", category: "Writing", body: "x" });
+      }
+    }
+    const full = await topCreators(db, 100);
+    expect(full).toHaveLength(6);
+    const page1 = await topCreators(db, 4, 0);
+    const page2 = await topCreators(db, 4, 4);
+    expect(page1.map((c) => c.handle)).toEqual(full.slice(0, 4).map((c) => c.handle));
+    expect(page2.map((c) => c.handle)).toEqual(full.slice(4).map((c) => c.handle));
+    expect(page2).toHaveLength(2);
+  });
 });
