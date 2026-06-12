@@ -9,6 +9,7 @@ import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
 import { CoverImageField } from "../components/CoverImageField";
 import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
+import { FileTree } from "../components/FileTree";
 import { track } from "../components/AnalyticsBeacon";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -60,6 +61,8 @@ export default function NewPromptPage() {
     setTags([...current, tag].join(", "));
   }
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
+  // Which file the multi-file editor is focused on (tree-nav, one file at a time).
+  const [activeEditIdx, setActiveEditIdx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
   const AI_MODELS = useModels();
@@ -651,38 +654,85 @@ export default function NewPromptPage() {
               </label>
             </div>
 
-            <div className="space-y-3">
-              {files.map((f, i) => (
-                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            {files.length > 1 ? (
+              // Multi-file: a clickable folder tree (left) + edit one file at a time
+              // (right), so a big import stays navigable instead of a textarea stack.
+              (() => {
+                const editIdx = Math.min(activeEditIdx, files.length - 1);
+                const f = files[editIdx];
+                return (
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="w-full md:w-60 lg:w-64 shrink-0">
+                      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2 max-h-72 md:max-h-[28rem] overflow-auto">
+                        <FileTree
+                          paths={files.map((x) => x.path)}
+                          activePath={f?.path ?? null}
+                          onSelect={(p) => { const i = files.findIndex((x) => x.path === p); if (i >= 0) setActiveEditIdx(i); }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                        className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        + Add file
+                      </button>
+                    </div>
+                    <div className="min-w-0 flex-1 w-full border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
+                        <input
+                          className="flex-1 text-sm font-mono bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
+                          value={f.path}
+                          placeholder="file path e.g. src/agent.md"
+                          onChange={(e) => updateFile(editIdx, { path: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { removeFile(editIdx); setActiveEditIdx((i) => Math.max(0, i - (editIdx <= i ? 1 : 0))); }}
+                          className="text-xs text-gray-400 hover:text-red-600 shrink-0"
+                        >
+                          remove
+                        </button>
+                      </div>
+                      <textarea
+                        className="w-full px-4 py-3 text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none"
+                        rows={18}
+                        placeholder="File content…"
+                        value={f.content}
+                        onChange={(e) => updateFile(editIdx, { content: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                   <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
                     <input
                       className="flex-1 text-sm font-mono bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
-                      value={f.path}
+                      value={files[0].path}
                       placeholder="file path e.g. prompt.md"
-                      onChange={(e) => updateFile(i, { path: e.target.value })}
+                      onChange={(e) => updateFile(0, { path: e.target.value })}
                     />
-                    {files.length > 1 && (
-                      <button type="button" onClick={() => removeFile(i)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">remove</button>
-                    )}
                   </div>
                   <textarea
                     className="w-full px-4 py-3 text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none"
                     rows={8}
                     placeholder="File content…"
-                    value={f.content}
-                    onChange={(e) => updateFile(i, { content: e.target.value })}
+                    value={files[0].content}
+                    onChange={(e) => updateFile(0, { content: e.target.value })}
                   />
                 </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }])}
-              className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              + Add file
-            </button>
+                <button
+                  type="button"
+                  onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                  className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  + Add file
+                </button>
+              </>
+            )}
           </div>
 
           {/* Tested Models */}
