@@ -41,11 +41,6 @@ export function Footer() {
             <ul className="space-y-2">
               <li><Link href="/feedback" className={col}>Send feedback</Link></li>
               <li><Link href="/security-policy" className={col}>Security</Link></li>
-              <li>
-                <a href="https://github.com/FMalejki/promptinghub" target="_blank" rel="noopener noreferrer" className={col}>
-                  GitHub
-                </a>
-              </li>
             </ul>
           </div>
         </div>

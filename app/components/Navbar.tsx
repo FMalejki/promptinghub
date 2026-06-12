@@ -18,6 +18,7 @@ const NAV_LINKS: NavLink[] = [
   { href: "/tags", label: "Tags", group: "explore" },
   { href: "/collections", label: "Collections", group: "explore" },
   { href: "/creators", label: "Creators", group: "explore" },
+  { href: "/feedback", label: "Feedback", group: "explore" },
 ];
 
 export function Navbar() {

@@ -352,19 +352,36 @@ export default function NewPromptPage() {
             </p>
             <input
               type="text"
+              name="gh-repo-url"
               value={ghUrl}
               onChange={(e) => setGhUrl(e.target.value)}
               placeholder="https://github.com/owner/repo  (or owner/repo, or .../tree/branch/path)"
               className={`${input} mt-3 font-mono text-sm`}
+              inputMode="url"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-bwignore="true"
+              data-form-type="other"
             />
+            {/* Masked via -webkit-text-security instead of type="password" so Chrome
+                does NOT see a login form here — otherwise it autofills a saved
+                email/password into the URL + token pair (real bug owner caught). */}
             <input
-              type="password"
+              type="text"
               name="gh-pat"
               value={ghToken}
               onChange={(e) => setGhToken(e.target.value)}
               placeholder="Optional GitHub token (private repos / higher rate limit)"
               className={`${input} mt-2 font-mono text-sm`}
+              style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               data-1p-ignore="true"
               data-lpignore="true"
               data-bwignore="true"
