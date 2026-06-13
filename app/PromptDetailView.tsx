@@ -48,6 +48,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount?: number;
   viewCount?: number;
+  commentCount?: number;
   priceCents?: number;
   tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
@@ -123,6 +124,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
+  const [commentCount, setCommentCount] = useState(prompt.commentCount ?? 0);
   const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
   // Which file tab is open (multi-file prompts render as tabs, not a long stack).
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -389,6 +391,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               </svg>
               <span>{viewCount}</span>
             </span>
+
+            <a
+              href="#comments"
+              title="Comments — jump to discussion"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span>{commentCount}</span>
+            </a>
 
             {(prompt.forkCount ?? 0) > 0 && (
               <span
@@ -739,7 +752,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       />
 
       {/* Comments */}
-      <Comments promptId={prompt.id} />
+      <div id="comments" className="scroll-mt-20" />
+      <Comments promptId={prompt.id} onCount={setCommentCount} />
 
       {/* Report */}
       {!canEdit && <ReportButton promptId={prompt.id} />}

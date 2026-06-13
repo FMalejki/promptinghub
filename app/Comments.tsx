@@ -63,7 +63,7 @@ function Body({ text }: { text: string }) {
   );
 }
 
-export function Comments({ promptId }: { promptId: string }) {
+export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n: number) => void }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -82,6 +82,9 @@ export function Comments({ promptId }: { promptId: string }) {
       .catch(() => {});
   }
   useEffect(load, [promptId]);
+  // Report the live comment total (top-level + replies) so the page header/stat
+  // can stay in sync as comments are added or removed.
+  useEffect(() => onCount?.(comments.length), [comments.length, onCount]);
 
   async function send(text: string, parentId: string | null) {
     if (!session?.user?.email) {

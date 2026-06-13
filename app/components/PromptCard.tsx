@@ -43,13 +43,14 @@ type PromptCardProps = {
   isSkill?: boolean;
   testedModels?: TestedModel[];
   copyCount?: number;
+  commentCount?: number;
   priceCents?: number;
   tokens?: number;
   attestation?: CardAttestation | null;
   useWith?: UseWith;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, commentCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = cardLengthBadge(tokens);
@@ -194,6 +195,14 @@ export function PromptCard({ id, name, description, category, author, image, sta
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm font-medium">{copyCount}</span>
+              </div>
+            )}
+            {commentCount > 0 && (
+              <div className="flex items-center gap-1" title={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="text-sm font-medium">{commentCount}</span>
               </div>
             )}
           </div>

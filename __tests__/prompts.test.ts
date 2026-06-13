@@ -31,6 +31,24 @@ beforeEach(async () => {
   ]);
 });
 
+describe("comment-count metric", () => {
+  it("reflects real comments on both the card list and the detail", async () => {
+    const p = await db.collection("prompts").findOne({ name: "Summarize" });
+    const id = p!._id.toString();
+    await db.collection("comments").insertMany([
+      { promptId: id, authorEmail: "bob@x.com", body: "nice", createdAt: new Date() },
+      { promptId: id, authorEmail: "alice@x.com", body: "thanks", createdAt: new Date() },
+    ]);
+    const card = (await listPrompts(db)).find((r) => r.id === id);
+    expect(card?.commentCount).toBe(2);
+    const detail = await getPromptDetail(db, id);
+    expect(detail?.commentCount).toBe(2);
+    // a prompt with no comments reports 0, never undefined
+    const other = (await listPrompts(db)).find((r) => r.name === "Code review");
+    expect(other?.commentCount).toBe(0);
+  });
+});
+
 describe("listPrompts (public pool)", () => {
   it("returns prompts from all users", async () => {
     const rows = await listPrompts(db);
@@ -140,6 +158,7 @@ describe("getPromptDetail", () => {
       testedModels: [],
       copyCount: 0,
       viewCount: 0,
+      commentCount: 0,
       priceCents: 0,
       tags: [],
       forkedFrom: null,

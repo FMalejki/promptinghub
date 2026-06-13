@@ -34,6 +34,8 @@ export type Prompt = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount: number;
+  // Number of comments on the prompt — a discussion-volume signal on the card.
+  commentCount?: number;
   priceCents: number;
   tags: string[];
   isSkill?: boolean;
@@ -77,6 +79,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount: number;
   viewCount: number;
+  commentCount: number;
   priceCents: number;
   tags: string[];
   forkedFrom: { id: string; name: string } | null;
@@ -356,6 +359,18 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         pipeline: [{ $project: { _id: 0, modelId: 1, email: 1, vote: 1 } }],
       },
     },
+    // Discussion volume per card: count comments whose promptId is this prompt's
+    // stringified _id. Counted server-side so the card shows a real number.
+    {
+      $lookup: {
+        from: "comments",
+        localField: "idStr",
+        foreignField: "promptId",
+        as: "cmts",
+        pipeline: [{ $count: "n" }],
+      },
+    },
+    { $addFields: { commentCount: { $ifNull: [{ $arrayElemAt: ["$cmts.n", 0] }, 0] } } },
   );
 
   const rows = await db.collection("prompts").aggregate(pipeline).toArray();
@@ -370,6 +385,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
+    commentCount: r.commentCount || 0,
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     isSkill: !!r.isSkill,
@@ -711,6 +727,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
   }
   const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
+  const commentCount = await db.collection("comments").countDocuments({ promptId: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -725,6 +742,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     viewCount: row.viewCount || 0,
+    commentCount,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
@@ -969,6 +987,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
   }
   const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
+  const commentCount = await db.collection("comments").countDocuments({ promptId: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -983,6 +1002,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     viewCount: row.viewCount || 0,
+    commentCount,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
