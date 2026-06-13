@@ -4,7 +4,7 @@ import { Footer } from "./components/Footer";
 import { AnalyticsBeacon } from "./components/AnalyticsBeacon";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { siteJsonLd } from "@/lib/jsonLd";
+import { siteJsonLd, jsonLdHtml } from "@/lib/jsonLd";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd(SITE_URL)) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdHtml(siteJsonLd(SITE_URL)) }}
         />
       </head>
       <body className="bg-gray-50 dark:bg-gray-900 transition-colors">

@@ -77,7 +77,7 @@ export default function TrendingPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ranked.map((p, i) => (
-              <div key={p.id} className="relative">
+              <div key={p.id} className="relative h-full">
                 {mode === "trending" && i < 3 && (
                   <div className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-sm font-bold flex items-center justify-center shadow-lg">
                     {i + 1}

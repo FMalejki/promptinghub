@@ -9,6 +9,8 @@ import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
 import { REACTION_EMOJIS } from "@/lib/reactionEmojis";
+import { useToast } from "./components/Toast";
+import { usePrompt } from "./components/ConfirmDialog";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
@@ -63,9 +65,11 @@ function Body({ text }: { text: string }) {
   );
 }
 
-export function Comments({ promptId }: { promptId: string }) {
+export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n: number) => void }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
+  const promptInput = usePrompt();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
@@ -82,6 +86,9 @@ export function Comments({ promptId }: { promptId: string }) {
       .catch(() => {});
   }
   useEffect(load, [promptId]);
+  // Report the live comment total (top-level + replies) so the page header/stat
+  // can stay in sync as comments are added or removed.
+  useEffect(() => onCount?.(comments.length), [comments.length, onCount]);
 
   async function send(text: string, parentId: string | null) {
     if (!session?.user?.email) {
@@ -131,7 +138,7 @@ export function Comments({ promptId }: { promptId: string }) {
       setEditing(null);
       setEditBody("");
     } else if (res.status === 409) {
-      alert("The edit window for this comment has closed.");
+      toast("The edit window for this comment has closed.", { variant: "error" });
     }
   }
 
@@ -140,13 +147,19 @@ export function Comments({ promptId }: { promptId: string }) {
       router.push("/login");
       return;
     }
-    const reason = window.prompt("Why are you reporting this comment? (optional)") ?? "";
+    const reason = await promptInput({
+      title: "Report comment",
+      message: "Why are you reporting this comment? (optional)",
+      placeholder: "Reason (optional)",
+      confirmLabel: "Report",
+    });
+    if (reason === null) return; // cancelled — don't file a report
     const res = await fetch(`/api/comments/${id}/report`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
-    if (res.ok) alert("Thanks — this comment has been flagged for moderation.");
+    if (res.ok) toast("Thanks — this comment has been flagged for moderation.", { variant: "success" });
   }
 
   async function toggleLike(id: string) {

@@ -22,7 +22,26 @@ beforeEach(async () => {
 });
 
 describe("topCreators", () => {
-  it("ranks creators by followers + stars + prompts and resolves handle/name", async () => {
+  it("ranks a low-volume but high-engagement creator above a prolific but ignored one", async () => {
+    for (const [email, name] of [["busy@x.com", "Busy"], ["loved@x.com", "Loved"]]) {
+      await createUser(db, email, "pw", name);
+      await ensureHandle(db, email);
+    }
+    // Busy: 5 prompts, zero engagement on any of them.
+    for (let i = 0; i < 5; i++) {
+      await createPrompt(db, "busy@x.com", { name: `B${i}`, description: "d", category: "Writing", body: "x" });
+    }
+    // Loved: a single prompt that earned real copies + views.
+    const p = await createPrompt(db, "loved@x.com", { name: "L1", description: "d", category: "Writing", body: "x" });
+    await db.collection("prompts").updateOne({ _id: new (require("mongodb").ObjectId)(p.id) }, { $set: { copyCount: 40, viewCount: 200 } });
+
+    const creators = await topCreators(db, 10);
+    expect(creators[0].name).toBe("Loved"); // engagement beats raw prompt count
+    expect(creators[0].engagement).toBe(40 * 2 + 200);
+    expect(creators.find((c) => c.name === "Busy")!.engagement).toBe(0);
+  });
+
+  it("ranks creators by engagement (+followers) and resolves handle/name", async () => {
     for (const [email, name] of [["a@x.com", "Alice"], ["b@x.com", "Bob"], ["fan@x.com", "Fan"]]) {
       await createUser(db, email, "pw", name);
       await ensureHandle(db, email);
@@ -50,5 +69,24 @@ describe("topCreators", () => {
     await db.collection("users").updateOne({ email: "nohandle@x.com" }, { $unset: { handle: "" } });
     await createPrompt(db, "nohandle@x.com", { name: "X", description: "d", category: "Writing", body: "x" });
     expect(await topCreators(db, 10)).toEqual([]);
+  });
+
+  it("paginates with offset over the ranked list without overlap", async () => {
+    // Six creators each with a distinct prompt count → strict descending rank.
+    for (let i = 0; i < 6; i++) {
+      const email = `c${i}@x.com`;
+      await createUser(db, email, "pw", `Creator${i}`);
+      await ensureHandle(db, email);
+      for (let j = 0; j <= 5 - i; j++) {
+        await createPrompt(db, email, { name: `c${i}-${j}`, description: "d", category: "Writing", body: "x" });
+      }
+    }
+    const full = await topCreators(db, 100);
+    expect(full).toHaveLength(6);
+    const page1 = await topCreators(db, 4, 0);
+    const page2 = await topCreators(db, 4, 4);
+    expect(page1.map((c) => c.handle)).toEqual(full.slice(0, 4).map((c) => c.handle));
+    expect(page2.map((c) => c.handle)).toEqual(full.slice(4).map((c) => c.handle));
+    expect(page2).toHaveLength(2);
   });
 });

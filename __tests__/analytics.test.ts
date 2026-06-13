@@ -1,7 +1,7 @@
 import { MongoClient, Db } from "mongodb";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { createPrompt, toggleStar } from "../lib/prompts";
-import { ownerAnalytics } from "../lib/analytics";
+import { ownerAnalytics, activityTimeseries } from "../lib/analytics";
 
 let mongod: MongoMemoryServer;
 let client: MongoClient;
@@ -41,5 +41,40 @@ describe("ownerAnalytics", () => {
     const a = await ownerAnalytics(db, "nobody@x.com");
     expect(a.totals).toEqual({ prompts: 0, copies: 0, stars: 0, forks: 0 });
     expect(a.perPrompt).toEqual([]);
+  });
+});
+
+describe("activityTimeseries", () => {
+  beforeEach(async () => {
+    await db.collection("copyEvents").deleteMany({});
+    await db.collection("viewEvents").deleteMany({});
+  });
+
+  it("returns zero-filled per-day copies and views over the window", async () => {
+    const now = new Date("2026-06-13T12:00:00Z");
+    const p = await createPrompt(db, "me@x.com", { name: "P", description: "d", category: "Writing", body: "x" });
+    const id = p.id;
+    await db.collection("copyEvents").insertMany([
+      { promptId: id, createdAt: new Date("2026-06-13T01:00:00Z") },
+      { promptId: id, createdAt: new Date("2026-06-13T09:00:00Z") },
+      { promptId: id, createdAt: new Date("2026-06-12T09:00:00Z") },
+    ]);
+    await db.collection("viewEvents").insertMany([
+      { promptId: id, createdAt: new Date("2026-06-13T02:00:00Z") },
+    ]);
+
+    const series = await activityTimeseries(db, "me@x.com", 14, now);
+    expect(series).toHaveLength(14);
+    const last = series[series.length - 1];
+    expect(last).toEqual({ day: "2026-06-13", copies: 2, views: 1 });
+    expect(series[series.length - 2]).toEqual({ day: "2026-06-12", copies: 1, views: 0 });
+    // activity (copies+views) on the last day = 3
+    expect(last.copies + last.views).toBe(3);
+  });
+
+  it("returns an all-zero window for an owner with no prompts", async () => {
+    const series = await activityTimeseries(db, "nobody@x.com", 7, new Date("2026-06-13T12:00:00Z"));
+    expect(series).toHaveLength(7);
+    expect(series.every((p) => p.copies === 0 && p.views === 0)).toBe(true);
   });
 });

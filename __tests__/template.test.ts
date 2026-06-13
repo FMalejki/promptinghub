@@ -83,4 +83,27 @@ describe("extractVariablesFromFiles", () => {
       { name: "task", default: "" },
     ]);
   });
+
+  it("ignores Handlebars control tokens like {{else}} and {{this}}", () => {
+    expect(extractVariables("{{#each items}}{{this}}{{else}}{{fallback}}{{/each}}")).toEqual([
+      { name: "fallback", default: "" },
+    ]);
+  });
+
+  it("ignores {{tokens}} that only appear inside code blocks", () => {
+    const files = [
+      { content: "Fill in {{tone}}.\n\n```js\nconst x = `{{installer_commit}}`; // {{generated_at}}\n```" },
+    ];
+    expect(extractVariablesFromFiles(files)).toEqual([{ name: "tone", default: "" }]);
+  });
+
+  it("returns [] when a prompt has more than MAX_CUSTOMIZE_VARS (it's a templating doc, not a form)", () => {
+    const many = Array.from({ length: 20 }, (_, i) => `{{v${i}}}`).join(" ");
+    expect(extractVariablesFromFiles([{ content: many }])).toEqual([]);
+  });
+
+  it("still returns a small, sane set for a real fill-in template", () => {
+    const files = [{ content: "Write a {{tone}} email to {{recipient}} about {{topic}}." }];
+    expect(extractVariablesFromFiles(files).map((v) => v.name)).toEqual(["tone", "recipient", "topic"]);
+  });
 });

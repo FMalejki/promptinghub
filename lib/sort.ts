@@ -37,7 +37,10 @@ export type SortSpec = Record<string, 1 | -1>;
 export function sortSpec(sort: SortKey): SortSpec {
   switch (sort) {
     case "popular":
-      return { stars: -1, createdAt: -1 };
+      // Engagement-weighted: stars + copies + views combined (computed in the
+      // listPrompts aggregation as engagementScore), not stars alone — with fake
+      // engagement zeroed, a stars-only "popular" collapsed into "recent".
+      return { engagementScore: -1, createdAt: -1 };
     case "copied":
       return { copyCount: -1, createdAt: -1 };
     case "trending":

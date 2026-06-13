@@ -1,6 +1,24 @@
-import { promptJsonLd, siteJsonLd, collectionsItemListJsonLd } from "../lib/jsonLd";
+import { promptJsonLd, siteJsonLd, collectionsItemListJsonLd, jsonLdHtml } from "../lib/jsonLd";
 
 const base = "https://promptinghub.app";
+
+describe("jsonLdHtml (XSS-safe <script> embedding)", () => {
+  it("neutralizes a </script> breakout in a user-controlled field", () => {
+    const html = jsonLdHtml({ name: "</script><script>alert(1)</script>" });
+    expect(html).not.toContain("</script>");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("\\u003c"); // < escaped
+  });
+
+  it("escapes <, >, &, and the JS line separators but stays valid JSON", () => {
+    const value = "a < b > c & d " + "\u2028" + " e " + "\u2029" + " f";
+    const html = jsonLdHtml({ name: value });
+    expect(html).not.toMatch(/[<>]/);
+    expect(html).not.toMatch(/[\u2028\u2029]/);
+    // round-trips: the escaped \uXXXX sequences decode back to the original
+    expect(JSON.parse(html).name).toBe(value);
+  });
+});
 
 describe("collectionsItemListJsonLd", () => {
   const collections = [

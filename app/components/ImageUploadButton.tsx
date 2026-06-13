@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { ImageCropper } from "./ImageCropper";
 
 // Small "Upload" control next to an image-URL field. Probes /api/upload on mount
 // and renders nothing when storage isn't configured (the URL field stays the only
-// path — graceful degradation). On success it calls onUploaded(publicUrl).
+// path — graceful degradation). On pick it opens a crop/preview step so the user
+// frames the image to the right aspect, then uploads the cropped JPEG and calls
+// onUploaded(publicUrl).
 export function ImageUploadButton({
   kind,
   onUploaded,
@@ -14,6 +17,7 @@ export function ImageUploadButton({
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -27,15 +31,31 @@ export function ImageUploadButton({
     };
   }, []);
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  // Release the object URL backing the cropper when it closes.
+  function closeCropper() {
+    setCropSrc((cur) => {
+      if (cur) URL.revokeObjectURL(cur);
+      return null;
+    });
+  }
+
+  // Picking a file opens the cropper instead of uploading immediately.
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
     if (!file) return;
+    setError(null);
+    setCropSrc(URL.createObjectURL(file));
+  }
+
+  // Upload the cropped blob produced by the cropper.
+  async function uploadBlob(blob: Blob) {
+    closeCropper();
     setBusy(true);
     setError(null);
     try {
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", blob, "crop.jpg");
       body.append("kind", kind);
       const res = await fetch("/api/upload", { method: "POST", body });
       const data = await res.json().catch(() => null);
@@ -55,6 +75,9 @@ export function ImageUploadButton({
 
   return (
     <div className="mt-2">
+      {cropSrc && (
+        <ImageCropper src={cropSrc} kind={kind} onCancel={closeCropper} onConfirm={uploadBlob} />
+      )}
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onFile} className="hidden" />
       <button
         type="button"

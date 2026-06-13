@@ -3,6 +3,7 @@ import {
   isImportablePath,
   selectFiles,
   buildDraft,
+  repoUrl,
   DEFAULT_CAPS,
   type TreeBlob,
 } from "../lib/githubImport";
@@ -44,6 +45,13 @@ describe("isImportablePath", () => {
       expect(isImportablePath(p)).toBe(false);
     }
   });
+  it("keeps text files with unknown or no extension (permissive — only binaries are skipped)", () => {
+    // The old allowlist dropped these; an import feature should pull any text file.
+    // Real binaries are caught at fetch time by the null-byte guard.
+    for (const p of [".cursorrules", "scripts/deploy", "app.config", "SKILL", "prompts/agent.mdc", "Justfile"]) {
+      expect(isImportablePath(p)).toBe(true);
+    }
+  });
 });
 
 describe("selectFiles", () => {
@@ -68,6 +76,14 @@ describe("selectFiles", () => {
     const sel = selectFiles([{ path: "big.ts", size: 999999 }], { ...DEFAULT_CAPS, maxFileBytes: 1000 });
     expect(sel.selected).toHaveLength(0);
   });
+  it("imports a realistic repo (74 small text files) fully under the default caps", () => {
+    // Owner hit truncation on a ~74-file repo with the old maxFiles:40 cap. The
+    // default caps must be generous enough that ordinary repos import whole.
+    const many: TreeBlob[] = Array.from({ length: 74 }, (_, i) => ({ path: `src/file-${i}.ts`, size: 1200 }));
+    const sel = selectFiles(many);
+    expect(sel.selected).toHaveLength(74);
+    expect(sel.truncated).toBe(false);
+  });
 });
 
 describe("buildDraft", () => {
@@ -83,5 +99,53 @@ describe("buildDraft", () => {
     expect(draft.tags).toEqual(expect.arrayContaining(["micrograd", "github", "python"]));
     expect(draft.description).toContain("github.com/karpathy/micrograd");
     expect(draft.notes).toEqual({ skipped: 3, truncated: false, imported: 1 });
+  });
+
+  it("attaches the linked source (repo url + branch + commit) when provided", () => {
+    const draft = buildDraft(
+      { owner: "o", repo: "r" },
+      {},
+      [{ path: "a.md", content: "x" }],
+      { skipped: 0, truncated: false },
+      { branch: "main", commit: "abc1234def" },
+    );
+    expect(draft.source).toEqual({ url: "https://github.com/o/r", ref: "main", commit: "abc1234def" });
+  });
+
+  it("omits source when not provided", () => {
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "a.md", content: "x" }], { skipped: 0, truncated: false });
+    expect(draft.source).toBeUndefined();
+  });
+
+  it("surfaces a README.md into the first-class readme field", () => {
+    const draft = buildDraft(
+      { owner: "o", repo: "r" },
+      {},
+      [{ path: "prompt.txt", content: "p" }, { path: "README.md", content: "# Hello\n\nUse it like this." }],
+      { skipped: 0, truncated: false },
+    );
+    expect(draft.readme).toBe("# Hello\n\nUse it like this.");
+  });
+
+  it("omits readme when there is no README file", () => {
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "main.py", content: "x" }], { skipped: 0, truncated: false });
+    expect(draft.readme).toBeUndefined();
+  });
+
+  it("truncates a very long README to the 20k publish cap", () => {
+    const long = "a".repeat(25000);
+    const draft = buildDraft({ owner: "o", repo: "r" }, {}, [{ path: "README.md", content: long }], { skipped: 0, truncated: false });
+    expect(draft.readme).toHaveLength(20000);
+  });
+});
+
+describe("repoUrl", () => {
+  it("builds a plain repo url", () => {
+    expect(repoUrl({ owner: "karpathy", repo: "nanoGPT" }, "master")).toBe("https://github.com/karpathy/nanoGPT");
+  });
+  it("includes /tree/<branch>/<subpath> when scoped", () => {
+    expect(repoUrl({ owner: "vercel", repo: "next.js", subpath: "packages/next" }, "canary")).toBe(
+      "https://github.com/vercel/next.js/tree/canary/packages/next",
+    );
   });
 });

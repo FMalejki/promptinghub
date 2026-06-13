@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CoverImage } from "../components/CoverImage";
 import { getDb } from "@/lib/db";
 import { listPublicCollections, type PublicCollection } from "@/lib/collections";
-import { collectionsItemListJsonLd } from "@/lib/jsonLd";
+import { collectionsItemListJsonLd, jsonLdHtml } from "@/lib/jsonLd";
 import { Navbar } from "../components/Navbar";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://promptinghub-night-shift.vercel.app";
@@ -28,7 +28,7 @@ export default async function CollectionsPage() {
       {collections.length > 0 && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionsItemListJsonLd(collections, SITE_URL)) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdHtml(collectionsItemListJsonLd(collections, SITE_URL)) }}
         />
       )}
       <Navbar />

@@ -9,7 +9,10 @@ import { useModels } from "@/lib/useModels";
 import { getTemplate } from "@/lib/templates";
 import { CoverImageField } from "../components/CoverImageField";
 import { AttachmentsField, type DraftAttachment } from "../components/AttachmentsField";
+import { FileTree } from "../components/FileTree";
+import { MarkdownField } from "../components/MarkdownField";
 import { track } from "../components/AnalyticsBeacon";
+import { useConfirm, usePrompt } from "../components/ConfirmDialog";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -17,6 +20,8 @@ type DraftFile = { path: string; content: string };
 export default function NewPromptPage() {
   const { status } = useSession();
   const router = useRouter();
+  const confirm = useConfirm();
+  const promptInput = usePrompt();
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -60,6 +65,10 @@ export default function NewPromptPage() {
     setTags([...current, tag].join(", "));
   }
   const [files, setFiles] = useState<DraftFile[]>([{ path: "prompt.txt", content: "" }]);
+  // Which file the multi-file editor is focused on (tree-nav, one file at a time).
+  const [activeEditIdx, setActiveEditIdx] = useState(0);
+  // GitHub repo this draft was imported from (persisted so it can be re-synced).
+  const [ghSource, setGhSource] = useState<{ url: string; ref?: string; commit?: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [testedModels, setTestedModels] = useState<TestedModel[]>([]);
   const AI_MODELS = useModels();
@@ -71,10 +80,12 @@ export default function NewPromptPage() {
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
   const [ghUrl, setGhUrl] = useState("");
-  const [ghToken, setGhToken] = useState("");
   const [ghImporting, setGhImporting] = useState(false);
   const [ghNote, setGhNote] = useState<string | null>(null);
+  const [ghError, setGhError] = useState<string | null>(null);
 
   // Debounced check for existing prompts with a similar name (duplicate warning).
   useEffect(() => {
@@ -98,6 +109,8 @@ export default function NewPromptPage() {
     if (!importText.trim()) return;
     setImporting(true);
     setError(null);
+    setImportNote(null);
+    setImportErr(null);
     try {
       const res = await fetch("/api/import", {
         method: "POST",
@@ -105,13 +118,15 @@ export default function NewPromptPage() {
         body: JSON.stringify({ text: importText, source: "paste" }),
       });
       if (!res.ok) {
-        setError("Could not parse that text.");
+        setImportErr("Could not parse that text — paste the prompt and try again.");
         return;
       }
-      const { draft } = await res.json();
+      const { draft, via } = await res.json();
       track("import_click", "/new", { source: "paste" });
+      setImportNote(via === "ai" ? "Filled in with AI — review and edit below before publishing." : "Filled in below — review and edit before publishing.");
       setForm((f) => ({ ...f, name: draft.name, description: draft.description, category: draft.category, isSkill: f.isSkill || !!draft.isSkill }));
       setFiles([{ path: "prompt.txt", content: draft.body }]);
+      if (Array.isArray(draft.tags) && draft.tags.length) setTags(draft.tags.join(", "));
       if (Array.isArray(draft.testedModels)) {
         setSelectedModels(new Set(draft.testedModels.map((m: TestedModel) => m.modelId)));
         setTestedModels(draft.testedModels);
@@ -128,15 +143,17 @@ export default function NewPromptPage() {
     setGhImporting(true);
     setError(null);
     setGhNote(null);
+    setGhError(null);
     try {
       const res = await fetch("/api/import/github", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: ghUrl.trim(), token: ghToken.trim() || undefined }),
+        body: JSON.stringify({ url: ghUrl.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "GitHub import failed.");
+        // Show the error right here at the import box — not only at the far bottom of the form.
+        setGhError(data.error || "GitHub import failed.");
         return;
       }
       const d = data.draft;
@@ -144,12 +161,13 @@ export default function NewPromptPage() {
       setForm((f) => ({ ...f, name: d.name, description: d.description, category: d.category, isSkill: f.isSkill || !!d.isSkill }));
       if (Array.isArray(d.tags)) setTags(d.tags.join(", "));
       if (Array.isArray(d.files) && d.files.length) setFiles(d.files.map((x: { path: string; content: string }) => ({ path: x.path, content: x.content })));
+      if (typeof d.readme === "string" && d.readme.trim()) setReadme(d.readme);
+      setGhSource(d.source || null);
       const n = d.notes || {};
       setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
       setGhUrl("");
-      setGhToken("");
     } catch {
-      setError("GitHub import failed.");
+      setGhError("GitHub import failed — check the URL and your connection.");
     } finally {
       setGhImporting(false);
     }
@@ -221,6 +239,45 @@ export default function NewPromptPage() {
   function removeFile(i: number) {
     setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
   }
+  // Delete a single file from the tree by its path (mirrors folder delete). If it
+  // would empty the prompt, fall back to a single blank prompt.txt.
+  async function removeFileByPath(path: string) {
+    const f = files.find((x) => x.path === path);
+    if (!f) return;
+    if (!(await confirm({ message: `Delete file "${path}"? This can't be undone.`, confirmLabel: "Delete", variant: "danger" }))) return;
+    setFiles((cur) => {
+      const kept = cur.filter((x) => x.path !== path);
+      return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
+    });
+    setActiveEditIdx(0);
+  }
+  // Delete a folder and every file under it. If that would empty the prompt,
+  // fall back to a single blank prompt.txt (same as "Remove all").
+  async function removeFolder(dirPath: string) {
+    const prefix = dirPath.replace(/\/+$/, "") + "/";
+    const count = files.filter((f) => f.path.startsWith(prefix)).length;
+    if (!count) return;
+    if (!(await confirm({ message: `Delete folder "${dirPath}" and its ${count} file${count === 1 ? "" : "s"}? This can't be undone.`, confirmLabel: "Delete", variant: "danger" }))) return;
+    setFiles((cur) => {
+      const kept = cur.filter((f) => !f.path.startsWith(prefix));
+      return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
+    });
+    setActiveEditIdx(0);
+  }
+  // Create a folder by adding a starter file inside it — folders here are just
+  // path prefixes (e.g. "src/utils/"), so an empty one can't exist on its own.
+  async function addFolder() {
+    const raw = await promptInput({ title: "New folder", message: "Folder name (e.g. src or src/utils)", placeholder: "src/utils", confirmLabel: "Create" });
+    if (raw === null) return;
+    const folder = raw.trim().replace(/^\/+|\/+$/g, "").replace(/\/{2,}/g, "/");
+    if (!folder) return;
+    const base = `${folder}/new-file.txt`;
+    const taken = new Set(files.map((f) => f.path));
+    let path = base;
+    for (let n = 1; taken.has(path); n++) path = `${folder}/new-file-${n}.txt`;
+    addFiles([{ path, content: "" }]);
+    setActiveEditIdx(files.length);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -252,6 +309,10 @@ export default function NewPromptPage() {
       readme: readme.trim() ? readme : undefined,
       attachments: attachments.filter((a) => a.url.trim()).length ? attachments.filter((a) => a.url.trim()) : undefined,
       sharedWith: form.isPrivate && shareWith.trim() ? shareWith : undefined,
+      // Persist the GitHub link (if imported) so the prompt can be re-synced later.
+      sourceUrl: ghSource?.url,
+      sourceRef: ghSource?.ref,
+      sourceCommit: ghSource?.commit,
     };
 
     try {
@@ -311,7 +372,7 @@ export default function NewPromptPage() {
               Import from text — paste a prompt to auto-fill
             </summary>
             <p className="mt-3 text-xs text-blue-700/80 dark:text-blue-300/70">
-              Paste your prompt — we&apos;ll fill in the title, category and the rest below for you to review.
+              Paste your prompt — we&apos;ll fill in the title, description, category and tags below for you to review.
             </p>
             <textarea
               value={importText}
@@ -339,6 +400,8 @@ export default function NewPromptPage() {
             >
               {importing ? "Parsing…" : "Fill form from text"}
             </button>
+            {importNote && <p className="mt-3 text-xs text-green-400">{importNote}</p>}
+            {importErr && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{importErr}</p>}
           </details>
 
           {/* Import a whole public GitHub repo as a multi-file prompt */}
@@ -348,23 +411,20 @@ export default function NewPromptPage() {
               Import from GitHub — paste a public repo URL
             </summary>
             <p className="mt-3 text-xs text-gray-400">
-              Pulls the repo&apos;s text/source files into a multi-file prompt (skips binaries &amp; build dirs; up to 40 files / 1.5 MB). Review before publishing.
+              Pulls the repo&apos;s files into a multi-file prompt, keeping the folder structure (skips binaries &amp; build dirs; up to 500 files / 4 MB). Review before publishing.
             </p>
             <input
               type="text"
+              name="gh-repo-url"
               value={ghUrl}
               onChange={(e) => setGhUrl(e.target.value)}
               placeholder="https://github.com/owner/repo  (or owner/repo, or .../tree/branch/path)"
               className={`${input} mt-3 font-mono text-sm`}
-            />
-            <input
-              type="password"
-              name="gh-pat"
-              value={ghToken}
-              onChange={(e) => setGhToken(e.target.value)}
-              placeholder="Optional GitHub token (private repos / higher rate limit)"
-              className={`${input} mt-2 font-mono text-sm`}
+              inputMode="url"
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               data-1p-ignore="true"
               data-lpignore="true"
               data-bwignore="true"
@@ -379,6 +439,7 @@ export default function NewPromptPage() {
               {ghImporting ? "Importing…" : "Import repo"}
             </button>
             {ghNote && <p className="mt-3 text-xs text-green-400">{ghNote}</p>}
+            {ghError && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{ghError}</p>}
           </details>
 
           {/* Basic Info */}
@@ -472,15 +533,13 @@ export default function NewPromptPage() {
 
             <div>
               <label className={label}>README (optional)</label>
-              <textarea
+              <MarkdownField
                 value={readme}
-                onChange={(e) => setReadme(e.target.value)}
-                className={`${input} font-mono min-h-[120px]`}
+                onChange={setReadme}
+                inputClassName={input}
                 placeholder={"# How to use this prompt\n\nExplain what it does, when to use it, and any setup. Markdown supported."}
-                maxLength={20000}
-                rows={6}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, code, links).</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Shown at the top of the prompt page. Markdown supported (headings, lists, ordered lists, quotes, code, links, images). Hit <span className="font-medium">Preview</span> to see it rendered.</p>
             </div>
 
             <AttachmentsField value={attachments} onChange={setAttachments} inputClassName={input} labelClassName={label} />
@@ -579,7 +638,21 @@ export default function NewPromptPage() {
 
           {/* Prompt Files */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Prompt Files</h2>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Prompt Files
+                {files.length > 1 && <span className="ml-2 text-sm font-normal text-gray-400">{files.length} files</span>}
+              </h2>
+              {files.length > 1 && (
+                <button
+                  type="button"
+                  onClick={async () => { if (await confirm({ message: `Remove all ${files.length} files?`, confirmLabel: "Remove all", variant: "danger" })) setFiles([{ path: "prompt.txt", content: "" }]); }}
+                  className="shrink-0 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                >
+                  Remove all
+                </button>
+              )}
+            </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               A prompt can be one file or a whole package (.md .py .yaml .ts …). Use{" "}
               <code className="text-gray-800 dark:text-gray-200">{"{{variable}}"}</code> or{" "}
@@ -608,38 +681,105 @@ export default function NewPromptPage() {
               </label>
             </div>
 
-            <div className="space-y-3">
-              {files.map((f, i) => (
-                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            {files.length > 1 ? (
+              // Multi-file: a clickable folder tree (left) + edit one file at a time
+              // (right), so a big import stays navigable instead of a textarea stack.
+              (() => {
+                const editIdx = Math.min(activeEditIdx, files.length - 1);
+                const f = files[editIdx];
+                return (
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="w-full md:w-60 lg:w-64 shrink-0">
+                      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2 max-h-72 md:max-h-[28rem] overflow-auto">
+                        <FileTree
+                          paths={files.map((x) => x.path)}
+                          activePath={f?.path ?? null}
+                          onSelect={(p) => { const i = files.findIndex((x) => x.path === p); if (i >= 0) setActiveEditIdx(i); }}
+                          onDeleteFolder={removeFolder}
+                          onDeleteFile={removeFileByPath}
+                        />
+                      </div>
+                      <div className="mt-2 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          + Add file
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addFolder}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          + New folder
+                        </button>
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1 w-full border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
+                        <input
+                          className="flex-1 text-sm font-mono bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
+                          value={f.path}
+                          placeholder="file path e.g. src/agent.md"
+                          onChange={(e) => updateFile(editIdx, { path: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { removeFile(editIdx); setActiveEditIdx((i) => Math.max(0, i - (editIdx <= i ? 1 : 0))); }}
+                          className="text-xs text-gray-400 hover:text-red-600 shrink-0"
+                        >
+                          remove
+                        </button>
+                      </div>
+                      <textarea
+                        className="w-full px-4 py-3 text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none"
+                        rows={18}
+                        placeholder="File content…"
+                        value={f.content}
+                        onChange={(e) => updateFile(editIdx, { content: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <>
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                   <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900">
                     <input
                       className="flex-1 text-sm font-mono bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none"
-                      value={f.path}
+                      value={files[0].path}
                       placeholder="file path e.g. prompt.md"
-                      onChange={(e) => updateFile(i, { path: e.target.value })}
+                      onChange={(e) => updateFile(0, { path: e.target.value })}
                     />
-                    {files.length > 1 && (
-                      <button type="button" onClick={() => removeFile(i)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">remove</button>
-                    )}
                   </div>
                   <textarea
                     className="w-full px-4 py-3 text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none"
                     rows={8}
                     placeholder="File content…"
-                    value={f.content}
-                    onChange={(e) => updateFile(i, { content: e.target.value })}
+                    value={files[0].content}
+                    onChange={(e) => updateFile(0, { content: e.target.value })}
                   />
                 </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }])}
-              className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              + Add file
-            </button>
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { addFiles([{ path: `file-${files.length + 1}.txt`, content: "" }]); setActiveEditIdx(files.length); }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + Add file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addFolder}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + New folder
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Tested Models */}

@@ -5,7 +5,7 @@ import { Avatar } from "../Avatar";
 import { getPlaceholderImage, getModelName } from "@/lib/constants";
 import { isImagePrompt } from "@/lib/imageModels";
 import { formatPrice, isPaid } from "@/lib/pricing";
-import { lengthLabel } from "@/lib/promptLength";
+import { cardLengthBadge } from "@/lib/promptLength";
 import type { CardAttestation } from "@/lib/attestations";
 import { useWithBadge, type UseWith } from "@/lib/useWith";
 
@@ -43,23 +43,24 @@ type PromptCardProps = {
   isSkill?: boolean;
   testedModels?: TestedModel[];
   copyCount?: number;
+  commentCount?: number;
   priceCents?: number;
   tokens?: number;
   attestation?: CardAttestation | null;
   useWith?: UseWith;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, commentCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
-  const length = lengthLabel(tokens);
+  const length = cardLengthBadge(tokens);
   const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
   const useWithChip = useWithBadge(useWith);
 
   return (
     <Link
       href={`/prompt/${id}`}
-      className="group block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
+      className="group flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
     >
       {/* Header: small cover thumbnail + title + inline meta (HF-style — the
           cover is secondary, not a hero). */}
@@ -161,8 +162,8 @@ export function PromptCard({ id, name, description, category, author, image, sta
         </div>
       )}
 
-      {/* Footer */}
-      <div className="mt-3 flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+      {/* Footer (mt-auto pins it to the bottom so cards in a grid row match height) */}
+      <div className="mt-auto pt-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-700">
           {/* Author */}
           {author.handle ? (
             <Link
@@ -194,6 +195,14 @@ export function PromptCard({ id, name, description, category, author, image, sta
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm font-medium">{copyCount}</span>
+              </div>
+            )}
+            {commentCount > 0 && (
+              <div className="flex items-center gap-1" title={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="text-sm font-medium">{commentCount}</span>
               </div>
             )}
           </div>

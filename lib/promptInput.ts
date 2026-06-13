@@ -2,7 +2,9 @@ import { z } from "zod";
 
 const fileSchema = z.object({
   path: z.string().min(1).max(200),
-  content: z.string().max(50000),
+  // Matches the GitHub importer's per-file cap (128 KB); generous headroom so
+  // imported source files aren't rejected at publish time.
+  content: z.string().max(200000),
   language: z.string().max(40).optional(),
 });
 
@@ -18,7 +20,7 @@ export const newPromptSchema = z
     description: z.string().min(1).max(300),
     category: z.string().min(1).max(40),
     body: z.string().max(50000).optional(),
-    files: z.array(fileSchema).max(50).optional(),
+    files: z.array(fileSchema).max(500).optional(),
     image: z.string().url().or(z.literal("")).optional(),
     isPrivate: z.boolean().optional(),
     // Author flag: this prompt is a reusable "skill".
@@ -44,6 +46,10 @@ export const newPromptSchema = z
     collaborators: z.union([z.string().max(4000), z.array(z.string().max(200)).max(200)]).optional(),
     // Optional "commit message" describing an edit (used on update, ignored on create).
     message: z.string().max(200).optional(),
+    // Linked GitHub repo (set by the importer) so the prompt can be re-synced.
+    sourceUrl: z.string().max(400).optional(),
+    sourceRef: z.string().max(200).optional(),
+    sourceCommit: z.string().max(64).optional(),
   })
   .refine((d) => Boolean(d.body && d.body.trim().length) || Boolean(d.files && d.files.length), {
     message: "Provide a prompt body or at least one file",

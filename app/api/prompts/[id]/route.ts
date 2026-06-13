@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getPrompt, getPromptDetail, updatePrompt, deletePrompt } from "@/lib/prompts";
+import { getPrompt, getPromptDetail, updatePrompt, deletePrompt, setPromptEmbedding } from "@/lib/prompts";
 import { canViewPrompt } from "@/lib/promptAuthz";
 import { newPromptSchema } from "@/lib/promptInput";
+import { embedText, embeddingTextFor } from "@/lib/embeddings";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -36,8 +37,16 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const { message, ...data } = parsed.data;
   try {
-    const ok = await updatePrompt(await getDb(), params.id, email, { ...data, image: data.image || undefined }, { message });
+    const db = await getDb();
+    const ok = await updatePrompt(db, params.id, email, { ...data, image: data.image || undefined }, { message, trackRemovals: true });
     if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
+    // Refresh the semantic embedding for the edited text (best-effort).
+    try {
+      const vec = await embedText(embeddingTextFor({ name: data.name, description: data.description, tags: data.tags }));
+      if (vec) await setPromptEmbedding(db, params.id, vec);
+    } catch {
+      /* embedding is optional */
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to update prompt";

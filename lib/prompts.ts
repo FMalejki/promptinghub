@@ -34,6 +34,8 @@ export type Prompt = {
   isPrivate: boolean;
   testedModels: TestedModel[];
   copyCount: number;
+  // Number of comments on the prompt — a discussion-volume signal on the card.
+  commentCount?: number;
   priceCents: number;
   tags: string[];
   isSkill?: boolean;
@@ -77,6 +79,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount: number;
   viewCount: number;
+  commentCount: number;
   priceCents: number;
   tags: string[];
   forkedFrom: { id: string; name: string } | null;
@@ -103,6 +106,10 @@ export type PromptDetail = {
   // Present when the owner has a handle and the prompt has a slug (see getPromptDetail).
   handle?: string;
   slug?: string;
+  // Linked GitHub repo (when imported from one) — powers the Sync button.
+  sourceUrl?: string;
+  sourceRef?: string | null;
+  sourceCommit?: string | null;
 };
 
 export type NamespacedPromptDetail = PromptDetail & { handle: string; slug: string };
@@ -154,6 +161,10 @@ export type NewPrompt = {
   // Emails granted EDIT access (collaborators). Same accepted shapes as
   // sharedWith. Owner-only to set; collaborators cannot change this list.
   collaborators?: string[] | string;
+  // Linked GitHub repo (set by the importer) for click-to-sync.
+  sourceUrl?: string;
+  sourceRef?: string;
+  sourceCommit?: string;
 };
 
 // Normalize a share list (array or comma/newline-separated string) into a clean,
@@ -293,8 +304,38 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         stars: { $size: { $ifNull: ["$starredBy", []] } },
         copyCount: { $ifNull: ["$copyCount", 0] },
         viewCount: { $ifNull: ["$viewCount", 0] },
-        // Trending = copies + stars (recency breaks ties via the $sort below).
-        trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
+        // Popular = weighted total engagement: stars (strongest intent) ×3,
+        // copies ×2, views ×1. Recency breaks ties.
+        engagementScore: {
+          $add: [
+            { $multiply: [{ $size: { $ifNull: ["$starredBy", []] } }, 3] },
+            { $multiply: [{ $ifNull: ["$copyCount", 0] }, 2] },
+            { $ifNull: ["$viewCount", 0] },
+          ],
+        },
+        // Trending = that same engagement with Hacker-News-style gravity decay by
+        // age, so a fresh, engaged prompt outranks a stale one with equal engagement
+        // ("more popular AND more recent"). score = engagement / sqrt(ageHours + 2).
+        trendingScore: {
+          $let: {
+            vars: {
+              eng: {
+                $add: [
+                  { $multiply: [{ $size: { $ifNull: ["$starredBy", []] } }, 3] },
+                  { $multiply: [{ $ifNull: ["$copyCount", 0] }, 2] },
+                  { $ifNull: ["$viewCount", 0] },
+                ],
+              },
+              ageHours: {
+                $divide: [
+                  { $max: [0, { $subtract: ["$$NOW", { $toDate: { $ifNull: ["$createdAt", "$$NOW"] } }] }] },
+                  3600000,
+                ],
+              },
+            },
+            in: { $divide: ["$$eng", { $sqrt: { $add: ["$$ageHours", 2] } }] },
+          },
+        },
       },
     },
     { $sort: sortField },
@@ -318,6 +359,18 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         pipeline: [{ $project: { _id: 0, modelId: 1, email: 1, vote: 1 } }],
       },
     },
+    // Discussion volume per card: count comments whose promptId is this prompt's
+    // stringified _id. Counted server-side so the card shows a real number.
+    {
+      $lookup: {
+        from: "comments",
+        localField: "idStr",
+        foreignField: "promptId",
+        as: "cmts",
+        pipeline: [{ $count: "n" }],
+      },
+    },
+    { $addFields: { commentCount: { $ifNull: [{ $arrayElemAt: ["$cmts.n", 0] }, 0] } } },
   );
 
   const rows = await db.collection("prompts").aggregate(pipeline).toArray();
@@ -332,6 +385,7 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
     isPrivate: r.isPrivate || false,
     testedModels: r.testedModels || [],
     copyCount: r.copyCount || 0,
+    commentCount: r.commentCount || 0,
     priceCents: r.priceCents || 0,
     tags: r.tags || [],
     isSkill: !!r.isSkill,
@@ -345,6 +399,44 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
 
 export async function listCategories(db: Db): Promise<string[]> {
   return ((await db.collection("prompts").distinct("category")) as string[]).sort();
+}
+
+// Existence checks for the /c and /t browse pages — true when ANY prompt (public
+// or private) uses this category/tag. Deliberately privacy-agnostic so we 404
+// only genuinely-empty URLs (typos), never a page a signed-in owner could fill
+// with their own private prompts. Match shapes mirror listPrompts' filters.
+export async function categoryExists(db: Db, category: string): Promise<boolean> {
+  if (!category) return false;
+  return (await db.collection("prompts").countDocuments({ category }, { limit: 1 })) > 0;
+}
+
+export async function tagExists(db: Db, tag: string): Promise<boolean> {
+  const t = normalizeTags(tag)[0];
+  if (!t) return false;
+  return (await db.collection("prompts").countDocuments({ tags: t }, { limit: 1 })) > 0;
+}
+
+// --- Semantic-search embedding storage (model-free; the vectors are computed in
+// the route/backfill via lib/embeddings, kept out of this module so tests and
+// other consumers never load the model). ---
+
+// Persist a prompt's embedding vector. Best-effort: callers ignore failures so a
+// missing/late embedding only means the prompt falls back to keyword matching.
+export async function setPromptEmbedding(db: Db, id: string, embedding: number[]): Promise<void> {
+  if (!ObjectId.isValid(id) || !Array.isArray(embedding) || !embedding.length) return;
+  await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: { embedding } });
+}
+
+// Load stored embeddings for a set of prompt ids → Map<id, vector>. Prompts
+// without an embedding are simply absent from the map.
+export async function getPromptEmbeddings(db: Db, ids: string[]): Promise<Map<string, number[]>> {
+  const objIds = ids.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+  if (!objIds.length) return new Map();
+  const rows = await db
+    .collection("prompts")
+    .find({ _id: { $in: objIds }, embedding: { $type: "array" } }, { projection: { embedding: 1 } })
+    .toArray();
+  return new Map(rows.map((r: any) => [r._id.toString(), r.embedding as number[]]));
 }
 
 /** Public prompt counts per category, descending by count. */
@@ -361,7 +453,8 @@ export async function topCategories(db: Db): Promise<{ category: string; count: 
 }
 
 /** Most-used tags across public prompts, descending by count. */
-export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count: number }[]> {
+export async function topTags(db: Db, limit = 30, offset = 0): Promise<{ tag: string; count: number }[]> {
+  const skip = Math.max(0, Math.floor(offset));
   const rows = await db
     .collection("prompts")
     .aggregate([
@@ -369,6 +462,7 @@ export async function topTags(db: Db, limit = 30): Promise<{ tag: string; count:
       { $unwind: "$tags" },
       { $group: { _id: "$tags", count: { $sum: 1 } } },
       { $sort: { count: -1, _id: 1 } },
+      ...(skip > 0 ? [{ $skip: skip }] : []),
       { $limit: limit },
     ])
     .toArray();
@@ -484,6 +578,14 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
     createdAt: new Date(),
   };
   if (files) doc.files = files;
+  // Link to the originating GitHub repo so the owner can re-sync later.
+  if (data.sourceUrl && /^https:\/\/github\.com\//i.test(data.sourceUrl)) {
+    doc.source = "github";
+    doc.sourceUrl = data.sourceUrl;
+    if (data.sourceRef) doc.sourceRef = data.sourceRef;
+    if (data.sourceCommit) doc.sourceCommit = data.sourceCommit;
+    doc.sourceSyncedAt = new Date();
+  }
   const { insertedId } = await db.collection("prompts").insertOne(doc);
   // Notify the source owner when their prompt is forked (best-effort, no self-notify).
   if (forkSource) {
@@ -529,12 +631,20 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
 // tags, testedModels, body/files) but NOT owner-only fields — privacy, price,
 // the share allowlist, or the collaborator list. Those are silently dropped for
 // non-owners so a collaborator can never widen access or change pricing.
+// Drop repo files whose path the owner has tombstoned (manually deleted), so a
+// GitHub sync re-pull doesn't resurrect them. Pure; used by the sync route.
+export function filterSyncedFiles<T extends { path: string }>(files: T[], removedPaths?: string[] | null): T[] {
+  if (!removedPaths || removedPaths.length === 0) return files;
+  const removed = new Set(removedPaths);
+  return files.filter((f) => !removed.has(f.path));
+}
+
 export async function updatePrompt(
   db: Db,
   id: string,
   editorEmail: string,
   data: Partial<NewPrompt>,
-  opts?: { message?: string },
+  opts?: { message?: string; trackRemovals?: boolean },
 ): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
 
@@ -555,6 +665,11 @@ export async function updatePrompt(
   if (data.attachments !== undefined) set.attachments = normalizeAttachments(data.attachments);
   if (data.isSkill !== undefined) set.isSkill = !!data.isSkill;
   if (data.useWith !== undefined) set.useWith = resolveUseWith(data.useWith);
+  // Sync-from-GitHub bookkeeping: record the commit we synced to + when.
+  if (data.sourceCommit !== undefined) {
+    set.sourceCommit = data.sourceCommit;
+    set.sourceSyncedAt = new Date();
+  }
 
   // Owner-only fields — ignored entirely when a collaborator is editing.
   let incomingShared: string[] | undefined;
@@ -584,6 +699,19 @@ export async function updatePrompt(
   if (contentEditing) {
     set.body = newBody ?? "";
     set.files = newFiles ?? [];
+
+    // Track owner deletions so a later GitHub sync doesn't resurrect removed
+    // files. Only on real editor saves (trackRemovals) — the sync path passes a
+    // pre-filtered set and must leave the existing tombstones untouched.
+    if (opts?.trackRemovals && newFiles) {
+      const newPaths = new Set(newFiles.map((f) => f.path));
+      const oldPaths = ((current.files as PromptFile[] | undefined) ?? []).map((f) => f.path);
+      const existing: string[] = Array.isArray(current.removedPaths) ? (current.removedPaths as string[]) : [];
+      // Keep tombstones still absent, add newly-removed paths; a re-added path clears its tombstone.
+      const removed = new Set<string>(existing.filter((p) => !newPaths.has(p)));
+      for (const p of oldPaths) if (!newPaths.has(p)) removed.add(p);
+      set.removedPaths = [...removed];
+    }
 
     // Snapshot the prior content as a version before overwriting it.
     const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;
@@ -658,6 +786,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
   }
   const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
+  const commentCount = await db.collection("comments").countDocuments({ promptId: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -672,6 +801,7 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     viewCount: row.viewCount || 0,
+    commentCount,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
@@ -683,6 +813,8 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    // Linked GitHub repo (public info — safe for any viewer; powers the Sync button).
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl as string, sourceRef: (row.sourceRef as string) ?? null, sourceCommit: (row.sourceCommit as string) ?? null } : {}),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
     canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),
@@ -914,6 +1046,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     if (src) forkedFrom = { id: row.forkedFrom, name: src.name };
   }
   const forkCount = await db.collection("prompts").countDocuments({ forkedFrom: row._id.toString() });
+  const commentCount = await db.collection("comments").countDocuments({ promptId: row._id.toString() });
   return {
     id: row._id.toString(),
     name: row.name,
@@ -928,6 +1061,7 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     testedModels: row.testedModels || [],
     copyCount: row.copyCount || 0,
     viewCount: row.viewCount || 0,
+    commentCount,
     priceCents: row.priceCents || 0,
     tags: row.tags || [],
     forkedFrom,
@@ -939,6 +1073,8 @@ export async function getPromptDetailByHandleAndSlug(db: Db, handle: string, slu
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
     isStarred: !!viewerEmail && Array.isArray(row.starredBy) && row.starredBy.includes(viewerEmail),
+    // Linked GitHub repo (public info — safe for any viewer; powers the Sync button).
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl as string, sourceRef: (row.sourceRef as string) ?? null, sourceCommit: (row.sourceCommit as string) ?? null } : {}),
     isOwner: !!viewerEmail && viewerEmail === row.ownerEmail,
     isCollaborator: isCollab(row as unknown as AuthzRow, viewerEmail),
     canEdit: canEditPrompt(row as unknown as AuthzRow, viewerEmail),

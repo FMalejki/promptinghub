@@ -12,6 +12,22 @@ describe("pickReadme", () => {
   it("ignores a readme with empty content", () => {
     expect(pickReadme([{ path: "README.md", content: "   " }])).toBeNull();
   });
+  it("prefers the ROOT readme over a nested one, regardless of array order", () => {
+    expect(
+      pickReadme([
+        { path: "phases/README.md", content: "# Phase files" },
+        { path: "README.md", content: "# Root" },
+      ]),
+    ).toBe("# Root");
+    // root listed second-deepest still wins
+    expect(
+      pickReadme([
+        { path: "a/b/readme.md", content: "deep" },
+        { path: "docs/README.md", content: "docs" },
+        { path: "README", content: "root-noext" },
+      ]),
+    ).toBe("root-noext");
+  });
 });
 
 describe("resolveReadme", () => {
@@ -51,6 +67,85 @@ describe("parseBlocks", () => {
       { type: "paragraph", text: "hello world" },
       { type: "paragraph", text: "second para" },
     ]);
+  });
+  it("keeps bullet lists in their original shape (no ordered key)", () => {
+    expect(parseBlocks("- a\n- b")).toEqual([{ type: "list", items: ["a", "b"] }]);
+  });
+  it("parses ordered (numbered) lists with an ordered flag", () => {
+    expect(parseBlocks("1. first\n2. second\n3. third")).toEqual([
+      { type: "list", ordered: true, items: ["first", "second", "third"] },
+    ]);
+  });
+  it("splits an ordered list and a following bullet list into two blocks", () => {
+    const b = parseBlocks("1. one\n2. two\n\n- a\n- b");
+    expect(b).toEqual([
+      { type: "list", ordered: true, items: ["one", "two"] },
+      { type: "list", items: ["a", "b"] },
+    ]);
+  });
+  it("parses a blockquote, collapsing consecutive > lines", () => {
+    expect(parseBlocks("> quoted line\n> still quoted")).toEqual([
+      { type: "quote", text: "quoted line still quoted" },
+    ]);
+  });
+  it("parses horizontal rules (---, ***, ___)", () => {
+    expect(parseBlocks("---")).toEqual([{ type: "hr" }]);
+    expect(parseBlocks("***")).toEqual([{ type: "hr" }]);
+    expect(parseBlocks("___")).toEqual([{ type: "hr" }]);
+  });
+  it("parses a standalone http(s) image line", () => {
+    expect(parseBlocks("![logo](https://x.com/a.png)")).toEqual([
+      { type: "image", alt: "logo", src: "https://x.com/a.png" },
+    ]);
+  });
+  it("does not treat a non-http image as a block image", () => {
+    const b = parseBlocks("![x](/local.png)");
+    expect(b[0].type).not.toBe("image");
+  });
+});
+
+describe("parseBlocks — GFM tables", () => {
+  it("parses a pipe table with header, alignment and rows", () => {
+    const src = "| Phase | Figures out |\n|---|:--:|\n| 0 · Preflight | Project path |\n| 1 · What to do | Your goal |";
+    expect(parseBlocks(src)).toEqual([
+      {
+        type: "table",
+        header: ["Phase", "Figures out"],
+        align: [null, "center"],
+        rows: [
+          ["0 · Preflight", "Project path"],
+          ["1 · What to do", "Your goal"],
+        ],
+      },
+    ]);
+  });
+
+  it("parses left/right/center alignment markers", () => {
+    const src = "| a | b | c |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |";
+    const b = parseBlocks(src)[0] as any;
+    expect(b.type).toBe("table");
+    expect(b.align).toEqual(["left", "center", "right"]);
+  });
+
+  it("tolerates missing outer pipes; truncates extra cells and pads short rows to header width", () => {
+    const src = "h1 | h2\n--- | ---\nx | y | z\nlonely |";
+    const b = parseBlocks(src)[0] as any;
+    expect(b.type).toBe("table");
+    expect(b.header).toEqual(["h1", "h2"]);
+    // extra cell (z) dropped; short row padded to header width
+    expect(b.rows).toEqual([["x", "y"], ["lonely", ""]]);
+  });
+
+  it("does NOT treat a lone pipe line (no delimiter row) as a table", () => {
+    const b = parseBlocks("| not | really |\njust text");
+    expect(b.every((x) => x.type !== "table")).toBe(true);
+  });
+
+  it("ends the table at a blank line and resumes normal blocks", () => {
+    const src = "| a | b |\n|---|---|\n| 1 | 2 |\n\nAfter the table.";
+    const blocks = parseBlocks(src);
+    expect(blocks[0].type).toBe("table");
+    expect(blocks[1]).toEqual({ type: "paragraph", text: "After the table." });
   });
 });
 

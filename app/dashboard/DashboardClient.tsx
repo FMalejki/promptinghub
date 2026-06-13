@@ -1,23 +1,40 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
+import { useToast } from "../components/Toast";
 import { weekOverWeek } from "@/lib/analyticsSummary";
 
 type Row = { id: string; name: string; copyCount: number; stars: number; forkCount: number; isPrivate: boolean };
-type SeriesPoint = { day: string; count: number };
+type SeriesPoint = { day: string; copies: number; views: number };
 type Analytics = { totals: { prompts: number; copies: number; stars: number; forks: number }; perPrompt: Row[]; series: SeriesPoint[] };
 
+type Metric = "activity" | "copies" | "views";
+const METRICS: { key: Metric; label: string; color: string }[] = [
+  { key: "activity", label: "Activity", color: "#3b82f6" },
+  { key: "copies", label: "Copies", color: "#8b5cf6" },
+  { key: "views", label: "Views", color: "#10b981" },
+];
+// Activity = everything together (copies + views); the others isolate one signal.
+function valueOf(p: SeriesPoint, metric: Metric): number {
+  if (metric === "copies") return p.copies;
+  if (metric === "views") return p.views;
+  return p.copies + p.views;
+}
+
 function Sparkline({ series }: { series: SeriesPoint[] }) {
+  const [metric, setMetric] = useState<Metric>("activity");
   if (!series || series.length === 0) return null;
   const w = 600;
   const h = 80;
-  const max = Math.max(1, ...series.map((p) => p.count));
+  const active = METRICS.find((m) => m.key === metric) || METRICS[0];
+  const pointsForMetric = series.map((p) => ({ day: p.day, count: valueOf(p, metric) }));
+  const max = Math.max(1, ...pointsForMetric.map((p) => p.count));
   const dx = series.length > 1 ? w / (series.length - 1) : 0;
-  const pts = series.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
-  const total = series.reduce((s, p) => s + p.count, 0);
-  const trend = weekOverWeek(series);
+  const pts = pointsForMetric.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
+  const total = pointsForMetric.reduce((s, p) => s + p.count, 0);
+  const trend = weekOverWeek(pointsForMetric);
   const trendColor =
     trend.direction === "up"
       ? "text-green-600 dark:text-green-400"
@@ -33,8 +50,8 @@ function Sparkline({ series }: { series: SeriesPoint[] }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Copies — last 14 days</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{active.label} — last 14 days</h2>
         <div className="flex items-baseline gap-2">
           {trendLabel && (
             <span className={`text-xs font-medium ${trendColor}`}>
@@ -45,8 +62,24 @@ function Sparkline({ series }: { series: SeriesPoint[] }) {
           <span className="text-xs text-gray-500 dark:text-gray-400">{total} total</span>
         </div>
       </div>
+      {/* Metric selector — defaults to combined Activity. */}
+      <div className="flex items-center gap-1 mb-3 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-900 w-fit">
+        {METRICS.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => setMetric(m.key)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+              metric === m.key
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
+        <polyline fill="none" stroke={active.color} strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="flex justify-between mt-1 text-[10px] text-gray-400">
         <span>{series[0]?.day.slice(5)}</span>
@@ -67,8 +100,82 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export default function DashboardPage() {
   const { status } = useSession();
+  const { toast } = useToast();
   const [data, setData] = useState<Analytics | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "anon" | "error">("loading");
+  // Pending deferred deletes: promptId → the timer that will fire the DELETE.
+  const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const mounted = useRef(true);
+  useEffect(() => {
+    const timers = pendingDeletes.current;
+    return () => {
+      mounted.current = false;
+      // Leave timers running so an in-flight delete still completes after the
+      // user navigates away (Gmail-style) — only stop tracking them.
+      timers.clear();
+    };
+  }, []);
+
+  // Re-insert a row that was optimistically removed (undo, or a failed delete).
+  function restoreRow(row: Row) {
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            totals: { ...d.totals, prompts: d.totals.prompts + 1 },
+            perPrompt: d.perPrompt.some((p) => p.id === row.id) ? d.perPrompt : [row, ...d.perPrompt],
+          }
+        : d,
+    );
+  }
+
+  // Delete one of your own prompts from the dashboard with an undo grace period
+  // (deferred-delete, à la Gmail): the row is removed immediately and the server
+  // DELETE only fires after the toast's window elapses, so "Undo" can cancel it
+  // before it ever leaves the browser. No native confirm — undo is the safety net.
+  function deletePrompt(row: Row) {
+    if (pendingDeletes.current.has(row.id)) return;
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            totals: { ...d.totals, prompts: Math.max(0, d.totals.prompts - 1) },
+            perPrompt: d.perPrompt.filter((p) => p.id !== row.id),
+          }
+        : d,
+    );
+    const fail = () => {
+      if (!mounted.current) return;
+      toast("Couldn't delete that prompt — it's been restored.", { variant: "error" });
+      restoreRow(row);
+    };
+    // Fire the actual delete just after the undo toast disappears (5.5s), so the
+    // Undo button is never visible once the request is committed.
+    const timer = setTimeout(() => {
+      pendingDeletes.current.delete(row.id);
+      fetch(`/api/prompts/${row.id}`, { method: "DELETE" })
+        .then((res) => {
+          if (!res.ok) fail();
+        })
+        .catch(fail);
+    }, 6000);
+    pendingDeletes.current.set(row.id, timer);
+    toast(`Deleted “${row.name}”.`, {
+      variant: "success",
+      durationMs: 5500,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const t = pendingDeletes.current.get(row.id);
+          if (t) {
+            clearTimeout(t);
+            pendingDeletes.current.delete(row.id);
+            restoreRow(row);
+          }
+        },
+      },
+    });
+  }
 
   const load = useCallback(() => {
     setState("loading");
@@ -143,6 +250,7 @@ export default function DashboardPage() {
                       <th className="px-4 py-3 font-medium text-right">Copies</th>
                       <th className="px-4 py-3 font-medium text-right">Stars</th>
                       <th className="px-4 py-3 font-medium text-right">Forks</th>
+                      <th className="px-4 py-3 font-medium text-right sr-only">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,6 +265,24 @@ export default function DashboardPage() {
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.copyCount}</td>
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.stars}</td>
                         <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.forkCount}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <Link
+                              href={`/prompt/${r.id}/edit`}
+                              className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              onClick={() => deletePrompt(r)}
+                              title="Delete this prompt"
+                              aria-label={`Delete ${r.name}`}
+                              className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -12,7 +12,7 @@ describe("securityHeaders", () => {
   it("applies baseline hardening to the embed route while keeping it framable", () => {
     const byName = Object.fromEntries(securityHeaders("/embed/abc").map((x) => [x.name, x.value]));
     expect(byName["X-Content-Type-Options"]).toBe("nosniff");
-    expect(byName["Content-Security-Policy"]).toBe("frame-ancestors *");
+    expect(byName["Content-Security-Policy"]).toContain("frame-ancestors *");
     expect(byName["X-Frame-Options"]).toBeUndefined();
   });
 });
@@ -35,7 +35,7 @@ describe("frameHeaders", () => {
     const h = frameHeaders("/login");
     const byName = Object.fromEntries(h.map((x) => [x.name, x.value]));
     expect(byName["X-Frame-Options"]).toBe("SAMEORIGIN");
-    expect(byName["Content-Security-Policy"]).toBe("frame-ancestors 'self'");
+    expect(byName["Content-Security-Policy"]).toContain("frame-ancestors 'self'");
   });
 
   it("leaves the embed route framable from any origin (oEmbed must work cross-site)", () => {
@@ -43,6 +43,14 @@ describe("frameHeaders", () => {
     const byName = Object.fromEntries(h.map((x) => [x.name, x.value]));
     // No X-Frame-Options (it has no allow-list value and would block cross-origin frames).
     expect(byName["X-Frame-Options"]).toBeUndefined();
-    expect(byName["Content-Security-Policy"]).toBe("frame-ancestors *");
+    expect(byName["Content-Security-Policy"]).toContain("frame-ancestors *");
+  });
+
+  it("always pins object-src and base-uri (anti-XSS hardening) on every path", () => {
+    for (const path of ["/login", "/embed/abc123", "/prompt/x"]) {
+      const csp = Object.fromEntries(frameHeaders(path).map((x) => [x.name, x.value]))["Content-Security-Policy"];
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).toContain("base-uri 'self'");
+    }
   });
 });

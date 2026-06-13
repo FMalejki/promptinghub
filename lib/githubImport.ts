@@ -2,6 +2,7 @@
 // (infrastructure-as-a-prompt). The route layer does the actual fetching and
 // injects results here. Keeping parse + filtering pure makes it unit-testable.
 import { looksLikeSkill } from "./import";
+import { pickReadme } from "./markdown";
 
 export type RepoRef = { owner: string; repo: string; ref?: string; subpath?: string };
 
@@ -37,37 +38,22 @@ export function parseRepoRef(input: string): RepoRef | null {
   return { owner, repo };
 }
 
-// Allowlist of text/source extensions worth importing as prompt files.
-const TEXT_EXT = new Set([
-  "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "kts",
-  "swift", "c", "h", "cc", "cpp", "hpp", "cs", "php", "sh", "bash", "zsh", "fish",
-  "sql", "graphql", "gql", "proto", "yaml", "yml", "toml", "ini", "cfg", "conf",
-  "json", "jsonc", "md", "mdx", "markdown", "txt", "rst", "html", "htm", "css",
-  "scss", "sass", "less", "vue", "svelte", "astro", "tf", "tfvars", "hcl", "r",
-  "jl", "lua", "pl", "pm", "ex", "exs", "erl", "clj", "cljs", "scala", "dart",
-  "gradle", "groovy", "xml", "csv", "tsv", "env", "example", "lock", "properties",
-  "make", "mk", "cmake", "nix", "vim", "el", "tex", "bib", "ipynb",
-]);
-
-// Files with no/odd extension that are still worth importing.
-const SPECIAL_NAMES = new Set([
-  "dockerfile", "makefile", "readme", "license", "licence", "changelog",
-  "contributing", ".gitignore", ".dockerignore", ".env.example", ".editorconfig",
-  ".eslintrc", ".prettierrc", ".npmrc", "procfile", "rakefile", "gemfile", "brewfile",
-]);
-
 const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", "out", "vendor", "coverage",
   ".venv", "venv", "__pycache__", "target", ".turbo", "bin", "obj", ".cache",
   ".idea", ".vscode", "tmp", "temp", ".gradle", "pkg", ".terraform",
 ]);
 
-// Definitely-binary or noise extensions we never import.
+// Definitely-binary or noise extensions we never import. Everything NOT on this
+// list (and not in a skip dir) is treated as importable text — the route layer's
+// null-byte guard drops anything that turns out to be binary at fetch time.
 const BINARY_EXT = new Set([
-  "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "tiff", "svg", "pdf", "zip",
-  "gz", "tgz", "tar", "rar", "7z", "woff", "woff2", "ttf", "otf", "eot", "mp4",
-  "mp3", "wav", "mov", "avi", "webm", "wasm", "so", "dll", "dylib", "exe", "bin",
-  "class", "jar", "o", "a", "node", "pyc", "min.js", "min.css", "map",
+  "png", "jpg", "jpeg", "gif", "webp", "ico", "icns", "bmp", "tiff", "heic", "heif",
+  "avif", "jfif", "psd", "ai", "xcf", "sketch", "fig", "svg", "pdf", "zip", "gz",
+  "tgz", "bz2", "xz", "tar", "rar", "7z", "woff", "woff2", "ttf", "ttc", "otf",
+  "eot", "mp4", "mp3", "wav", "flac", "ogg", "mov", "avi", "mkv", "webm", "wasm",
+  "so", "dll", "dylib", "exe", "bin", "dat", "db", "sqlite", "class", "jar", "o",
+  "a", "node", "pyc", "pyo", "glb", "gltf", "fbx", "stl", "blend", "map",
 ]);
 
 function basename(path: string): string {
@@ -89,14 +75,18 @@ export function isImportablePath(path: string): boolean {
   if (name.endsWith(".min.js") || name.endsWith(".min.css")) return false;
   const ext = extOf(name);
   if (ext && BINARY_EXT.has(ext)) return false;
-  if (SPECIAL_NAMES.has(name)) return true;
-  if (!ext) return false; // unknown, no extension, not special → skip
-  return TEXT_EXT.has(ext);
+  // Permissive by design: anything that isn't in a skip dir and isn't a known
+  // binary is importable text — including unknown/no extension (configs, dotfiles,
+  // scripts). The route's null-byte guard drops anything binary at fetch time.
+  return true;
 }
 
 export type TreeBlob = { path: string; size: number };
 export type ImportCaps = { maxFiles: number; maxFileBytes: number; maxTotalBytes: number };
-export const DEFAULT_CAPS: ImportCaps = { maxFiles: 40, maxFileBytes: 96 * 1024, maxTotalBytes: 1_500_000 };
+// Generous enough that ordinary repos/skills import whole (the old maxFiles:40
+// truncated real repos). The total-bytes guard is the real safety limit — it keeps
+// the resulting single prompt doc well under Mongo's 16 MB ceiling.
+export const DEFAULT_CAPS: ImportCaps = { maxFiles: 500, maxFileBytes: 128 * 1024, maxTotalBytes: 4_000_000 };
 
 export type Selection = { selected: TreeBlob[]; skipped: number; truncated: boolean };
 
@@ -127,6 +117,11 @@ export function selectFiles(blobs: TreeBlob[], caps: ImportCaps = DEFAULT_CAPS):
 
 export type RepoMeta = { description?: string | null; language?: string | null; stars?: number };
 
+// The GitHub repo a prompt is linked to, so it can be re-synced later. `url` is
+// the canonical repo (with /tree/<ref>/<subpath> when scoped), `ref` the branch,
+// `commit` the HEAD SHA at import time (used to detect new commits).
+export type ImportSource = { url: string; ref: string; commit?: string };
+
 export type ImportDraft = {
   name: string;
   description: string;
@@ -136,13 +131,25 @@ export type ImportDraft = {
   notes: { skipped: number; truncated: boolean; imported: number };
   // True when the repo looks like an agent skill (e.g. contains a SKILL.md).
   isSkill?: boolean;
+  // The linked repo, for click-to-sync.
+  source?: ImportSource;
+  // The repo's README.md content (if any), surfaced into the prompt's first-class
+  // README field so it renders as markdown above the files (like GitHub).
+  readme?: string;
 };
+
+// Canonical GitHub URL for a parsed ref + resolved branch.
+export function repoUrl(ref: RepoRef, branch: string): string {
+  const base = `https://github.com/${ref.owner}/${ref.repo}`;
+  return ref.subpath ? `${base}/tree/${branch}/${ref.subpath}` : base;
+}
 
 export function buildDraft(
   ref: RepoRef,
   meta: RepoMeta,
   files: { path: string; content: string }[],
   selection: Pick<Selection, "skipped" | "truncated">,
+  source?: { branch: string; commit?: string },
 ): ImportDraft {
   const tags = [ref.repo.toLowerCase(), "github"];
   if (meta.language) tags.push(meta.language.toLowerCase());
@@ -150,6 +157,10 @@ export function buildDraft(
     (meta.description && meta.description.trim()) ||
     `Imported from github.com/${ref.owner}/${ref.repo}`;
   const isSkill = looksLikeSkill({ files });
+  // The prompt's README field caps at 20 000 chars (newPromptSchema); truncate so
+  // a long repo README never blocks publishing.
+  const readmeRaw = pickReadme(files);
+  const readme = readmeRaw ? readmeRaw.slice(0, 20000) : null;
   return {
     name: ref.repo,
     description: `${desc} — github.com/${ref.owner}/${ref.repo}`.slice(0, 280),
@@ -158,5 +169,7 @@ export function buildDraft(
     files,
     notes: { skipped: selection.skipped, truncated: selection.truncated, imported: files.length },
     ...(isSkill ? { isSkill: true } : {}),
+    ...(source ? { source: { url: repoUrl(ref, source.branch), ref: source.branch, commit: source.commit } } : {}),
+    ...(readme ? { readme } : {}),
   };
 }

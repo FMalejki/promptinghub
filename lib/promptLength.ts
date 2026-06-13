@@ -8,3 +8,11 @@ export function lengthLabel(tokens: number | undefined): LengthBadge | null {
   const label = tokens <= 150 ? "Short" : tokens <= 600 ? "Medium" : "Long";
   return { label, tokens };
 }
+
+// Card-level variant: most prompts fall into the unremarkable "Medium" middle, so
+// a chip reading "Medium" on every card is noise. Surface only the informative
+// extremes — Short / Long — and show nothing for Medium.
+export function cardLengthBadge(tokens: number | undefined): LengthBadge | null {
+  const badge = lengthLabel(tokens);
+  return badge && badge.label !== "Medium" ? badge : null;
+}

@@ -18,6 +18,9 @@ const NAV_LINKS: NavLink[] = [
   { href: "/tags", label: "Tags", group: "explore" },
   { href: "/collections", label: "Collections", group: "explore" },
   { href: "/creators", label: "Creators", group: "explore" },
+  // Feedback intentionally lives OUTSIDE this list: it gets its own always-visible
+  // button in the right-side actions (desktop) + a dedicated mobile entry, so it's
+  // never buried in the Explore dropdown.
 ];
 
 export function Navbar() {
@@ -96,6 +99,17 @@ export function Navbar() {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
+            {/* Feedback — always visible so users can speak up from any page. */}
+            <Link
+              href="/feedback"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors whitespace-nowrap"
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8a9 9 0 110-18 9 9 0 010 18zm0 0l-4-1-1 1 1-4" />
+              </svg>
+              Feedback
+            </Link>
+
             {/* Dark mode toggle */}
             <button
               onClick={toggleTheme}
@@ -238,6 +252,16 @@ export function Navbar() {
                 {l.label}
               </Link>
             ))}
+            <Link
+              href="/feedback"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 text-base font-medium text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8a9 9 0 110-18 9 9 0 010 18zm0 0l-4-1-1 1 1-4" />
+              </svg>
+              Feedback
+            </Link>
             <div className="my-2 border-t border-gray-200 dark:border-gray-800" />
             {authed ? (
               <>

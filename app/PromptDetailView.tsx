@@ -21,6 +21,7 @@ import { VersionHistory } from "./VersionHistory";
 import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
+import { PrivateShareButton } from "./PrivateShareButton";
 import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
@@ -28,6 +29,8 @@ import { AssistantLinks } from "./components/AssistantLinks";
 import { track, getAnonId } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
+import { FileTree } from "./components/FileTree";
+import { useToast } from "./components/Toast";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { name: string; image: string | null; handle: string | null };
@@ -47,6 +50,7 @@ export type PromptDetail = {
   testedModels: TestedModel[];
   copyCount?: number;
   viewCount?: number;
+  commentCount?: number;
   priceCents?: number;
   tags?: string[];
   forkedFrom?: { id: string; name: string } | null;
@@ -63,16 +67,37 @@ export type PromptDetail = {
   canEdit?: boolean;
   handle?: string;
   slug?: string;
+  // Linked GitHub repo (when imported) — shown as a "Linked to …" row.
+  sourceUrl?: string;
+  sourceRef?: string | null;
+  sourceCommit?: string | null;
 };
 
 // Render prompt text with {{variables}} resolved to their values, and any
 // UNFILLED variable shown as a highlighted chip instead of a confusing blank.
-function PromptText({ content, values }: { content: string; values: Record<string, string> }) {
+// `activeNames` is the set of real Customize fields; only those are treated as
+// variables — every other {{token}} (control words, code examples, or a
+// templating-heavy prompt with too many) renders verbatim, never stripped.
+function PromptText({
+  content,
+  values,
+  activeNames,
+}: {
+  content: string;
+  values: Record<string, string>;
+  activeNames: Set<string>;
+}) {
+  // Not a fill-in template → show the body exactly as written.
+  if (activeNames.size === 0) return <>{content}</>;
   const tokens = tokenizeTemplate(content);
   return (
     <>
       {tokens.map((t, i) => {
         if (t.type === "text") return <span key={i}>{t.text}</span>;
+        if (!activeNames.has(t.name)) {
+          // A {{token}} that isn't a Customize field — render it literally.
+          return <span key={i}>{t.default ? `{{${t.name}:${t.default}}}` : `{{${t.name}}}`}</span>;
+        }
         const v = values[t.name];
         const resolved = v !== undefined && v !== "" ? v : t.default;
         if (resolved) return <span key={i}>{resolved}</span>;
@@ -93,6 +118,7 @@ function PromptText({ content, values }: { content: string; values: Record<strin
 export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [stars, setStars] = useState(prompt.stars);
   const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
   const [counted, setCounted] = useState(false);
@@ -118,6 +144,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [relatedByTag, setRelatedByTag] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [byAuthor, setByAuthor] = useState<React.ComponentProps<typeof PromptCard>[]>([]);
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
+  const [commentCount, setCommentCount] = useState(prompt.commentCount ?? 0);
   const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
   // Which file tab is open (multi-file prompts render as tabs, not a long stack).
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -212,7 +239,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       const body = await res.json().catch(() => null);
       setIsPinned(Array.isArray(body?.pinned) ? body.pinned.includes(prompt.id) : !isPinned);
     } else if (res.status === 400) {
-      alert("You can pin up to 3 prompts. Unpin one first.");
+      toast("You can pin up to 3 prompts. Unpin one first.", { variant: "error" });
     }
   }
 
@@ -232,7 +259,13 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   const files = prompt.files ?? [];
   const vars = useMemo(() => extractVariablesFromFiles(files), [files]);
-  const filled = useMemo(() => files.map((f) => ({ ...f, content: applyVariables(f.content, values) })), [files, values]);
+  const activeNames = useMemo(() => new Set(vars.map((v) => v.name)), [vars]);
+  // Only substitute when this is a real fill-in template; otherwise keep the body
+  // verbatim so a templating-heavy prompt's {{tokens}} aren't blanked out.
+  const filled = useMemo(
+    () => (vars.length > 0 ? files.map((f) => ({ ...f, content: applyVariables(f.content, values) })) : files),
+    [files, values, vars.length],
+  );
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => resolveReadme(prompt.readme, files), [prompt.readme, files]);
@@ -269,8 +302,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
           Back to browse
         </Link>
 
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
+        <div>
+          <div>
             <div className="flex items-center gap-3 mb-2">
               <Link href={`/c/${encodeURIComponent(prompt.category)}`} className="inline-block px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50">
                 {prompt.category}
@@ -347,7 +380,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 mt-6 pt-5 border-t border-gray-100 dark:border-gray-800">
             <button
               onClick={toggleStar}
               aria-pressed={isStarred}
@@ -385,6 +418,17 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
               <span>{viewCount}</span>
             </span>
 
+            <a
+              href="#comments"
+              title="Comments — jump to discussion"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span>{commentCount}</span>
+            </a>
+
             {(prompt.forkCount ?? 0) > 0 && (
               <span
                 title="Number of forks"
@@ -411,6 +455,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
             <SaveToCollection promptId={prompt.id} />
 
+            {prompt.isPrivate && <PrivateShareButton canManage={canEdit} />}
+
             {prompt.isOwner && !prompt.isPrivate && (
               <button
                 onClick={togglePin}
@@ -421,8 +467,9 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                     : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                 }`}
               >
-                <svg className="w-5 h-5" fill={isPinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.828 1.172a.5.5 0 00-.707 0L7.05 3.243a2 2 0 01-1.137.566l-2.31.33a.5.5 0 00-.277.853l1.672 1.63a2 2 0 01.575 1.77l-.394 2.3a.5.5 0 00.726.527l2.066-1.086a2 2 0 011.86 0l2.066 1.086a.5.5 0 00.725-.527l-.394-2.3a2 2 0 01.575-1.77l1.672-1.63a.5.5 0 00-.277-.853l-2.31-.33a2 2 0 01-1.137-.566L9.828 1.172z" />
+                <svg className="w-5 h-5" fill={isPinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <line x1="12" x2="12" y1="17" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
                 </svg>
                 <span>{isPinned ? "Pinned" : "Pin"}</span>
               </button>
@@ -500,63 +547,65 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             <CopyButton text={allText} label="Copy prompt" onCopy={recordCopy} variant="primary" />
           </div>
         </div>
-        {/* Multi-file: tabs to browse one file at a time instead of a long scroll. */}
-        {multi && (
-          <div className="flex flex-wrap gap-1.5 overflow-x-auto" role="tablist" aria-label="Files">
-            {filled.map((f, i) => (
-              <button
-                key={f.path}
-                role="tab"
-                aria-selected={i === activeIdx}
-                onClick={() => setActiveFile(f.path)}
-                title={f.path}
-                className={`px-3 py-1 text-xs font-mono rounded-lg border whitespace-nowrap transition-colors ${
-                  i === activeIdx
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                {f.path}
-              </button>
-            ))}
-          </div>
+        {prompt.sourceUrl && (
+          <GithubLink id={prompt.id} url={prompt.sourceUrl} commit={prompt.sourceCommit ?? null} isOwner={!!prompt.isOwner} />
         )}
-        {(() => {
-          const f = filled[activeIdx];
-          if (!f) return null;
-          return (
+        {/* Multi-file: a clickable folder tree (left) + the selected file (right),
+            mirroring the repo's real directory structure. Single-file prompts skip
+            the tree and just render the one panel. */}
+        <div className={multi ? "flex flex-col md:flex-row gap-4 items-start" : undefined}>
+          {multi && (
             <div
-              key={f.path}
-              id={fileAnchorId(f.path)}
-              role={multi ? "tabpanel" : undefined}
-              className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
-                anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
-              }`}
+              className="w-full md:w-64 lg:w-72 shrink-0 self-start md:sticky md:top-20 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-72 md:max-h-[calc(100vh-6rem)] overflow-auto"
+              role="tablist"
+              aria-label="Files"
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
-                  <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {multi && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
-                      }}
-                      title="Copy a link to this file"
-                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                    >
-                      Link
-                    </button>
-                  )}
-                  <CopyButton text={f.content} label="Copy file" />
-                </div>
-              </div>
-              <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} /></pre>
+              <FileTree
+                paths={filled.map((f) => f.path)}
+                activePath={filled[activeIdx]?.path ?? null}
+                onSelect={setActiveFile}
+              />
             </div>
-          );
-        })()}
+          )}
+          <div className={multi ? "min-w-0 flex-1 w-full" : undefined}>
+            {(() => {
+              const f = filled[activeIdx];
+              if (!f) return null;
+              return (
+                <div
+                  key={f.path}
+                  id={fileAnchorId(f.path)}
+                  role={multi ? "tabpanel" : undefined}
+                  className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-colors scroll-mt-20 ${
+                    anchoredFile === f.path ? "border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/50" : "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {multi && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(fileAnchorLink(window.location.href, f.path)).catch(() => {});
+                          }}
+                          title="Copy a link to this file"
+                          className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                        >
+                          Link
+                        </button>
+                      )}
+                      <CopyButton text={f.content} label="Copy file" />
+                    </div>
+                  </div>
+                  <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} activeNames={activeNames} /></pre>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
 
       {/* Attachments — multimodal references (images, video, pdf, docs) an LLM can view */}
@@ -681,42 +730,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         <PlaygroundPanel text={allText} />
       </div>
 
-      {/* Related prompts (same category) */}
-      {related.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {related.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Related by tag */}
-      {relatedByTag.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {relatedByTag.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* More from the same author */}
-      {byAuthor.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More from {author.name}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {byAuthor.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Share */}
       {!prompt.isPrivate && <ShareButtons title={prompt.name} promptId={prompt.id} />}
 
@@ -732,10 +745,116 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       />
 
       {/* Comments */}
-      <Comments promptId={prompt.id} />
+      <div id="comments" className="scroll-mt-20" />
+      <Comments promptId={prompt.id} onCount={setCommentCount} />
 
       {/* Report */}
       {!canEdit && <ReportButton promptId={prompt.id} />}
+
+      {/* Related discovery — kept at the very bottom, below the discussion, so the
+          prompt + comments come first (owner: "more in pod komentarzami na samym dole"). */}
+      {related.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {related.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {relatedByTag.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {relatedByTag.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {byAuthor.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More from {author.name}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {byAuthor.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+// "Linked to github.com/owner/repo @ sha" with an owner-only "Sync from GitHub"
+// button that re-pulls the repo's latest commit into this prompt's files.
+function GithubLink({ id, url, commit, isOwner }: { id: string; url: string; commit: string | null; isOwner: boolean }) {
+  const [syncing, setSyncing] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+  const repoLabel = url.replace(/^https:\/\/github\.com\//i, "");
+  const short = commit ? commit.slice(0, 7) : null;
+
+  async function sync() {
+    setSyncing(true);
+    setMsg(null);
+    setOk(false);
+    try {
+      const r = await fetch(`/api/prompts/${id}/sync-github`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setMsg(d.error || "Sync failed.");
+        setSyncing(false);
+        return;
+      }
+      if (d.alreadyCurrent) {
+        setOk(true);
+        setMsg("Already up to date with the latest commit.");
+        setSyncing(false);
+        return;
+      }
+      setOk(true);
+      setMsg(`Synced ${d.imported} file${d.imported === 1 ? "" : "s"}${d.commit ? ` @ ${String(d.commit).slice(0, 7)}` : ""}. Reloading…`);
+      setTimeout(() => window.location.reload(), 700);
+    } catch {
+      setMsg("Sync failed — check your connection.");
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 min-w-0"
+        title={url}
+      >
+        <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg>
+        <span className="truncate">Linked to {repoLabel}{short && <span className="text-gray-400"> @ {short}</span>}</span>
+      </a>
+      {isOwner && (
+        <button
+          onClick={sync}
+          disabled={syncing}
+          className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-60 transition-colors"
+          title="Re-pull the latest commit's files from GitHub"
+        >
+          <svg className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          {syncing ? "Syncing…" : "Sync from GitHub"}
+        </button>
+      )}
+      {msg && (
+        <span className={`w-full text-xs ${ok ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>{msg}</span>
+      )}
+    </div>
   );
 }

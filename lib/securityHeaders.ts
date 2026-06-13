@@ -27,10 +27,16 @@ export function frameHeaders(pathname: string): HeaderPair[] {
   if (isEmbedPath(pathname)) {
     // Explicitly allow framing anywhere; deliberately NO X-Frame-Options, whose
     // only cross-origin value (ALLOW-FROM) is deprecated/unsupported.
-    return [{ name: "Content-Security-Policy", value: "frame-ancestors *" }];
+    return [{ name: "Content-Security-Policy", value: `frame-ancestors *; ${BASE_CSP}` }];
   }
   return [
     { name: "X-Frame-Options", value: "SAMEORIGIN" },
-    { name: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { name: "Content-Security-Policy", value: `frame-ancestors 'self'; ${BASE_CSP}` },
   ];
 }
+
+// CSP directives applied everywhere regardless of framing policy. The safe,
+// no-nonce subset: block plugin/object embeds (a legacy XSS vector) and pin
+// <base href> to our own origin so injected markup can't rewrite relative URLs.
+// (A full script-src would need per-request nonces — out of scope here.)
+const BASE_CSP = "object-src 'none'; base-uri 'self'";
