@@ -11,6 +11,7 @@ export function FileTree({
   onSelect,
   onDeleteFolder,
   onDeleteFile,
+  matchCounts,
 }: {
   paths: string[];
   activePath: string | null;
@@ -21,6 +22,10 @@ export function FileTree({
   // Editor-only: when provided, each file shows a delete control. Omitted on the
   // read-only detail view.
   onDeleteFile?: (path: string) => void;
+  // Search mode: path → match count. When provided, files with matches show a
+  // count badge and files with none are dimmed, so the user can spot which files
+  // contain the query at a glance.
+  matchCounts?: Record<string, number>;
 }) {
   const tree = useMemo(() => buildFileTree(paths), [paths]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -36,7 +41,7 @@ export function FileTree({
   return (
     <div className="text-sm" role="tree" aria-label="Files">
       {tree.map((n) => (
-        <TreeRow key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} onDeleteFile={onDeleteFile} />
+        <TreeRow key={n.path} node={n} depth={0} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} onDeleteFile={onDeleteFile} matchCounts={matchCounts} />
       ))}
     </div>
   );
@@ -51,6 +56,7 @@ function TreeRow({
   onSelect,
   onDeleteFolder,
   onDeleteFile,
+  matchCounts,
 }: {
   node: TreeNode;
   depth: number;
@@ -60,6 +66,7 @@ function TreeRow({
   onSelect: (path: string) => void;
   onDeleteFolder?: (dirPath: string) => void;
   onDeleteFile?: (path: string) => void;
+  matchCounts?: Record<string, number>;
 }) {
   const pad = { paddingLeft: `${depth * 12 + 8}px` };
 
@@ -98,15 +105,18 @@ function TreeRow({
           )}
         </div>
         {isOpen && node.children.map((c) => (
-          <TreeRow key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} onDeleteFile={onDeleteFile} />
+          <TreeRow key={c.path} node={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} activePath={activePath} onSelect={onSelect} onDeleteFolder={onDeleteFolder} onDeleteFile={onDeleteFile} matchCounts={matchCounts} />
         ))}
       </div>
     );
   }
 
   const active = node.path === activePath;
+  const searching = !!matchCounts;
+  const count = matchCounts?.[node.path] ?? 0;
+  const dimmed = searching && count === 0;
   return (
-    <div className="group flex w-full items-center rounded hover:bg-gray-100 dark:hover:bg-gray-700/50">
+    <div className={`group flex w-full items-center rounded hover:bg-gray-100 dark:hover:bg-gray-700/50 ${dimmed ? "opacity-40" : ""}`}>
       <button
         type="button"
         onClick={() => onSelect(node.path)}
@@ -125,6 +135,11 @@ function TreeRow({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         <span className="truncate">{node.name}</span>
+        {count > 0 && (
+          <span className="ml-auto shrink-0 rounded-full bg-yellow-200 dark:bg-yellow-500/40 text-yellow-800 dark:text-yellow-200 text-[10px] font-semibold px-1.5 py-0.5 tabular-nums">
+            {count}
+          </span>
+        )}
       </button>
       {onDeleteFile && (
         <button

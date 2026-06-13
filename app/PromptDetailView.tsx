@@ -30,6 +30,8 @@ import { track, getAnonId } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 import { FileTree } from "./components/FileTree";
+import { HighlightedText } from "./components/HighlightedText";
+import { searchFiles, MIN_QUERY_LEN } from "@/lib/promptSearch";
 import { useToast } from "./components/Toast";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -146,6 +148,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const [viewCount, setViewCount] = useState(prompt.viewCount ?? 0);
   const [commentCount, setCommentCount] = useState(prompt.commentCount ?? 0);
   const [anchoredFile, setAnchoredFile] = useState<string | null>(null);
+  // In-prompt search query (find text across the prompt's files).
+  const [search, setSearch] = useState("");
   // Which file tab is open (multi-file prompts render as tabs, not a long stack).
   const [activeFile, setActiveFile] = useState<string | null>(null);
 
@@ -267,6 +271,23 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
     [files, values, vars.length],
   );
   const multi = filled.length > 1;
+  // In-prompt search: count matches per file so the tree can badge them and the
+  // viewer can highlight. Shown for multi-file prompts and longer single files.
+  const isSearching = search.trim().length >= MIN_QUERY_LEN;
+  const searchResult = useMemo(() => searchFiles(filled, search), [filled, search]);
+  const showSearch = multi || (filled.length === 1 && (filled[0]?.content?.length ?? 0) > 400);
+  // When the query changes and the open file has no hits, jump to the first file
+  // that does — so typing a term lands you on a relevant file without hunting.
+  // Keyed on `search` only, so manual file navigation afterwards isn't overridden.
+  useEffect(() => {
+    if (search.trim().length < MIN_QUERY_LEN || !multi) return;
+    const active = filled[activeIdx]?.path;
+    const res = searchFiles(filled, search);
+    if (active && (res.counts[active] ?? 0) > 0) return;
+    const firstHit = filled.find((f) => (res.counts[f.path] ?? 0) > 0);
+    if (firstHit) setActiveFile(firstHit.path);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => resolveReadme(prompt.readme, files), [prompt.readme, files]);
   // Active tab for multi-file prompts (falls back to the first file).
@@ -550,6 +571,47 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         {prompt.sourceUrl && (
           <GithubLink id={prompt.id} url={prompt.sourceUrl} commit={prompt.sourceCommit ?? null} isOwner={!!prompt.isOwner} />
         )}
+        {/* In-prompt search — find text across all files. Especially handy on
+            multi-file prompts: matching files get a count badge in the tree and
+            matches are highlighted in the open file. */}
+        {showSearch && (
+          <div className="mb-3">
+            <div className="relative">
+              <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 110-14 7 7 0 010 14z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={multi ? "Search across all files…" : "Search in this prompt…"}
+                aria-label="Search in prompt"
+                className="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {isSearching && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400" aria-live="polite">
+                {searchResult.total > 0
+                  ? `${searchResult.total} match${searchResult.total === 1 ? "" : "es"}${
+                      multi ? ` in ${searchResult.filesWithMatches} file${searchResult.filesWithMatches === 1 ? "" : "s"}` : ""
+                    }`
+                  : "No matches"}
+              </p>
+            )}
+          </div>
+        )}
         {/* Multi-file: a clickable folder tree (left) + the selected file (right),
             mirroring the repo's real directory structure. Single-file prompts skip
             the tree and just render the one panel. */}
@@ -564,6 +626,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                 paths={filled.map((f) => f.path)}
                 activePath={filled[activeIdx]?.path ?? null}
                 onSelect={setActiveFile}
+                matchCounts={isSearching ? searchResult.counts : undefined}
               />
             </div>
           )}
@@ -584,6 +647,11 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{f.path}</span>
                       <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 shrink-0">{f.language}</span>
+                      {isSearching && (
+                        <span className="shrink-0 text-[10px] font-semibold rounded-full bg-yellow-200 dark:bg-yellow-500/40 text-yellow-800 dark:text-yellow-200 px-1.5 py-0.5 tabular-nums">
+                          {searchResult.counts[f.path] ?? 0} here
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {multi && (
@@ -600,7 +668,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                       <CopyButton text={f.content} label="Copy file" />
                     </div>
                   </div>
-                  <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} activeNames={activeNames} /></pre>
+                  <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed">{isSearching ? <HighlightedText text={f.content} query={search} /> : <PromptText content={files[activeIdx].content} values={values} activeNames={activeNames} />}</pre>
                 </div>
               );
             })()}
