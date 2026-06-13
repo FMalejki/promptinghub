@@ -5,6 +5,7 @@ import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
 import { PromptOfDay } from "../components/PromptOfDay";
 import { TrendingNow } from "../components/TrendingNow";
+import { trendingRankMap, TRENDING_BADGE_TOP_N } from "@/lib/trendingBadge";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { hasActiveFilters } from "@/lib/browseFilters";
 import { isSearchFocusTrigger } from "@/lib/shortcuts";
@@ -42,6 +43,9 @@ export default function BrowsePage() {
   const [error, setError] = useState(false);
   const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
   const [catCounts, setCatCounts] = useState<Record<string, number>>({});
+  // id → 1-based trending rank for the current top window, so any card that's
+  // trending right now shows a flame badge regardless of the active sort.
+  const [trendingRanks, setTrendingRanks] = useState<Map<string, number>>(new Map());
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Press "/" anywhere (outside a field) to jump to the search box.
@@ -65,6 +69,11 @@ export default function BrowsePage() {
     fetch("/api/categories")
       .then((r) => (r.ok ? r.json() : { counts: {} }))
       .then((d) => setCatCounts(d.counts || {}))
+      .catch(() => {});
+    // Top trending ids → rank map, so cards can show a "trending now" badge.
+    fetch(`/api/prompts?sort=trending&limit=${TRENDING_BADGE_TOP_N}`)
+      .then((r) => (r.ok ? r.json() : { prompts: [] }))
+      .then((d) => setTrendingRanks(trendingRankMap((d.prompts || []).map((p: { id: string }) => p.id))))
       .catch(() => {});
   }, []);
 
@@ -410,7 +419,7 @@ export default function BrowsePage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {prompts.map((prompt) => (
-                <PromptCard key={prompt.id} {...prompt} />
+                <PromptCard key={prompt.id} {...prompt} trendingRank={trendingRanks.get(prompt.id) ?? null} />
               ))}
             </div>
             {nextCursor != null && (

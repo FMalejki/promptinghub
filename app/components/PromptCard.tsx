@@ -8,6 +8,7 @@ import { formatPrice, isPaid } from "@/lib/pricing";
 import { cardLengthBadge } from "@/lib/promptLength";
 import type { CardAttestation } from "@/lib/attestations";
 import { useWithBadge, type UseWith } from "@/lib/useWith";
+import { trendingBadge } from "@/lib/trendingBadge";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type TestedModel = { modelId: string; version?: string; notes?: string };
@@ -48,14 +49,18 @@ type PromptCardProps = {
   tokens?: number;
   attestation?: CardAttestation | null;
   useWith?: UseWith;
+  // 1-based position in the current trending ranking, when this prompt is in the
+  // top window — drives the inline "🔥 Trending" badge. Omitted/null = not trending.
+  trendingRank?: number | null;
 };
 
-export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, commentCount = 0, priceCents = 0, tokens, attestation, useWith }: PromptCardProps) {
+export function PromptCard({ id, name, description, category, author, image, stars, isPrivate, isSkill = false, testedModels = [], copyCount = 0, commentCount = 0, priceCents = 0, tokens, attestation, useWith, trendingRank }: PromptCardProps) {
   const [imgSrc, setImgSrc] = useState(image || getPlaceholderImage(id, category));
   const imageGen = isImagePrompt({ testedModels, category });
   const length = cardLengthBadge(tokens);
   const attest = attestation ? ATTEST_BADGE[attestation.verdict] : null;
   const useWithChip = useWithBadge(useWith);
+  const trending = trendingBadge(trendingRank);
 
   return (
     <div className="group relative flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200">
@@ -84,6 +89,21 @@ export function PromptCard({ id, name, description, category, author, image, sta
             {name}
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {trending && (
+              <span
+                title={trending.top3 ? `Trending — #${trending.rank} right now` : "Trending right now"}
+                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-semibold rounded ${
+                  trending.top3
+                    ? "text-white bg-amber-500"
+                    : "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30"
+                }`}
+              >
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                  <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
+                </svg>
+                {trending.label}
+              </span>
+            )}
             <span className="inline-block px-1.5 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded">
               {category}
             </span>
