@@ -12,7 +12,7 @@ import { AttachmentsField, type DraftAttachment } from "../components/Attachment
 import { FileTree } from "../components/FileTree";
 import { MarkdownField } from "../components/MarkdownField";
 import { track } from "../components/AnalyticsBeacon";
-import { useConfirm } from "../components/ConfirmDialog";
+import { useConfirm, usePrompt } from "../components/ConfirmDialog";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -21,6 +21,7 @@ export default function NewPromptPage() {
   const { status } = useSession();
   const router = useRouter();
   const confirm = useConfirm();
+  const promptInput = usePrompt();
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -265,8 +266,8 @@ export default function NewPromptPage() {
   }
   // Create a folder by adding a starter file inside it — folders here are just
   // path prefixes (e.g. "src/utils/"), so an empty one can't exist on its own.
-  function addFolder() {
-    const raw = window.prompt("New folder name (e.g. src or src/utils):");
+  async function addFolder() {
+    const raw = await promptInput({ title: "New folder", message: "Folder name (e.g. src or src/utils)", placeholder: "src/utils", confirmLabel: "Create" });
     if (raw === null) return;
     const folder = raw.trim().replace(/^\/+|\/+$/g, "").replace(/\/{2,}/g, "/");
     if (!folder) return;

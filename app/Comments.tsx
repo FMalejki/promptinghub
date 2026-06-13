@@ -10,6 +10,7 @@ import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
 import { REACTION_EMOJIS } from "@/lib/reactionEmojis";
 import { useToast } from "./components/Toast";
+import { usePrompt } from "./components/ConfirmDialog";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
@@ -68,6 +69,7 @@ export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n
   const { data: session } = useSession();
   const router = useRouter();
   const { toast } = useToast();
+  const promptInput = usePrompt();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
@@ -145,7 +147,13 @@ export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n
       router.push("/login");
       return;
     }
-    const reason = window.prompt("Why are you reporting this comment? (optional)") ?? "";
+    const reason = await promptInput({
+      title: "Report comment",
+      message: "Why are you reporting this comment? (optional)",
+      placeholder: "Reason (optional)",
+      confirmLabel: "Report",
+    });
+    if (reason === null) return; // cancelled — don't file a report
     const res = await fetch(`/api/comments/${id}/report`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
