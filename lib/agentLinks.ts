@@ -1,27 +1,35 @@
-// "Use this prompt in a coding agent" targets. Unlike web chat assistants
-// (lib/llmLinks), coding agents like Claude Code, Cursor or Windsurf have no
-// reliable URL scheme to prefill their chat from a web page — the prompt-prefill
-// deeplink is, as of mid-2026, an open feature request for Cursor and doesn't
-// exist for the Claude Code CLI at all. So the honest, never-broken action is:
-// copy the prompt to the clipboard and tell the user exactly where to paste it
-// in each tool. This list is the data behind that UI; kept pure + unit-testable.
+// "Use this prompt in a coding agent" targets. Most of these editors are VS Code
+// forks (Cursor, Windsurf, Antigravity) or VS Code itself, and register a custom
+// URL scheme that LAUNCHES the app from the browser (cursor://, vscode://,
+// windsurf://, antigravity://). We use that to actually open the agent — but none
+// of them expose a public "prefill the chat with this text" deep link (Cursor's
+// is an open feature request), so we ALSO copy the prompt to the clipboard and
+// tell the user to paste it into the agent's chat. Claude Code is the exception:
+// it's a terminal CLI with no URL scheme, so it can't be launched from a link —
+// that one is copy-only. Kept pure + unit-testable.
 
-export type AgentId = "claude-code" | "cursor" | "vscode" | "windsurf";
+export type AgentId = "claude-code" | "cursor" | "antigravity" | "vscode" | "windsurf";
 
 export type AgentTarget = {
   id: AgentId;
   label: string;
-  // Short instruction shown after copying — where to paste in this tool.
+  // Custom URL scheme that launches the desktop app, or null when there's no way
+  // to open it from a link (Claude Code — a terminal CLI). When present we open
+  // it on click; when null the button is copy-only.
+  scheme: string | null;
+  // Short instruction shown after the action — where to paste in this tool.
   hint: string;
 };
 
-// Ordered by popularity for coding-agent prompts. Labels are the product names
-// users recognize; hints name the actual chat surface + its open shortcut.
+// Ordered for coding-agent prompts. Claude Code first (most common here), then
+// the launchable editors. Labels are the product names users recognize; hints
+// name the actual chat surface + its open shortcut.
 export const AGENT_TARGETS: AgentTarget[] = [
-  { id: "claude-code", label: "Claude Code", hint: "paste it into your Claude Code session" },
-  { id: "cursor", label: "Cursor", hint: "paste into Cursor chat (⌘L / Ctrl+L)" },
-  { id: "vscode", label: "VS Code", hint: "paste into Copilot Chat (⌃⌘I / Ctrl+Alt+I)" },
-  { id: "windsurf", label: "Windsurf", hint: "paste into Cascade (⌘L / Ctrl+L)" },
+  { id: "claude-code", label: "Claude Code", scheme: null, hint: "paste it into your Claude Code session" },
+  { id: "cursor", label: "Cursor", scheme: "cursor://", hint: "paste into Cursor chat (⌘L / Ctrl+L)" },
+  { id: "antigravity", label: "Antigravity", scheme: "antigravity://", hint: "paste into Antigravity's agent (⌘L / Ctrl+L)" },
+  { id: "vscode", label: "VS Code", scheme: "vscode://", hint: "paste into Copilot Chat (⌃⌘I / Ctrl+Alt+I)" },
+  { id: "windsurf", label: "Windsurf", scheme: "windsurf://", hint: "paste into Cascade (⌘L / Ctrl+L)" },
 ];
 
 /** The agent targets to offer for a prompt — null when there's no text to use. */
