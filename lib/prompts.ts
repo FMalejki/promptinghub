@@ -832,7 +832,11 @@ export async function getPromptDetail(db: Db, id: string, viewerEmail?: string |
  * Atomically bump a prompt's copy/usage counter and return the new total.
  * Returns null for a malformed or missing id.
  */
-export type CounterOpts = { viewer?: string; nowMs?: number };
+// `viewer` is the client's anonId (preferred dedup key). `ipKey` is an
+// IP-derived fallback used only when no valid `viewer` is present, so an
+// anonymous no-id caller still de-duplicates per network per window instead of
+// counting on every request. See lib/idempotency.ipViewerKey.
+export type CounterOpts = { viewer?: string; ipKey?: string; nowMs?: number };
 
 async function readCounter(db: Db, id: string, field: "copyCount" | "viewCount"): Promise<number | null> {
   const p = await db.collection("prompts").findOne({ _id: new ObjectId(id) }, { projection: { [field]: 1 } });
@@ -842,7 +846,7 @@ async function readCounter(db: Db, id: string, field: "copyCount" | "viewCount")
 
 export async function incrementCopyCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
-  const viewer = normalizeViewer(opts.viewer);
+  const viewer = normalizeViewer(opts.viewer) || normalizeViewer(opts.ipKey);
   const now = opts.nowMs ?? Date.now();
 
   // Idempotent path: when we know the (anonymous) viewer, only count the first
@@ -883,7 +887,7 @@ export async function incrementCopyCount(db: Db, id: string, opts: CounterOpts =
  */
 export async function incrementViewCount(db: Db, id: string, opts: CounterOpts = {}): Promise<number | null> {
   if (!ObjectId.isValid(id)) return null;
-  const viewer = normalizeViewer(opts.viewer);
+  const viewer = normalizeViewer(opts.viewer) || normalizeViewer(opts.ipKey);
   const now = opts.nowMs ?? Date.now();
 
   // Idempotent path: a known viewer only counts once per window, so a refresh or
