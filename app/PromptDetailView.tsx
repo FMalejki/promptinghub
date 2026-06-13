@@ -730,42 +730,6 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         <PlaygroundPanel text={allText} />
       </div>
 
-      {/* Related prompts (same category) */}
-      {related.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {related.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Related by tag */}
-      {relatedByTag.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {relatedByTag.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* More from the same author */}
-      {byAuthor.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More from {author.name}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {byAuthor.map((p) => (
-              <PromptCard key={p.id} {...p} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Share */}
       {!prompt.isPrivate && <ShareButtons title={prompt.name} promptId={prompt.id} />}
 
@@ -786,6 +750,41 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
       {/* Report */}
       {!canEdit && <ReportButton promptId={prompt.id} />}
+
+      {/* Related discovery — kept at the very bottom, below the discussion, so the
+          prompt + comments come first (owner: "more in pod komentarzami na samym dole"). */}
+      {related.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More in {prompt.category}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {related.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {relatedByTag.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Similar tags</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {relatedByTag.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {byAuthor.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">More from {author.name}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {byAuthor.map((p) => (
+              <PromptCard key={p.id} {...p} />
+            ))}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
