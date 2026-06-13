@@ -554,7 +554,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         <div className={multi ? "flex flex-col md:flex-row gap-4 items-start" : undefined}>
           {multi && (
             <div
-              className="w-full md:w-64 lg:w-72 shrink-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-72 md:max-h-[34rem] overflow-auto"
+              className="w-full md:w-64 lg:w-72 shrink-0 self-start md:sticky md:top-20 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-72 md:max-h-[calc(100vh-6rem)] overflow-auto"
               role="tablist"
               aria-label="Files"
             >
