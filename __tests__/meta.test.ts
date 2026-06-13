@@ -57,6 +57,24 @@ describe("promptOgMetadata", () => {
     expect(tw?.startsWith("data:")).toBe(false);
   });
 
+  it("declares 1200×630 dims + PromptingHub siteName for the generated OG image (reliable big card on Messenger/FB/X)", () => {
+    const m = promptOgMetadata({ name: "Hello World", description: "a nice prompt" });
+    expect((m.openGraph as { siteName?: string })?.siteName).toBe("PromptingHub");
+    expect(m.openGraph?.images).toEqual([
+      expect.objectContaining({ width: 1200, height: 630 }),
+    ]);
+  });
+
+  it("omits image dims for a real custom cover (unknown aspect ratio)", () => {
+    const m = promptOgMetadata({ name: "P", description: "d", image: "https://img/x.png" });
+    expect(m.openGraph?.images).toEqual([{ url: "https://img/x.png" }]);
+  });
+
+  it("sets openGraph.url from the canonical when provided", () => {
+    const m = promptOgMetadata({ name: "P", description: "d" }, { canonical: "https://site/p/ada/x" });
+    expect((m.openGraph as { url?: string })?.url).toBe("https://site/p/ada/x");
+  });
+
   it("falls back to a generic card when the prompt is missing/private", () => {
     const m = promptOgMetadata(null);
     expect(m.title).toBe("Prompt");

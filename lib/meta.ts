@@ -52,13 +52,26 @@ export function promptOgMetadata(input: PromptMetaInput | null, opts: PromptMeta
   // (or anything non-absolute) falls back to the generated /api/og PNG so the
   // preview is never broken on Twitter/Discord/Slack. Resolved to absolute by
   // Next via metadataBase.
-  const images = [{ url: socialImageUrl(input.image, input.name, input.description) }];
+  // When there's no real http cover we fall back to the generated /api/og PNG,
+  // which is always 1200×630 — declare those dims so Messenger/Facebook/X render
+  // the big card reliably (they prefer explicit sizes). Custom covers get no dims
+  // since their aspect ratio is unknown.
+  const usingGeneratedOg = !(input.image && /^https?:\/\//i.test(input.image.trim()));
+  const imageUrl = socialImageUrl(input.image, input.name, input.description);
+  const images = [usingGeneratedOg ? { url: imageUrl, width: 1200, height: 630 } : { url: imageUrl }];
 
   const meta: Metadata = {
     title,
     description,
-    openGraph: { title: branded, description, type: "article", images },
-    twitter: { card: "summary_large_image", title: branded, description, images: images?.map((i) => i.url) },
+    openGraph: {
+      title: branded,
+      description,
+      type: "article",
+      siteName: "PromptingHub",
+      ...(opts.canonical ? { url: opts.canonical } : {}),
+      images,
+    },
+    twitter: { card: "summary_large_image", title: branded, description, images: images.map((i) => i.url) },
   };
   if (opts.oembedUrl || opts.canonical) {
     meta.alternates = {
