@@ -12,6 +12,22 @@ describe("pickReadme", () => {
   it("ignores a readme with empty content", () => {
     expect(pickReadme([{ path: "README.md", content: "   " }])).toBeNull();
   });
+  it("prefers the ROOT readme over a nested one, regardless of array order", () => {
+    expect(
+      pickReadme([
+        { path: "phases/README.md", content: "# Phase files" },
+        { path: "README.md", content: "# Root" },
+      ]),
+    ).toBe("# Root");
+    // root listed second-deepest still wins
+    expect(
+      pickReadme([
+        { path: "a/b/readme.md", content: "deep" },
+        { path: "docs/README.md", content: "docs" },
+        { path: "README", content: "root-noext" },
+      ]),
+    ).toBe("root-noext");
+  });
 });
 
 describe("resolveReadme", () => {

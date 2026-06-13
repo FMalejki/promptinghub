@@ -19,9 +19,17 @@ export type Block =
   | { type: "paragraph"; text: string };
 
 export function pickReadme(files: { path: string; content: string }[]): string | null {
-  const readme = files.find((f) => /(^|\/)readme(\.md)?$/i.test(f.path.trim()));
-  if (!readme || !readme.content.trim()) return null;
-  return readme.content;
+  // Prefer the ROOT readme over a nested one (e.g. don't pick phases/README.md when
+  // a top-level README.md exists). Rank by directory depth, then by shorter path.
+  const readmes = files
+    .filter((f) => /(^|\/)readme(\.md)?$/i.test((f.path || "").trim()) && f.content.trim())
+    .sort((a, b) => {
+      const da = (a.path.match(/\//g) || []).length;
+      const db = (b.path.match(/\//g) || []).length;
+      if (da !== db) return da - db;
+      return a.path.length - b.path.length;
+    });
+  return readmes.length ? readmes[0].content : null;
 }
 
 // The README shown on a prompt's detail page. Prefer the author's explicit
