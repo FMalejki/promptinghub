@@ -1,5 +1,6 @@
 import {
   aiImportProvider,
+  aiImportProviders,
   aiImportAvailable,
   buildExtractionInstruction,
   extractFirstJsonObject,
@@ -36,6 +37,28 @@ describe("aiImportProvider — prefers FREE providers, degrades cleanly", () => 
   });
   it("honours IMPORT_AI_MODEL override", () => {
     expect(aiImportProvider({ GROQ_API_KEY: "k", IMPORT_AI_MODEL: "llama-x" })?.model).toBe("llama-x");
+  });
+  it("defaults Gemini to a model with free-tier generateContent quota (2.5-flash, not 2.0-flash)", () => {
+    const c = aiImportProvider({ GEMINI_API_KEY: "g" });
+    expect(c?.model).toBe("gemini-2.5-flash");
+  });
+});
+
+describe("aiImportProviders — ordered cascade for graceful fallback", () => {
+  it("returns every configured provider in FREE-first preference order", () => {
+    const list = aiImportProviders({ GEMINI_API_KEY: "g", GROQ_API_KEY: "k", OPENAI_API_KEY: "o", ANTHROPIC_API_KEY: "a" });
+    expect(list.map((c) => c.provider)).toEqual(["gemini", "groq", "openai", "anthropic"]);
+  });
+  it("lets a Gemini failure fall back to Groq (both are in the list)", () => {
+    const list = aiImportProviders({ GEMINI_API_KEY: "g", GROQ_API_KEY: "k" });
+    expect(list.map((c) => c.provider)).toEqual(["gemini", "groq"]);
+  });
+  it("is empty when nothing is configured", () => {
+    expect(aiImportProviders({})).toEqual([]);
+  });
+  it("the singular helper is just the head of the list", () => {
+    const env = { GROQ_API_KEY: "k", OPENAI_API_KEY: "o" };
+    expect(aiImportProvider(env)).toEqual(aiImportProviders(env)[0]);
   });
 });
 

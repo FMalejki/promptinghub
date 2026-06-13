@@ -19,23 +19,42 @@ function has(v: string | undefined): boolean {
   return !!v && v.trim().length > 0;
 }
 
+// Default model per provider. Gemini uses 2.5-flash — 2.0-flash has no free-tier
+// generateContent quota on current keys (returns 429 RESOURCE_EXHAUSTED, limit 0),
+// whereas 2.5-flash works on the free tier and is a stronger extractor anyway.
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const OPENAI_MODEL = "gpt-4o-mini";
+const ANTHROPIC_MODEL = "claude-3-5-haiku-latest";
+
 /**
- * Choose the provider from configured keys, preferring FREE tiers (Gemini, then
- * Groq) for this cheap task before paid keys (OpenAI, Anthropic). `IMPORT_AI_MODEL`
- * overrides the model. Returns null when nothing is configured.
+ * ALL configured providers in preference order — FREE tiers first (Gemini, then
+ * Groq) for this cheap task, then paid keys (OpenAI, Anthropic). The route tries
+ * them in order and only falls to the deterministic heuristic once every configured
+ * provider fails, so a quota/outage on the preferred provider can never drop import
+ * quality below the next-best configured one. `IMPORT_AI_MODEL` overrides the model.
+ */
+export function aiImportProviders(env: Env): AiImportChoice[] {
+  const override = env.IMPORT_AI_MODEL?.trim() || "";
+  const out: AiImportChoice[] = [];
+  if (has(env.GEMINI_API_KEY) || has(env.GOOGLE_API_KEY))
+    out.push({ provider: "gemini", model: override || GEMINI_MODEL, free: true });
+  if (has(env.GROQ_API_KEY)) out.push({ provider: "groq", model: override || GROQ_MODEL, free: true });
+  if (has(env.OPENAI_API_KEY)) out.push({ provider: "openai", model: override || OPENAI_MODEL, free: false });
+  if (has(env.ANTHROPIC_API_KEY)) out.push({ provider: "anthropic", model: override || ANTHROPIC_MODEL, free: false });
+  return out;
+}
+
+/**
+ * The single most-preferred provider (or null when nothing is configured).
+ * Thin wrapper over aiImportProviders for callers that only want the top choice.
  */
 export function aiImportProvider(env: Env): AiImportChoice | null {
-  const override = env.IMPORT_AI_MODEL?.trim() || "";
-  if (has(env.GEMINI_API_KEY) || has(env.GOOGLE_API_KEY))
-    return { provider: "gemini", model: override || "gemini-2.0-flash", free: true };
-  if (has(env.GROQ_API_KEY)) return { provider: "groq", model: override || "llama-3.3-70b-versatile", free: true };
-  if (has(env.OPENAI_API_KEY)) return { provider: "openai", model: override || "gpt-4o-mini", free: false };
-  if (has(env.ANTHROPIC_API_KEY)) return { provider: "anthropic", model: override || "claude-3-5-haiku-latest", free: false };
-  return null;
+  return aiImportProviders(env)[0] ?? null;
 }
 
 export function aiImportAvailable(env: Env): boolean {
-  return aiImportProvider(env) !== null;
+  return aiImportProviders(env).length > 0;
 }
 
 /**

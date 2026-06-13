@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { parsePastedPrompt } from "@/lib/import";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import {
-  aiImportProvider,
+  aiImportProviders,
   buildExtractionInstruction,
   extractFirstJsonObject,
   mergeAiDraft,
@@ -104,13 +104,17 @@ export async function POST(req: Request) {
   const source = data.source || "paste";
   const text = data.text.slice(0, AI_IMPORT_MAX_INPUT + 4000); // hard cap input
 
-  const choice = aiImportProvider(process.env as Record<string, string | undefined>);
-  if (choice) {
-    const raw = await callImportModel(choice, buildExtractionInstruction(text, PROMPT_CATEGORIES));
+  // Try each configured provider in preference order; the first that returns a
+  // usable draft wins. Only if ALL fail do we fall through to the heuristic, so a
+  // quota/outage on the preferred provider (e.g. Gemini 429) degrades to the next
+  // configured one (e.g. Groq) rather than straight to the heuristic.
+  const instruction = buildExtractionInstruction(text, PROMPT_CATEGORIES);
+  const providers = aiImportProviders(process.env as Record<string, string | undefined>);
+  for (const choice of providers) {
+    const raw = await callImportModel(choice, instruction);
     const parsed = raw ? extractFirstJsonObject(raw) : null;
     const aiDraft = parsed ? mergeAiDraft(text, parsed, source) : null;
-    if (aiDraft) return NextResponse.json({ draft: aiDraft, via: "ai" });
-    // fall through to heuristic on any AI failure
+    if (aiDraft) return NextResponse.json({ draft: aiDraft, via: "ai", provider: choice.provider });
   }
 
   const draft = parsePastedPrompt(text, source);
