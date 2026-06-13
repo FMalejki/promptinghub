@@ -3,11 +3,35 @@ export type TemplateVar = { name: string; default: string };
 // Matches {{ name }} or {{ name:default text }}
 const VAR_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*(?::([^}]*))?\}\}/g;
 
+// Above this many distinct variables, a prompt is almost certainly using {{ }}
+// as its OWN templating syntax (Handlebars/Jinja docs, code generators) rather
+// than offering a short fill-in form. We then show no Customize panel and render
+// the body verbatim — a 87-field form helps nobody.
+export const MAX_CUSTOMIZE_VARS = 12;
+
+// {{else}}, {{this}} etc. look like variables but are Handlebars/templating
+// control tokens, never user-fillable fields. ({{#if}} / {{/each}} already fail
+// the [a-zA-Z0-9_] match, so only the bare keywords need excluding.)
+const CONTROL_WORDS = new Set([
+  "else", "this", "if", "unless", "each", "with", "end", "endif", "endfor", "endwith", "endunless",
+]);
+
+function isFillable(name: string): boolean {
+  return !CONTROL_WORDS.has(name.toLowerCase());
+}
+
+// Remove fenced + inline code so {{tokens}} that are only ever code EXAMPLES
+// don't get surfaced as fill-in fields. Used for extraction only, never rendering.
+function stripCode(text: string): string {
+  return (text || "").replace(/```[\s\S]*?```/g, " ").replace(/`[^`]*`/g, " ");
+}
+
 export function extractVariables(text: string): TemplateVar[] {
   const order: string[] = [];
   const defaults = new Map<string, string>();
   for (const m of text.matchAll(VAR_RE)) {
     const name = m[1];
+    if (!isFillable(name)) continue;
     const def = (m[2] ?? "").trim();
     if (!defaults.has(name)) {
       order.push(name);
@@ -47,11 +71,14 @@ export function tokenizeTemplate(text: string): TemplateToken[] {
   return out;
 }
 
+// Variables to offer in the Customize panel: deduped across files, control words
+// and code-example tokens excluded, and capped — beyond MAX_CUSTOMIZE_VARS the
+// prompt is treated as a templating doc (returns []) so it renders verbatim.
 export function extractVariablesFromFiles(files: { content: string }[]): TemplateVar[] {
   const order: string[] = [];
   const defaults = new Map<string, string>();
   for (const f of files) {
-    for (const v of extractVariables(f.content)) {
+    for (const v of extractVariables(stripCode(f.content))) {
       if (!defaults.has(v.name)) {
         order.push(v.name);
         defaults.set(v.name, v.default);
@@ -60,5 +87,6 @@ export function extractVariablesFromFiles(files: { content: string }[]): Templat
       }
     }
   }
+  if (order.length > MAX_CUSTOMIZE_VARS) return [];
   return order.map((name) => ({ name, default: defaults.get(name) ?? "" }));
 }

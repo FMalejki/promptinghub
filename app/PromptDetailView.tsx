@@ -74,12 +74,29 @@ export type PromptDetail = {
 
 // Render prompt text with {{variables}} resolved to their values, and any
 // UNFILLED variable shown as a highlighted chip instead of a confusing blank.
-function PromptText({ content, values }: { content: string; values: Record<string, string> }) {
+// `activeNames` is the set of real Customize fields; only those are treated as
+// variables — every other {{token}} (control words, code examples, or a
+// templating-heavy prompt with too many) renders verbatim, never stripped.
+function PromptText({
+  content,
+  values,
+  activeNames,
+}: {
+  content: string;
+  values: Record<string, string>;
+  activeNames: Set<string>;
+}) {
+  // Not a fill-in template → show the body exactly as written.
+  if (activeNames.size === 0) return <>{content}</>;
   const tokens = tokenizeTemplate(content);
   return (
     <>
       {tokens.map((t, i) => {
         if (t.type === "text") return <span key={i}>{t.text}</span>;
+        if (!activeNames.has(t.name)) {
+          // A {{token}} that isn't a Customize field — render it literally.
+          return <span key={i}>{t.default ? `{{${t.name}:${t.default}}}` : `{{${t.name}}}`}</span>;
+        }
         const v = values[t.name];
         const resolved = v !== undefined && v !== "" ? v : t.default;
         if (resolved) return <span key={i}>{resolved}</span>;
@@ -240,7 +257,13 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
 
   const files = prompt.files ?? [];
   const vars = useMemo(() => extractVariablesFromFiles(files), [files]);
-  const filled = useMemo(() => files.map((f) => ({ ...f, content: applyVariables(f.content, values) })), [files, values]);
+  const activeNames = useMemo(() => new Set(vars.map((v) => v.name)), [vars]);
+  // Only substitute when this is a real fill-in template; otherwise keep the body
+  // verbatim so a templating-heavy prompt's {{tokens}} aren't blanked out.
+  const filled = useMemo(
+    () => (vars.length > 0 ? files.map((f) => ({ ...f, content: applyVariables(f.content, values) })) : files),
+    [files, values, vars.length],
+  );
   const multi = filled.length > 1;
   const allText = filled.map((f) => (multi ? `// ${f.path}\n${f.content}` : f.content)).join("\n\n");
   const readme = useMemo(() => resolveReadme(prompt.readme, files), [prompt.readme, files]);
@@ -574,7 +597,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
                       <CopyButton text={f.content} label="Copy file" />
                     </div>
                   </div>
-                  <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} /></pre>
+                  <pre className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words font-mono overflow-x-auto leading-relaxed"><PromptText content={files[activeIdx].content} values={values} activeNames={activeNames} /></pre>
                 </div>
               );
             })()}
