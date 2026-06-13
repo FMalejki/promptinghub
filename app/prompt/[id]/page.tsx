@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db";
 import { getPrompt, getPromptDetail } from "@/lib/prompts";
 import { promptOgMetadata, canonicalPromptUrl } from "@/lib/meta";
 import { oembedDiscoveryUrl } from "@/lib/oembed";
-import { promptJsonLd, promptBreadcrumbJsonLd } from "@/lib/jsonLd";
+import { promptJsonLd, promptBreadcrumbJsonLd, jsonLdHtml } from "@/lib/jsonLd";
 import { getPlaceholderImage } from "@/lib/constants";
 import { PromptDetailClient } from "./PromptDetailClient";
 
@@ -33,7 +33,7 @@ async function promptLdJson(id: string): Promise<string | null> {
   try {
     const d = await getPromptDetail(await getDb(), id);
     if (!d || d.isPrivate) return null;
-    return JSON.stringify([promptJsonLd(d, SITE_URL), promptBreadcrumbJsonLd(d, SITE_URL)]);
+    return jsonLdHtml([promptJsonLd(d, SITE_URL), promptBreadcrumbJsonLd(d, SITE_URL)]);
   } catch {
     return null;
   }

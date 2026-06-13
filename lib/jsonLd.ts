@@ -130,3 +130,17 @@ export function creatorJsonLd(
     mainEntity: person,
   };
 }
+
+// Serialize structured data for embedding in an inline <script type="application/
+// ld+json">. Plain JSON.stringify does NOT escape "</script>" or the JS line
+// separators, so a user-controlled field (a prompt/creator/collection name) could
+// break out of the script tag → stored XSS. Escaping `<`, `>`, `&`, U+2028/U+2029
+// keeps the JSON valid while making a breakout impossible.
+export function jsonLdHtml(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
