@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { getPromptDetail } from "@/lib/prompts";
+import { getPrompt, getPromptDetail } from "@/lib/prompts";
 import { promptOgMetadata, canonicalPromptUrl } from "@/lib/meta";
 import { oembedDiscoveryUrl } from "@/lib/oembed";
 import { promptJsonLd, promptBreadcrumbJsonLd } from "@/lib/jsonLd";
@@ -39,6 +40,12 @@ async function promptLdJson(id: string): Promise<string | null> {
 }
 
 export default async function PromptDetailPage({ params }: { params: { id: string } }) {
+  // Return a real 404 (status + branded page) when the prompt doesn't exist, instead
+  // of a 200 with a client-rendered empty state. Existence only — privacy stays the
+  // client's job (a private prompt the viewer can access must still render).
+  const exists = await getPrompt(await getDb(), params.id);
+  if (!exists) notFound();
+
   const ld = await promptLdJson(params.id);
   return (
     <>
