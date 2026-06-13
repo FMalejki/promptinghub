@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { CopyButton } from "./PromptView";
 import { getModelName, getModelProvider, getPlaceholderImage, promptImageSrc } from "@/lib/constants";
-import { applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "@/lib/template";
+import { applyVariables, extractVariablesFromFiles, tokenizeTemplate, humanizeVarName, isLongValueVar } from "@/lib/template";
 import { buildForkInput } from "@/lib/fork";
 import { resolveReadme } from "@/lib/markdown";
 import { attachmentKind, attachmentLabel } from "@/lib/attachments";
@@ -269,8 +269,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   // Only substitute when this is a real fill-in template; otherwise keep the body
   // verbatim so a templating-heavy prompt's {{tokens}} aren't blanked out.
   const filled = useMemo(
-    () => (vars.length > 0 ? files.map((f) => ({ ...f, content: applyVariables(f.content, values) })) : files),
-    [files, values, vars.length],
+    () => (vars.length > 0 ? files.map((f) => ({ ...f, content: applyVariables(f.content, values, activeNames) })) : files),
+    [files, values, vars.length, activeNames],
   );
   const multi = filled.length > 1;
   // In-prompt search: count matches per file so the tree can badge them and the
@@ -510,19 +510,46 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       {/* Customize panel ({{variable}} templates) */}
       {vars.length > 0 && (
         <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Customize ({vars.length})</div>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">Customize ({vars.length})</div>
+            {Object.values(values).some((v) => v) && (
+              <button
+                type="button"
+                onClick={() => setValues({})}
+                className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                Reset
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {vars.map((v) => (
-              <label key={v.name} className="text-xs text-gray-600 dark:text-gray-400">
-                <span className="font-mono text-gray-500 dark:text-gray-400">{v.name}</span>
-                <input
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={v.default || v.name}
-                  value={values[v.name] ?? ""}
-                  onChange={(e) => setValues((cur) => ({ ...cur, [v.name]: e.target.value }))}
-                />
-              </label>
-            ))}
+            {vars.map((v) => {
+              const long = isLongValueVar(v);
+              return (
+                <label key={v.name} className={`text-xs text-gray-600 dark:text-gray-400 ${long ? "sm:col-span-2" : ""}`}>
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{humanizeVarName(v.name)}</span>
+                    <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">{`{{${v.name}}}`}</span>
+                  </span>
+                  {long ? (
+                    <textarea
+                      rows={3}
+                      className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                      placeholder={v.default || humanizeVarName(v.name)}
+                      value={values[v.name] ?? ""}
+                      onChange={(e) => setValues((cur) => ({ ...cur, [v.name]: e.target.value }))}
+                    />
+                  ) : (
+                    <input
+                      className="mt-1 w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={v.default || humanizeVarName(v.name)}
+                      value={values[v.name] ?? ""}
+                      onChange={(e) => setValues((cur) => ({ ...cur, [v.name]: e.target.value }))}
+                    />
+                  )}
+                </label>
+              );
+            })}
           </div>
         </div>
       )}

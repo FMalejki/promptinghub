@@ -43,12 +43,43 @@ export function extractVariables(text: string): TemplateVar[] {
   return order.map((name) => ({ name, default: defaults.get(name) ?? "" }));
 }
 
-export function applyVariables(text: string, values: Record<string, string>): string {
-  return text.replace(VAR_RE, (_full, name: string, def?: string) => {
+// Substitute {{variables}} with their filled values (falling back to the inline
+// default). When `activeNames` is given, only those names are substituted and
+// every other {{token}} is left verbatim — so {{tokens}} inside code examples
+// and Handlebars control words ({{else}}, {{this}}) survive into the copied /
+// run text exactly as the on-screen render shows them. Without `activeNames`
+// (legacy callers) every match is substituted, as before.
+export function applyVariables(text: string, values: Record<string, string>, activeNames?: Set<string>): string {
+  return text.replace(VAR_RE, (full, name: string, def?: string) => {
+    if (activeNames && !activeNames.has(name)) return full;
     const v = values[name];
     if (v !== undefined && v !== "") return v;
     return (def ?? "").trim();
   });
+}
+
+// Turn a variable name into a human label for the Customize form:
+// user_name → "User name", recipientEmail → "Recipient email", topic → "Topic".
+// The raw {{name}} is still shown alongside for people who wrote the template.
+export function humanizeVarName(name: string): string {
+  const spaced = (name || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!spaced) return name;
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+// Variables whose value is likely a sentence/paragraph/code rather than a short
+// token get a textarea instead of a one-line input. Decided by the name's intent
+// or a default that's already long / multi-line.
+const LONG_VALUE_HINT_RE =
+  /(text|content|body|description|example|paragraph|message|prompt|instructions?|notes?|details|essay|story|code|snippet|context|background|requirements?)/i;
+export function isLongValueVar(v: { name: string; default?: string }): boolean {
+  if (LONG_VALUE_HINT_RE.test(v.name)) return true;
+  const d = v.default ?? "";
+  return d.includes("\n") || d.length > 60;
 }
 
 export type TemplateToken =
