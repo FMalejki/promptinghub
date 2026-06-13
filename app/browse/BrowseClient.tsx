@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
 import { PromptOfDay } from "../components/PromptOfDay";
+import { TrendingNow } from "../components/TrendingNow";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { hasActiveFilters } from "@/lib/browseFilters";
 import { isSearchFocusTrigger } from "@/lib/shortcuts";
@@ -178,8 +179,13 @@ export default function BrowsePage() {
           )}
         </div>
 
-        {/* Prompt of the day — only on the default, unfiltered view */}
-        {!q && !category && !tag && !imageOnly && !skillsOnly && <PromptOfDay />}
+        {/* Prompt of the day + Trending now — only on the default, unfiltered view */}
+        {!q && !category && !tag && !imageOnly && !skillsOnly && (
+          <>
+            <PromptOfDay />
+            <TrendingNow />
+          </>
+        )}
 
         {/* Search Bar */}
         <div className="mb-8">
