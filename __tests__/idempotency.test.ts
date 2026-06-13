@@ -1,4 +1,4 @@
-import { timeBucket, normalizeViewer, VIEW_WINDOW_MS, COPY_WINDOW_MS } from "../lib/idempotency";
+import { timeBucket, normalizeViewer, ipViewerKey, VIEW_WINDOW_MS, COPY_WINDOW_MS } from "../lib/idempotency";
 
 describe("timeBucket", () => {
   it("maps timestamps in the same window to the same bucket", () => {
@@ -33,5 +33,30 @@ describe("normalizeViewer", () => {
 
   it("trims surrounding whitespace before validating", () => {
     expect(normalizeViewer("  a1b2c3d4e5f6  ")).toBe("a1b2c3d4e5f6");
+  });
+});
+
+describe("ipViewerKey", () => {
+  it("derives a stable, namespaced token that passes normalizeViewer", () => {
+    const k = ipViewerKey("203.0.113.7");
+    expect(k).toMatch(/^ip[0-9a-f]{8}$/);
+    expect(normalizeViewer(k)).toBe(k); // usable as a viewer dedup key
+  });
+
+  it("is deterministic for the same IP and differs across IPs", () => {
+    expect(ipViewerKey("203.0.113.7")).toBe(ipViewerKey("203.0.113.7"));
+    expect(ipViewerKey("203.0.113.7")).not.toBe(ipViewerKey("203.0.113.8"));
+  });
+
+  it("returns '' for empty / unknown / non-string input", () => {
+    expect(ipViewerKey("")).toBe("");
+    expect(ipViewerKey("   ")).toBe("");
+    expect(ipViewerKey("unknown")).toBe("");
+    expect(ipViewerKey(null)).toBe("");
+    expect(ipViewerKey(42 as unknown)).toBe("");
+  });
+
+  it("can never collide with a real anonId (always 'ip'-prefixed)", () => {
+    expect(ipViewerKey("8.8.8.8").startsWith("ip")).toBe(true);
   });
 });

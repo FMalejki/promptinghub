@@ -22,3 +22,23 @@ export function normalizeViewer(raw: unknown): string {
   const s = typeof raw === "string" ? raw.trim() : "";
   return /^[A-Za-z0-9]{8,64}$/.test(s) ? s : "";
 }
+
+// Derive a stable, namespaced dedup token from a client IP. Used ONLY as a
+// fallback viewer when the request carries no valid anonId, so a scripted
+// no-id caller (curl) still de-duplicates per network per window instead of
+// incrementing on every hit. Honest browsers always send a localStorage anonId
+// and never reach this path. Returns "" for an empty/unknown IP. The "ip"
+// prefix keeps it inside normalizeViewer's alnum space while making it
+// impossible to collide with a real anonId.
+export function ipViewerKey(ip: unknown): string {
+  const s = typeof ip === "string" ? ip.trim() : "";
+  if (!s || s === "unknown") return "";
+  // FNV-1a → 32-bit hex. Not cryptographic — just a compact, deterministic,
+  // non-identifying bucket key (we never store the raw IP).
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return "ip" + h.toString(16).padStart(8, "0");
+}
