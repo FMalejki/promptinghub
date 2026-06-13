@@ -93,16 +93,29 @@ export type TopCreator = {
   prompts: number;
   stars: number;
   followers: number;
+  // Total engagement earned UNDER their prompts: stars×3 + copies×2 + views.
+  // This — not the raw prompt count — is what the leaderboard ranks on.
+  engagement: number;
 };
 
-// Leaderboard of creators (must have a handle), ranked by followers*3 + stars + prompts.
+// Leaderboard of creators (must have a handle), ranked by the ENGAGEMENT their
+// prompts have earned (stars×3 + copies×2 + views) plus follower endorsement —
+// NOT by how many prompts they posted. Prompt count is shown but only breaks ties.
 export async function topCreators(db: Db, limit = 20, offset = 0): Promise<TopCreator[]> {
-  // Public prompt counts + star sums per owner.
+  // Per owner: public prompt count + summed stars / copies / views.
   const promptAgg = await db
     .collection("prompts")
     .aggregate([
       { $match: { isPrivate: { $ne: true } } },
-      { $group: { _id: "$ownerEmail", prompts: { $sum: 1 }, stars: { $sum: { $size: { $ifNull: ["$starredBy", []] } } } } },
+      {
+        $group: {
+          _id: "$ownerEmail",
+          prompts: { $sum: 1 },
+          stars: { $sum: { $size: { $ifNull: ["$starredBy", []] } } },
+          copies: { $sum: { $ifNull: ["$copyCount", 0] } },
+          views: { $sum: { $ifNull: ["$viewCount", 0] } },
+        },
+      },
     ])
     .toArray();
   if (!promptAgg.length) return [];
@@ -120,6 +133,7 @@ export async function topCreators(db: Db, limit = 20, offset = 0): Promise<TopCr
     const u = userByEmail.get(p._id);
     if (!u?.handle) continue; // only creators with a public handle
     const followers = followersByEmail.get(p._id) || 0;
+    const engagement = p.stars * 3 + (p.copies || 0) * 2 + (p.views || 0);
     creators.push({
       handle: u.handle,
       name: u.name || (p._id as string).split("@")[0],
@@ -128,11 +142,16 @@ export async function topCreators(db: Db, limit = 20, offset = 0): Promise<TopCr
       prompts: p.prompts,
       stars: p.stars,
       followers,
+      engagement,
     });
   }
 
-  const score = (c: TopCreator) => c.followers * 3 + c.stars + c.prompts;
-  const ranked = creators.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  // Activity-first: engagement under their prompts dominates, followers add
+  // endorsement weight; prompt count only breaks an otherwise exact tie.
+  const score = (c: TopCreator) => c.engagement + c.followers * 5;
+  const ranked = creators.sort(
+    (a, b) => score(b) - score(a) || b.prompts - a.prompts || a.name.localeCompare(b.name),
+  );
   const start = Math.max(0, Math.floor(offset));
   return ranked.slice(start, start + limit);
 }

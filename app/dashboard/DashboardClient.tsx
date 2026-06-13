@@ -6,18 +6,34 @@ import { Navbar } from "../components/Navbar";
 import { weekOverWeek } from "@/lib/analyticsSummary";
 
 type Row = { id: string; name: string; copyCount: number; stars: number; forkCount: number; isPrivate: boolean };
-type SeriesPoint = { day: string; count: number };
+type SeriesPoint = { day: string; copies: number; views: number };
 type Analytics = { totals: { prompts: number; copies: number; stars: number; forks: number }; perPrompt: Row[]; series: SeriesPoint[] };
 
+type Metric = "activity" | "copies" | "views";
+const METRICS: { key: Metric; label: string; color: string }[] = [
+  { key: "activity", label: "Activity", color: "#3b82f6" },
+  { key: "copies", label: "Copies", color: "#8b5cf6" },
+  { key: "views", label: "Views", color: "#10b981" },
+];
+// Activity = everything together (copies + views); the others isolate one signal.
+function valueOf(p: SeriesPoint, metric: Metric): number {
+  if (metric === "copies") return p.copies;
+  if (metric === "views") return p.views;
+  return p.copies + p.views;
+}
+
 function Sparkline({ series }: { series: SeriesPoint[] }) {
+  const [metric, setMetric] = useState<Metric>("activity");
   if (!series || series.length === 0) return null;
   const w = 600;
   const h = 80;
-  const max = Math.max(1, ...series.map((p) => p.count));
+  const active = METRICS.find((m) => m.key === metric) || METRICS[0];
+  const pointsForMetric = series.map((p) => ({ day: p.day, count: valueOf(p, metric) }));
+  const max = Math.max(1, ...pointsForMetric.map((p) => p.count));
   const dx = series.length > 1 ? w / (series.length - 1) : 0;
-  const pts = series.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
-  const total = series.reduce((s, p) => s + p.count, 0);
-  const trend = weekOverWeek(series);
+  const pts = pointsForMetric.map((p, i) => `${i * dx},${h - (p.count / max) * (h - 8) - 4}`);
+  const total = pointsForMetric.reduce((s, p) => s + p.count, 0);
+  const trend = weekOverWeek(pointsForMetric);
   const trendColor =
     trend.direction === "up"
       ? "text-green-600 dark:text-green-400"
@@ -33,8 +49,8 @@ function Sparkline({ series }: { series: SeriesPoint[] }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Copies — last 14 days</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{active.label} — last 14 days</h2>
         <div className="flex items-baseline gap-2">
           {trendLabel && (
             <span className={`text-xs font-medium ${trendColor}`}>
@@ -45,8 +61,24 @@ function Sparkline({ series }: { series: SeriesPoint[] }) {
           <span className="text-xs text-gray-500 dark:text-gray-400">{total} total</span>
         </div>
       </div>
+      {/* Metric selector — defaults to combined Activity. */}
+      <div className="flex items-center gap-1 mb-3 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-900 w-fit">
+        {METRICS.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => setMetric(m.key)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+              metric === m.key
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
+        <polyline fill="none" stroke={active.color} strokeWidth="2" points={pts.join(" ")} vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="flex justify-between mt-1 text-[10px] text-gray-400">
         <span>{series[0]?.day.slice(5)}</span>

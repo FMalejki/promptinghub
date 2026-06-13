@@ -22,7 +22,26 @@ beforeEach(async () => {
 });
 
 describe("topCreators", () => {
-  it("ranks creators by followers + stars + prompts and resolves handle/name", async () => {
+  it("ranks a low-volume but high-engagement creator above a prolific but ignored one", async () => {
+    for (const [email, name] of [["busy@x.com", "Busy"], ["loved@x.com", "Loved"]]) {
+      await createUser(db, email, "pw", name);
+      await ensureHandle(db, email);
+    }
+    // Busy: 5 prompts, zero engagement on any of them.
+    for (let i = 0; i < 5; i++) {
+      await createPrompt(db, "busy@x.com", { name: `B${i}`, description: "d", category: "Writing", body: "x" });
+    }
+    // Loved: a single prompt that earned real copies + views.
+    const p = await createPrompt(db, "loved@x.com", { name: "L1", description: "d", category: "Writing", body: "x" });
+    await db.collection("prompts").updateOne({ _id: new (require("mongodb").ObjectId)(p.id) }, { $set: { copyCount: 40, viewCount: 200 } });
+
+    const creators = await topCreators(db, 10);
+    expect(creators[0].name).toBe("Loved"); // engagement beats raw prompt count
+    expect(creators[0].engagement).toBe(40 * 2 + 200);
+    expect(creators.find((c) => c.name === "Busy")!.engagement).toBe(0);
+  });
+
+  it("ranks creators by engagement (+followers) and resolves handle/name", async () => {
     for (const [email, name] of [["a@x.com", "Alice"], ["b@x.com", "Bob"], ["fan@x.com", "Fan"]]) {
       await createUser(db, email, "pw", name);
       await ensureHandle(db, email);

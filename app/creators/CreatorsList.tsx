@@ -61,6 +61,7 @@ export function CreatorsList({
                 <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">@{c.handle}</div>
               </div>
               <div className="hidden sm:flex items-center gap-5 text-sm text-gray-600 dark:text-gray-400">
+                <span title="Total engagement under their prompts (stars×3 + copies×2 + views)"><b className="text-gray-900 dark:text-white">{c.engagement.toLocaleString()}</b> activity</span>
                 <span><b className="text-gray-900 dark:text-white">{c.followers}</b> followers</span>
                 <span><b className="text-gray-900 dark:text-white">{c.stars}</b> stars</span>
                 <span><b className="text-gray-900 dark:text-white">{c.prompts}</b> prompts</span>
