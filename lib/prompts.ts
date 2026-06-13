@@ -631,12 +631,20 @@ export async function createPrompt(db: Db, ownerEmail: string, data: NewPrompt):
 // tags, testedModels, body/files) but NOT owner-only fields — privacy, price,
 // the share allowlist, or the collaborator list. Those are silently dropped for
 // non-owners so a collaborator can never widen access or change pricing.
+// Drop repo files whose path the owner has tombstoned (manually deleted), so a
+// GitHub sync re-pull doesn't resurrect them. Pure; used by the sync route.
+export function filterSyncedFiles<T extends { path: string }>(files: T[], removedPaths?: string[] | null): T[] {
+  if (!removedPaths || removedPaths.length === 0) return files;
+  const removed = new Set(removedPaths);
+  return files.filter((f) => !removed.has(f.path));
+}
+
 export async function updatePrompt(
   db: Db,
   id: string,
   editorEmail: string,
   data: Partial<NewPrompt>,
-  opts?: { message?: string },
+  opts?: { message?: string; trackRemovals?: boolean },
 ): Promise<boolean> {
   if (!ObjectId.isValid(id)) return false;
 
@@ -691,6 +699,19 @@ export async function updatePrompt(
   if (contentEditing) {
     set.body = newBody ?? "";
     set.files = newFiles ?? [];
+
+    // Track owner deletions so a later GitHub sync doesn't resurrect removed
+    // files. Only on real editor saves (trackRemovals) — the sync path passes a
+    // pre-filtered set and must leave the existing tombstones untouched.
+    if (opts?.trackRemovals && newFiles) {
+      const newPaths = new Set(newFiles.map((f) => f.path));
+      const oldPaths = ((current.files as PromptFile[] | undefined) ?? []).map((f) => f.path);
+      const existing: string[] = Array.isArray(current.removedPaths) ? (current.removedPaths as string[]) : [];
+      // Keep tombstones still absent, add newly-removed paths; a re-added path clears its tombstone.
+      const removed = new Set<string>(existing.filter((p) => !newPaths.has(p)));
+      for (const p of oldPaths) if (!newPaths.has(p)) removed.add(p);
+      set.removedPaths = [...removed];
+    }
 
     // Snapshot the prior content as a version before overwriting it.
     const version = (await db.collection("promptVersions").countDocuments({ promptId: id })) + 1;

@@ -38,7 +38,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const { message, ...data } = parsed.data;
   try {
     const db = await getDb();
-    const ok = await updatePrompt(db, params.id, email, { ...data, image: data.image || undefined }, { message });
+    const ok = await updatePrompt(db, params.id, email, { ...data, image: data.image || undefined }, { message, trackRemovals: true });
     if (!ok) return NextResponse.json({ error: "Not found or not yours" }, { status: 404 });
     // Refresh the semantic embedding for the edited text (best-effort).
     try {

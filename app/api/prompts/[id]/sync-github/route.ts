@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { ObjectId } from "mongodb";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { updatePrompt } from "@/lib/prompts";
+import { updatePrompt, filterSyncedFiles } from "@/lib/prompts";
 import { parseRepoRef } from "@/lib/githubImport";
 import { importRepo, serverGithubToken } from "@/lib/githubFetch";
 import { enforceRateLimit, MIN } from "@/lib/apiRateLimit";
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const db = await getDb();
-  const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) }, { projection: { ownerEmail: 1, sourceUrl: 1, sourceCommit: 1 } });
+  const row = await db.collection("prompts").findOne({ _id: new ObjectId(id) }, { projection: { ownerEmail: 1, sourceUrl: 1, sourceCommit: 1, removedPaths: 1 } });
   if (!row) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (row.ownerEmail !== email) return NextResponse.json({ error: "Only the owner can sync this prompt." }, { status: 403 });
   if (!row.sourceUrl) return NextResponse.json({ error: "This prompt isn't linked to a GitHub repo." }, { status: 400 });
@@ -44,20 +44,27 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const before = (row.sourceCommit as string | undefined) ?? null;
   const alreadyCurrent = !!newCommit && !!before && newCommit === before;
 
+  // Respect files the owner manually deleted: don't let a re-pull resurrect them.
+  // trackRemovals is OFF here so the tombstones (set by editor saves) survive.
+  const removedPaths = Array.isArray(row.removedPaths) ? (row.removedPaths as string[]) : [];
+  const files = filterSyncedFiles(result.draft.files, removedPaths);
+  const skipped = result.draft.files.length - files.length;
+
   // Re-pull files even when the commit matches (lets the owner restore from the
   // repo); updatePrompt snapshots the prior content as a version.
   const ok = await updatePrompt(
     db,
     id,
     email,
-    { files: result.draft.files, sourceCommit: newCommit ?? undefined },
+    { files, sourceCommit: newCommit ?? undefined },
     { message: `Synced from GitHub${newCommit ? ` @ ${newCommit.slice(0, 7)}` : ""}` },
   );
   if (!ok) return NextResponse.json({ error: "Could not update the prompt." }, { status: 500 });
 
   return NextResponse.json({
     ok: true,
-    imported: result.draft.files.length,
+    imported: files.length,
+    skipped,
     commit: newCommit,
     previousCommit: before,
     alreadyCurrent,
