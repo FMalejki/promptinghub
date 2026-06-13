@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buildAssistantLinks, type Assistant } from "@/lib/llmLinks";
+import { buildAssistantLinks, assistantOpenUrl, type Assistant } from "@/lib/llmLinks";
 import { track } from "./AnalyticsBeacon";
 
 // "Run it" buttons that open a prompt in an external assistant. Every click
@@ -23,7 +23,10 @@ export function AssistantLinks({ text, onOpen }: { text: string; onOpen?: () => 
     setCopiedId(a.id);
     track("cta_click", typeof window !== "undefined" ? window.location.pathname : "/", { action: "open_in", assistant: a.id });
     onOpen?.();
-    window.open(a.url, "_blank", "noopener,noreferrer");
+    // On Android, "Open in Gemini" must avoid the /app path (its App Link crashes
+    // the native Gemini app on launch) — assistantOpenUrl swaps in the bare host.
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : undefined;
+    window.open(assistantOpenUrl(a, ua), "_blank", "noopener,noreferrer");
     setTimeout(() => setCopiedId((c) => (c === a.id ? null : c)), 2500);
   }
 

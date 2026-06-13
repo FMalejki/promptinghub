@@ -35,3 +35,22 @@ export function buildAssistantLinks(text: string): Assistant[] | null {
     { id: "perplexity", label: "Perplexity", url: `https://www.perplexity.ai/search?q=${q}`, prefilled: true },
   ];
 }
+
+// Bare-host Gemini URL used as the Android fallback (no "/app" path).
+export const GEMINI_ANDROID_URL = "https://gemini.google.com/";
+
+/**
+ * The URL to actually open for an assistant, given the browser's user agent.
+ * Identical to `assistant.url` everywhere except one case: on Android, "Open in
+ * Gemini" must drop the "/app" path. `gemini.google.com/app` is claimed by the
+ * installed Gemini app's Android App Link, and handing it to the app that way
+ * crashes it on launch (verified on two devices). The bare host isn't
+ * intercepted, so it loads web Gemini in the browser — where the user pastes
+ * the prompt that was already copied to the clipboard. Kept pure + unit-tested
+ * so this workaround can't silently regress.
+ */
+export function assistantOpenUrl(a: Pick<Assistant, "id" | "url">, userAgent?: string): string {
+  const isAndroid = typeof userAgent === "string" && /android/i.test(userAgent);
+  if (a.id === "gemini" && isAndroid) return GEMINI_ANDROID_URL;
+  return a.url;
+}
