@@ -63,6 +63,36 @@ export function Markdown({ src }: { src: string }) {
               <Inline text={b.text} />
             </blockquote>
           );
+        if (b.type === "table") {
+          const alignClass = (a: (typeof b.align)[number]) =>
+            a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
+          return (
+            <div key={i} className="my-4 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-gray-300 dark:border-gray-600">
+                    {b.header.map((h, c) => (
+                      <th key={c} className={`px-3 py-2 font-semibold text-gray-900 dark:text-white ${alignClass(b.align[c])}`}>
+                        <Inline text={h} />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {b.rows.map((row, r) => (
+                    <tr key={r} className="border-b border-gray-200 dark:border-gray-700">
+                      {row.map((cell, c) => (
+                        <td key={c} className={`px-3 py-2 align-top ${alignClass(b.align[c])}`}>
+                          <Inline text={cell} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
         if (b.type === "hr") return <hr key={i} className="my-5 border-gray-200 dark:border-gray-700" />;
         if (b.type === "image")
           // eslint-disable-next-line @next/next/no-img-element

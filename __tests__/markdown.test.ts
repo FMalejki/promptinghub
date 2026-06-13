@@ -104,6 +104,51 @@ describe("parseBlocks", () => {
   });
 });
 
+describe("parseBlocks — GFM tables", () => {
+  it("parses a pipe table with header, alignment and rows", () => {
+    const src = "| Phase | Figures out |\n|---|:--:|\n| 0 · Preflight | Project path |\n| 1 · What to do | Your goal |";
+    expect(parseBlocks(src)).toEqual([
+      {
+        type: "table",
+        header: ["Phase", "Figures out"],
+        align: [null, "center"],
+        rows: [
+          ["0 · Preflight", "Project path"],
+          ["1 · What to do", "Your goal"],
+        ],
+      },
+    ]);
+  });
+
+  it("parses left/right/center alignment markers", () => {
+    const src = "| a | b | c |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |";
+    const b = parseBlocks(src)[0] as any;
+    expect(b.type).toBe("table");
+    expect(b.align).toEqual(["left", "center", "right"]);
+  });
+
+  it("tolerates missing outer pipes; truncates extra cells and pads short rows to header width", () => {
+    const src = "h1 | h2\n--- | ---\nx | y | z\nlonely |";
+    const b = parseBlocks(src)[0] as any;
+    expect(b.type).toBe("table");
+    expect(b.header).toEqual(["h1", "h2"]);
+    // extra cell (z) dropped; short row padded to header width
+    expect(b.rows).toEqual([["x", "y"], ["lonely", ""]]);
+  });
+
+  it("does NOT treat a lone pipe line (no delimiter row) as a table", () => {
+    const b = parseBlocks("| not | really |\njust text");
+    expect(b.every((x) => x.type !== "table")).toBe(true);
+  });
+
+  it("ends the table at a blank line and resumes normal blocks", () => {
+    const src = "| a | b |\n|---|---|\n| 1 | 2 |\n\nAfter the table.";
+    const blocks = parseBlocks(src);
+    expect(blocks[0].type).toBe("table");
+    expect(blocks[1]).toEqual({ type: "paragraph", text: "After the table." });
+  });
+});
+
 describe("parseInline", () => {
   it("splits bold, italic and inline code", () => {
     expect(parseInline("a **b** c")).toEqual([

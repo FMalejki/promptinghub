@@ -9,6 +9,8 @@ export type InlineSegment =
   | { type: "code"; text: string }
   | { type: "link"; text: string; href: string };
 
+export type TableAlign = "left" | "center" | "right" | null;
+
 export type Block =
   | { type: "heading"; level: number; text: string }
   | { type: "code"; lang: string; text: string }
@@ -16,7 +18,35 @@ export type Block =
   | { type: "quote"; text: string }
   | { type: "image"; alt: string; src: string }
   | { type: "hr" }
+  | { type: "table"; header: string[]; align: TableAlign[]; rows: string[][] }
   | { type: "paragraph"; text: string };
+
+// Split a GFM table row into trimmed cells, dropping optional outer pipes and
+// honoring backslash-escaped pipes (\|) inside a cell.
+function splitTableRow(line: string): string[] {
+  let s = line.trim();
+  if (s.startsWith("|")) s = s.slice(1);
+  if (s.endsWith("|") && !s.endsWith("\\|")) s = s.slice(0, -1);
+  return s.split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+}
+
+// A GFM delimiter row: each cell is dashes with optional leading/trailing colons
+// (e.g. ---, :--, --:, :-:). Must have at least one cell.
+function isTableDelimiter(line: string): boolean {
+  if (!line.includes("-")) return false;
+  const cells = splitTableRow(line);
+  return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
+}
+
+function alignOfCell(cell: string): TableAlign {
+  const c = cell.trim();
+  const left = c.startsWith(":");
+  const right = c.endsWith(":");
+  if (left && right) return "center";
+  if (right) return "right";
+  if (left) return "left";
+  return null;
+}
 
 export function pickReadme(files: { path: string; content: string }[]): string | null {
   // Prefer the ROOT readme over a nested one (e.g. don't pick phases/README.md when
@@ -87,6 +117,27 @@ export function parseBlocks(src: string): Block[] {
       while (i < lines.length && !/^```\s*$/.test(lines[i])) buf.push(lines[i++]);
       i++; // skip closing fence
       blocks.push({ type: "code", lang, text: buf.join("\n") });
+      continue;
+    }
+
+    // GFM pipe table: a header row followed by a |---|:--:|--- delimiter row.
+    // Cells are truncated/padded to the header's column count (GFM semantics);
+    // the table ends at a blank line or a line with no pipe.
+    if (line.includes("|") && i + 1 < lines.length && isTableDelimiter(lines[i + 1])) {
+      flushPara();
+      flushList();
+      flushQuote();
+      const header = splitTableRow(line);
+      const delim = splitTableRow(lines[i + 1]);
+      const align: TableAlign[] = header.map((_, c) => alignOfCell(delim[c] ?? ""));
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].trim() !== "" && lines[i].includes("|")) {
+        const cells = splitTableRow(lines[i]);
+        rows.push(header.map((_, c) => cells[c] ?? ""));
+        i++;
+      }
+      blocks.push({ type: "table", header, align, rows });
       continue;
     }
 
