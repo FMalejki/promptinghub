@@ -301,8 +301,6 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
         stars: { $size: { $ifNull: ["$starredBy", []] } },
         copyCount: { $ifNull: ["$copyCount", 0] },
         viewCount: { $ifNull: ["$viewCount", 0] },
-        // Trending = copies + stars (recency breaks ties via the $sort below).
-        trendingScore: { $add: [{ $ifNull: ["$copyCount", 0] }, { $size: { $ifNull: ["$starredBy", []] } }] },
         // Popular = weighted total engagement: stars (strongest intent) ×3,
         // copies ×2, views ×1. Recency breaks ties.
         engagementScore: {
@@ -311,6 +309,29 @@ export async function listPrompts(db: Db, opts: ListOpts = {}): Promise<Prompt[]
             { $multiply: [{ $ifNull: ["$copyCount", 0] }, 2] },
             { $ifNull: ["$viewCount", 0] },
           ],
+        },
+        // Trending = that same engagement with Hacker-News-style gravity decay by
+        // age, so a fresh, engaged prompt outranks a stale one with equal engagement
+        // ("more popular AND more recent"). score = engagement / sqrt(ageHours + 2).
+        trendingScore: {
+          $let: {
+            vars: {
+              eng: {
+                $add: [
+                  { $multiply: [{ $size: { $ifNull: ["$starredBy", []] } }, 3] },
+                  { $multiply: [{ $ifNull: ["$copyCount", 0] }, 2] },
+                  { $ifNull: ["$viewCount", 0] },
+                ],
+              },
+              ageHours: {
+                $divide: [
+                  { $max: [0, { $subtract: ["$$NOW", { $toDate: { $ifNull: ["$createdAt", "$$NOW"] } }] }] },
+                  3600000,
+                ],
+              },
+            },
+            in: { $divide: ["$$eng", { $sqrt: { $add: ["$$ageHours", 2] } }] },
+          },
         },
       },
     },

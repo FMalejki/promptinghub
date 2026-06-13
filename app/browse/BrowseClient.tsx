@@ -29,7 +29,7 @@ export default function BrowsePage() {
   const { status, data } = useSession();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<"popular" | "recent" | "copied">("popular");
+  const [sort, setSort] = useState<"popular" | "trending" | "recent" | "copied">("popular");
   const [imageOnly, setImageOnly] = useState(false);
   const [skillsOnly, setSkillsOnly] = useState(false);
   const [useWith, setUseWith] = useState<"chat" | "agent" | null>(null);
@@ -78,6 +78,8 @@ export default function BrowsePage() {
     if (params.get("skill") === "1") setSkillsOnly(true);
     const uw = params.get("useWith");
     if (uw === "chat" || uw === "agent") setUseWith(uw);
+    const s = params.get("sort");
+    if (s === "popular" || s === "trending" || s === "recent" || s === "copied") setSort(s);
   }, []);
 
   const buildParams = useCallback(
@@ -206,88 +208,92 @@ export default function BrowsePage() {
 
         {/* Filters */}
         <div className="mb-8 space-y-4">
-          {/* Sort */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-center">
-            <button
-              onClick={() => setSort("popular")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                sort === "popular"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              Popular
-            </button>
-            <button
-              onClick={() => setSort("recent")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                sort === "recent"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              Recent
-            </button>
-            <button
-              onClick={() => setSort("copied")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                sort === "copied"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              Most copied
-            </button>
-            <button
-              onClick={() => setImageOnly((v) => !v)}
-              title="Show only image-generation prompts"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                imageOnly
-                  ? "bg-purple-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Images
-            </button>
-            <button
-              onClick={() => setSkillsOnly((v) => !v)}
-              title="Show only prompts marked as skills"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                skillsOnly
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Skills
-            </button>
-            <button
-              onClick={() => setUseWith((v) => (v === "agent" ? null : "agent"))}
-              title="Show prompts best used with a coding agent"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                useWith === "agent"
-                  ? "bg-amber-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              🤖 For agents
-            </button>
-            <button
-              onClick={() => setUseWith((v) => (v === "chat" ? null : "chat"))}
-              title="Show prompts best used in a web chat"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                useWith === "chat"
-                  ? "bg-amber-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              💬 For chat
-            </button>
+          {/* Sort (pick-one segmented control) + Filters (multi-toggle chips),
+              visually separated so it's clear they're different kinds of control. */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
+            {/* Sort — segmented control on a track; exactly one is active */}
+            <div className="inline-flex items-center rounded-xl bg-gray-100 dark:bg-gray-800 p-1" role="group" aria-label="Sort by">
+              {([
+                { key: "popular", label: "Popular" },
+                { key: "trending", label: "Trending" },
+                { key: "recent", label: "Recent" },
+                { key: "copied", label: "Most copied" },
+              ] as const).map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setSort(s.key)}
+                  aria-pressed={sort === s.key}
+                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    sort === s.key
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Divider between sorts and filters */}
+            <div className="hidden sm:block h-6 w-px bg-gray-200 dark:bg-gray-700" aria-hidden />
+
+            {/* Filters — multi-select toggle chips (rounded-full to distinguish from the sort control) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setImageOnly((v) => !v)}
+                title="Show only image-generation prompts"
+                aria-pressed={imageOnly}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  imageOnly
+                    ? "bg-purple-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Images
+              </button>
+              <button
+                onClick={() => setSkillsOnly((v) => !v)}
+                title="Show only prompts marked as skills"
+                aria-pressed={skillsOnly}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  skillsOnly
+                    ? "bg-indigo-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Skills
+              </button>
+              <button
+                onClick={() => setUseWith((v) => (v === "agent" ? null : "agent"))}
+                title="Show prompts best used with a coding agent"
+                aria-pressed={useWith === "agent"}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  useWith === "agent"
+                    ? "bg-amber-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                🤖 For agents
+              </button>
+              <button
+                onClick={() => setUseWith((v) => (v === "chat" ? null : "chat"))}
+                title="Show prompts best used in a web chat"
+                aria-pressed={useWith === "chat"}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  useWith === "chat"
+                    ? "bg-amber-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                💬 For chat
+              </button>
+            </div>
           </div>
 
           {/* Categories */}
