@@ -58,10 +58,14 @@ export function PromptCard({ id, name, description, category, author, image, sta
   const useWithChip = useWithBadge(useWith);
 
   return (
-    <Link
-      href={`/prompt/${id}`}
-      className="group flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
-    >
+    <div className="group relative flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200">
+      {/* Stretched overlay link — makes the whole card clickable to the prompt
+          WITHOUT wrapping the inner author link in a second <a> (invalid HTML
+          that fires React's "<a> cannot be a descendant of <a>" hydration
+          warning). Inner interactive links sit above it via relative z-10. */}
+      <Link href={`/prompt/${id}`} className="absolute inset-0 z-0 rounded-xl" aria-label={name}>
+        <span className="sr-only">{name}</span>
+      </Link>
       {/* Header: small cover thumbnail + title + inline meta (HF-style — the
           cover is secondary, not a hero). */}
       <div className="flex items-start gap-3">
@@ -168,14 +172,13 @@ export function PromptCard({ id, name, description, category, author, image, sta
           {author.handle ? (
             <Link
               href={`/u/${author.handle}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              className="relative z-10 flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
               <Avatar name={author.name} image={author.image} size={24} />
               <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
             </Link>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="relative z-10 flex items-center gap-2">
               <Avatar name={author.name} image={author.image} size={24} />
               <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{author.name}</span>
             </div>
@@ -207,7 +210,7 @@ export function PromptCard({ id, name, description, category, author, image, sta
             )}
           </div>
         </div>
-    </Link>
+    </div>
   );
 }
 
