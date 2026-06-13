@@ -5,15 +5,21 @@ import {
   playgroundProvider,
   buildAnthropicRequest,
   extractAnthropicText,
+  buildChatCompletionRequest,
+  extractChatCompletionText,
   PLAYGROUND_MAX_INPUT,
   DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_GROQ_MODEL,
 } from "@/lib/playground";
+import { enforceAiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
 // Run a prompt against an LLM. Env-gated: only works when a provider key is set
-// (ANTHROPIC_API_KEY preferred, else OPENAI_API_KEY). Auth required so the key is
-// never an open proxy. Returns 503 with { configured:false } when unconfigured.
+// (ANTHROPIC_API_KEY preferred, then OPENAI_API_KEY, then free GROQ_API_KEY).
+// Auth required so the key is never an open proxy, and a hard multi-layer rate
+// limit (per-user / per-IP / global-daily) stops anyone farming accounts to
+// drain the shared key. Returns 503 with { configured:false } when unconfigured.
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,10 +27,13 @@ export async function POST(req: Request) {
   const provider = playgroundProvider(process.env as Record<string, string | undefined>);
   if (!provider) {
     return NextResponse.json(
-      { error: "Playground is not configured. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY) to enable it.", configured: false },
+      { error: "Playground is not configured. Set GROQ_API_KEY (free), ANTHROPIC_API_KEY or OPENAI_API_KEY to enable it.", configured: false },
       { status: 503 },
     );
   }
+
+  const limited = await enforceAiRateLimit(req, session.user.email);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const text = typeof body?.text === "string" ? body.text.trim() : "";
@@ -53,20 +62,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ output: extractAnthropicText(json), provider, model });
     }
 
-    // OpenAI fallback (chat completions).
-    const model = process.env.PLAYGROUND_MODEL || "gpt-4o-mini";
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    // OpenAI + Groq share the OpenAI chat-completions wire format; only the
+    // endpoint, key and default model differ.
+    const isGroq = provider === "groq";
+    const url = isGroq
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const key = isGroq ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
+    const model = process.env.PLAYGROUND_MODEL || (isGroq ? DEFAULT_GROQ_MODEL : "gpt-4o-mini");
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model, max_tokens: 1024, messages: [{ role: "user", content: text }] }),
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildChatCompletionRequest(model, text, 1024)),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       return NextResponse.json({ error: "Provider error", status: res.status, detail: detail.slice(0, 300) }, { status: 502 });
     }
     const json = await res.json();
-    const output = json?.choices?.[0]?.message?.content ?? "";
-    return NextResponse.json({ output, provider, model });
+    return NextResponse.json({ output: extractChatCompletionText(json), provider, model });
   } catch (e) {
     return NextResponse.json({ error: "Request failed" }, { status: 502 });
   }

@@ -61,8 +61,9 @@ export function PlaygroundPanel({ text }: { text: string }) {
 
       {!configured ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Live running isn’t enabled on this instance. Set <code className="text-xs">ANTHROPIC_API_KEY</code> (or{" "}
-          <code className="text-xs">OPENAI_API_KEY</code>) to try prompts against a model here.
+          Live running isn’t enabled on this instance. Set <code className="text-xs">GROQ_API_KEY</code> (free),{" "}
+          <code className="text-xs">ANTHROPIC_API_KEY</code> or <code className="text-xs">OPENAI_API_KEY</code> to try
+          prompts against a model here.
         </p>
       ) : (
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">

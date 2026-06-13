@@ -11,6 +11,7 @@ import {
   AI_IMPORT_MAX_INPUT,
   type AiImportChoice,
 } from "@/lib/aiImport";
+import { enforceAiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,10 @@ async function callImportModel(choice: AiImportChoice, instruction: string): Pro
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Hard multi-layer limit — this route can spend the shared LLM key.
+  const limited = await enforceAiRateLimit(req, session.user.email);
+  if (limited) return limited;
 
   const data = (await req.json().catch(() => null)) as { text?: string; source?: string } | null;
   if (!data || typeof data.text !== "string") {

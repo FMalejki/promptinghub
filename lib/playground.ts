@@ -2,11 +2,12 @@
 // route stays thin and the gating/parsing is unit-testable; the actual network
 // call lives in the route and only fires when a provider key is configured.
 
-export type PlaygroundProvider = "anthropic" | "openai";
+export type PlaygroundProvider = "anthropic" | "openai" | "groq";
 
 export const PLAYGROUND_MAX_INPUT = 12000; // chars — cap request size
 export const PLAYGROUND_MAX_TOKENS = 4096; // ceiling for the completion
 export const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest";
+export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 
 type Env = Record<string, string | undefined>;
 
@@ -14,12 +15,29 @@ function has(v: string | undefined): boolean {
   return !!v && v.trim().length > 0;
 }
 
-// Which provider to use, based on configured keys (Anthropic preferred). Null
-// when nothing is configured → the route returns a clear "not configured" state.
+// Which provider to use, based on configured keys. Paid-but-stronger providers
+// are preferred when present (Anthropic, then OpenAI); free Groq is the fallback
+// so the playground works on a zero-cost key. Null when nothing is configured →
+// the route returns a clear "not configured" state.
 export function playgroundProvider(env: Env): PlaygroundProvider | null {
   if (has(env.ANTHROPIC_API_KEY)) return "anthropic";
   if (has(env.OPENAI_API_KEY)) return "openai";
+  if (has(env.GROQ_API_KEY)) return "groq";
   return null;
+}
+
+// OpenAI-compatible chat-completions body (used by both OpenAI and Groq, which
+// share the same wire format). Pure + testable; the route adds the auth header.
+export function buildChatCompletionRequest(model: string, userText: string, maxTokens: number) {
+  return {
+    model,
+    max_tokens: Math.max(1, Math.min(maxTokens, PLAYGROUND_MAX_TOKENS)),
+    messages: [{ role: "user", content: userText }],
+  };
+}
+
+export function extractChatCompletionText(json: any): string {
+  return json?.choices?.[0]?.message?.content ?? "";
 }
 
 export function playgroundAvailable(env: Env): boolean {

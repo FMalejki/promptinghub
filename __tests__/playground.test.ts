@@ -3,6 +3,8 @@ import {
   playgroundAvailable,
   buildAnthropicRequest,
   extractAnthropicText,
+  buildChatCompletionRequest,
+  extractChatCompletionText,
   PLAYGROUND_MAX_INPUT,
 } from "../lib/playground";
 
@@ -18,8 +20,31 @@ describe("playgroundProvider / availability", () => {
   it("falls back to OpenAI when only its key is present", () => {
     expect(playgroundProvider({ OPENAI_API_KEY: "sk-x" })).toBe("openai");
   });
+  it("falls back to free Groq when only its key is present", () => {
+    expect(playgroundProvider({ GROQ_API_KEY: "gsk_x" })).toBe("groq");
+    expect(playgroundAvailable({ GROQ_API_KEY: "gsk_x" })).toBe(true);
+  });
+  it("prefers paid providers over Groq when several keys are set", () => {
+    expect(playgroundProvider({ GROQ_API_KEY: "gsk_x", OPENAI_API_KEY: "sk-x" })).toBe("openai");
+    expect(playgroundProvider({ GROQ_API_KEY: "gsk_x", ANTHROPIC_API_KEY: "sk-ant" })).toBe("anthropic");
+  });
   it("ignores blank keys", () => {
     expect(playgroundProvider({ ANTHROPIC_API_KEY: "  " })).toBeNull();
+    expect(playgroundProvider({ GROQ_API_KEY: "  " })).toBeNull();
+  });
+});
+
+describe("buildChatCompletionRequest / extractChatCompletionText (OpenAI + Groq shape)", () => {
+  it("builds a chat-completions body and clamps max_tokens", () => {
+    const body = buildChatCompletionRequest("llama-3.3-70b-versatile", "Hi", 1024);
+    expect(body.model).toBe("llama-3.3-70b-versatile");
+    expect(body.messages).toEqual([{ role: "user", content: "Hi" }]);
+    expect(buildChatCompletionRequest("m", "x", 999999).max_tokens).toBeLessThanOrEqual(4096);
+  });
+  it("pulls the assistant message text out of the response", () => {
+    expect(extractChatCompletionText({ choices: [{ message: { content: "hello" } }] })).toBe("hello");
+    expect(extractChatCompletionText({})).toBe("");
+    expect(extractChatCompletionText(null)).toBe("");
   });
 });
 

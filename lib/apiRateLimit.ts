@@ -26,3 +26,22 @@ export async function enforceRateLimit(
 
 // Common windows so callers stay consistent.
 export const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+
+// Hard, multi-layer limit for endpoints that spend a SHARED provider key (the AI
+// import + playground routes run against one server-side Groq/LLM key). Three
+// independent buckets, so no single vector can drain the key:
+//   1. per-account — a generous-but-bounded budget for one signed-in user
+//   2. per-IP      — catches one machine farming many throwaway Google accounts
+//   3. global      — an absolute daily ceiling on TOTAL spend across everyone
+// The first bucket over budget returns the 429; every layer fails OPEN on a
+// limiter error, so a DB hiccup never blocks legitimate traffic.
+export async function enforceAiRateLimit(req: Request, who?: string | null): Promise<NextResponse | null> {
+  const ip = clientIp(req);
+  return (
+    (await enforceRateLimit(req, "ai-user", 20, HOUR, who || ip)) ||
+    (await enforceRateLimit(req, "ai-ip", 40, HOUR, ip)) ||
+    (await enforceRateLimit(req, "ai-global", 1500, DAY, "all"))
+  );
+}
