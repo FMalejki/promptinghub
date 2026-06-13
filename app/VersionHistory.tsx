@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { diffLines, diffStats } from "@/lib/diff";
+import { useConfirm } from "./components/ConfirmDialog";
 
 type Version = {
   version: number;
@@ -32,6 +33,7 @@ export function VersionHistory({
   const [open, setOpen] = useState<number | null>(null);
   const [restoring, setRestoring] = useState<number | null>(null);
   const [comparing, setComparing] = useState<number | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetch(`/api/prompts/${promptId}/versions`)
@@ -41,7 +43,7 @@ export function VersionHistory({
   }, [promptId]);
 
   async function restore(version: number) {
-    if (!confirm(`Restore version ${version}? The current content is saved to history first.`)) return;
+    if (!(await confirm({ message: `Restore version ${version}? The current content is saved to history first.`, confirmLabel: "Restore" }))) return;
     setRestoring(version);
     const res = await fetch(`/api/prompts/${promptId}/versions/${version}/restore`, { method: "POST" });
     if (res.ok) window.location.reload();

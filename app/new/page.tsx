@@ -12,6 +12,7 @@ import { AttachmentsField, type DraftAttachment } from "../components/Attachment
 import { FileTree } from "../components/FileTree";
 import { MarkdownField } from "../components/MarkdownField";
 import { track } from "../components/AnalyticsBeacon";
+import { useConfirm } from "../components/ConfirmDialog";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type DraftFile = { path: string; content: string };
@@ -19,6 +20,7 @@ type DraftFile = { path: string; content: string };
 export default function NewPromptPage() {
   const { status } = useSession();
   const router = useRouter();
+  const confirm = useConfirm();
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -238,10 +240,10 @@ export default function NewPromptPage() {
   }
   // Delete a single file from the tree by its path (mirrors folder delete). If it
   // would empty the prompt, fall back to a single blank prompt.txt.
-  function removeFileByPath(path: string) {
+  async function removeFileByPath(path: string) {
     const f = files.find((x) => x.path === path);
     if (!f) return;
-    if (!confirm(`Delete file "${path}"? This can't be undone.`)) return;
+    if (!(await confirm({ message: `Delete file "${path}"? This can't be undone.`, confirmLabel: "Delete", variant: "danger" }))) return;
     setFiles((cur) => {
       const kept = cur.filter((x) => x.path !== path);
       return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
@@ -250,11 +252,11 @@ export default function NewPromptPage() {
   }
   // Delete a folder and every file under it. If that would empty the prompt,
   // fall back to a single blank prompt.txt (same as "Remove all").
-  function removeFolder(dirPath: string) {
+  async function removeFolder(dirPath: string) {
     const prefix = dirPath.replace(/\/+$/, "") + "/";
     const count = files.filter((f) => f.path.startsWith(prefix)).length;
     if (!count) return;
-    if (!confirm(`Delete folder "${dirPath}" and its ${count} file${count === 1 ? "" : "s"}? This can't be undone.`)) return;
+    if (!(await confirm({ message: `Delete folder "${dirPath}" and its ${count} file${count === 1 ? "" : "s"}? This can't be undone.`, confirmLabel: "Delete", variant: "danger" }))) return;
     setFiles((cur) => {
       const kept = cur.filter((f) => !f.path.startsWith(prefix));
       return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
@@ -643,7 +645,7 @@ export default function NewPromptPage() {
               {files.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => { if (confirm(`Remove all ${files.length} files?`)) setFiles([{ path: "prompt.txt", content: "" }]); }}
+                  onClick={async () => { if (await confirm({ message: `Remove all ${files.length} files?`, confirmLabel: "Remove all", variant: "danger" })) setFiles([{ path: "prompt.txt", content: "" }]); }}
                   className="shrink-0 text-xs font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
                 >
                   Remove all

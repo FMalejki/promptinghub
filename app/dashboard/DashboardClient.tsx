@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
@@ -103,34 +103,78 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [data, setData] = useState<Analytics | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "anon" | "error">("loading");
-  const [deleting, setDeleting] = useState<string | null>(null);
+  // Pending deferred deletes: promptId → the timer that will fire the DELETE.
+  const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const mounted = useRef(true);
+  useEffect(() => {
+    const timers = pendingDeletes.current;
+    return () => {
+      mounted.current = false;
+      // Leave timers running so an in-flight delete still completes after the
+      // user navigates away (Gmail-style) — only stop tracking them.
+      timers.clear();
+    };
+  }, []);
 
-  // Delete one of your own prompts straight from the dashboard (no need to open
-  // the editor). Confirms first; on success drops the row + decrements the count.
-  async function deletePrompt(row: Row) {
-    if (deleting) return;
-    if (!confirm(`Delete "${row.name}"? This cannot be undone.`)) return;
-    setDeleting(row.id);
-    try {
-      const res = await fetch(`/api/prompts/${row.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        toast("Couldn't delete that prompt. Please try again.", { variant: "error" });
-        return;
-      }
-      setData((d) =>
-        d
-          ? {
-              ...d,
-              totals: { ...d.totals, prompts: Math.max(0, d.totals.prompts - 1) },
-              perPrompt: d.perPrompt.filter((p) => p.id !== row.id),
-            }
-          : d,
-      );
-    } catch {
-      toast("Couldn't delete that prompt. Check your connection.", { variant: "error" });
-    } finally {
-      setDeleting(null);
-    }
+  // Re-insert a row that was optimistically removed (undo, or a failed delete).
+  function restoreRow(row: Row) {
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            totals: { ...d.totals, prompts: d.totals.prompts + 1 },
+            perPrompt: d.perPrompt.some((p) => p.id === row.id) ? d.perPrompt : [row, ...d.perPrompt],
+          }
+        : d,
+    );
+  }
+
+  // Delete one of your own prompts from the dashboard with an undo grace period
+  // (deferred-delete, à la Gmail): the row is removed immediately and the server
+  // DELETE only fires after the toast's window elapses, so "Undo" can cancel it
+  // before it ever leaves the browser. No native confirm — undo is the safety net.
+  function deletePrompt(row: Row) {
+    if (pendingDeletes.current.has(row.id)) return;
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            totals: { ...d.totals, prompts: Math.max(0, d.totals.prompts - 1) },
+            perPrompt: d.perPrompt.filter((p) => p.id !== row.id),
+          }
+        : d,
+    );
+    const fail = () => {
+      if (!mounted.current) return;
+      toast("Couldn't delete that prompt — it's been restored.", { variant: "error" });
+      restoreRow(row);
+    };
+    // Fire the actual delete just after the undo toast disappears (5.5s), so the
+    // Undo button is never visible once the request is committed.
+    const timer = setTimeout(() => {
+      pendingDeletes.current.delete(row.id);
+      fetch(`/api/prompts/${row.id}`, { method: "DELETE" })
+        .then((res) => {
+          if (!res.ok) fail();
+        })
+        .catch(fail);
+    }, 6000);
+    pendingDeletes.current.set(row.id, timer);
+    toast(`Deleted “${row.name}”.`, {
+      variant: "success",
+      durationMs: 5500,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const t = pendingDeletes.current.get(row.id);
+          if (t) {
+            clearTimeout(t);
+            pendingDeletes.current.delete(row.id);
+            restoreRow(row);
+          }
+        },
+      },
+    });
   }
 
   const load = useCallback(() => {
@@ -231,12 +275,11 @@ export default function DashboardPage() {
                             </Link>
                             <button
                               onClick={() => deletePrompt(r)}
-                              disabled={deleting === r.id}
                               title="Delete this prompt"
                               aria-label={`Delete ${r.name}`}
-                              className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                              className="text-xs font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                             >
-                              {deleting === r.id ? "Deleting…" : "Delete"}
+                              Delete
                             </button>
                           </div>
                         </td>

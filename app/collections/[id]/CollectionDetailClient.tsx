@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../../components/Navbar";
 import { PromptCard } from "../../components/PromptCard";
+import { useConfirm } from "../../components/ConfirmDialog";
 
 type CollectionDetail = {
   id: string;
@@ -66,6 +67,7 @@ export function CollectionDetailClient({ id }: { id: string }) {
   const { data: session } = useSession();
   const [collection, setCollection] = useState<CollectionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetch(`/api/collections/${id}`)
@@ -78,7 +80,7 @@ export function CollectionDetailClient({ id }: { id: string }) {
   const isOwner = session?.user?.email && collection && session.user.email === collection.ownerEmail;
 
   async function del() {
-    if (!confirm("Delete this collection? The prompts themselves are not deleted.")) return;
+    if (!(await confirm({ message: "Delete this collection? The prompts themselves are not deleted.", confirmLabel: "Delete", variant: "danger" }))) return;
     const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
     if (res.ok) router.push(`/user/${encodeURIComponent(collection!.ownerEmail)}`);
   }
