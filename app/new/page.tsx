@@ -80,7 +80,6 @@ export default function NewPromptPage() {
   const [importNote, setImportNote] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [ghUrl, setGhUrl] = useState("");
-  const [ghToken, setGhToken] = useState("");
   const [ghImporting, setGhImporting] = useState(false);
   const [ghNote, setGhNote] = useState<string | null>(null);
   const [ghError, setGhError] = useState<string | null>(null);
@@ -146,7 +145,7 @@ export default function NewPromptPage() {
       const res = await fetch("/api/import/github", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: ghUrl.trim(), token: ghToken.trim() || undefined }),
+        body: JSON.stringify({ url: ghUrl.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -164,7 +163,6 @@ export default function NewPromptPage() {
       const n = d.notes || {};
       setGhNote(`Imported ${n.imported} file${n.imported === 1 ? "" : "s"}${n.skipped ? `, skipped ${n.skipped}` : ""}${n.truncated ? " (truncated to fit limits)" : ""}. Review below before publishing.`);
       setGhUrl("");
-      setGhToken("");
     } catch {
       setGhError("GitHub import failed — check the URL and your connection.");
     } finally {
@@ -237,6 +235,18 @@ export default function NewPromptPage() {
   }
   function removeFile(i: number) {
     setFiles((cur) => (cur.length > 1 ? cur.filter((_, idx) => idx !== i) : cur));
+  }
+  // Delete a single file from the tree by its path (mirrors folder delete). If it
+  // would empty the prompt, fall back to a single blank prompt.txt.
+  function removeFileByPath(path: string) {
+    const f = files.find((x) => x.path === path);
+    if (!f) return;
+    if (!confirm(`Delete file "${path}"? This can't be undone.`)) return;
+    setFiles((cur) => {
+      const kept = cur.filter((x) => x.path !== path);
+      return kept.length ? kept : [{ path: "prompt.txt", content: "" }];
+    });
+    setActiveEditIdx(0);
   }
   // Delete a folder and every file under it. If that would empty the prompt,
   // fall back to a single blank prompt.txt (same as "Remove all").
@@ -408,26 +418,6 @@ export default function NewPromptPage() {
               placeholder="https://github.com/owner/repo  (or owner/repo, or .../tree/branch/path)"
               className={`${input} mt-3 font-mono text-sm`}
               inputMode="url"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              data-1p-ignore="true"
-              data-lpignore="true"
-              data-bwignore="true"
-              data-form-type="other"
-            />
-            {/* Masked via -webkit-text-security instead of type="password" so Chrome
-                does NOT see a login form here — otherwise it autofills a saved
-                email/password into the URL + token pair (real bug owner caught). */}
-            <input
-              type="text"
-              name="gh-pat"
-              value={ghToken}
-              onChange={(e) => setGhToken(e.target.value)}
-              placeholder="Optional GitHub token (private repos / higher rate limit)"
-              className={`${input} mt-2 font-mono text-sm`}
-              style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
@@ -703,6 +693,7 @@ export default function NewPromptPage() {
                           activePath={f?.path ?? null}
                           onSelect={(p) => { const i = files.findIndex((x) => x.path === p); if (i >= 0) setActiveEditIdx(i); }}
                           onDeleteFolder={removeFolder}
+                          onDeleteFile={removeFileByPath}
                         />
                       </div>
                       <div className="mt-2 flex items-center gap-3">
