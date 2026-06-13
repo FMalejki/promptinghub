@@ -1,4 +1,4 @@
-import { extractVariables, applyVariables, extractVariablesFromFiles, tokenizeTemplate } from "../lib/template";
+import { extractVariables, applyVariables, extractVariablesFromFiles, tokenizeTemplate, humanizeVarName, isLongValueVar } from "../lib/template";
 
 describe("tokenizeTemplate", () => {
   it("splits literal text and variables in order", () => {
@@ -69,6 +69,55 @@ describe("applyVariables", () => {
 
   it("substitutes every occurrence", () => {
     expect(applyVariables("{{a}}-{{a}}", { a: "z" })).toBe("z-z");
+  });
+
+  describe("with an activeNames set (only fill-in fields are substituted)", () => {
+    it("leaves non-field {{tokens}} (code examples) verbatim", () => {
+      const active = new Set(["topic"]);
+      const text = "Write about {{topic}}.\n```js\nconst x = {{model_name}};\n```";
+      expect(applyVariables(text, { topic: "AI" }, active)).toBe(
+        "Write about AI.\n```js\nconst x = {{model_name}};\n```",
+      );
+    });
+    it("leaves Handlebars control tokens like {{else}}/{{this}} intact", () => {
+      const active = new Set(["fallback"]);
+      const text = "{{#each x}}{{this}}{{else}}{{fallback}}{{/each}}";
+      expect(applyVariables(text, { fallback: "none" }, active)).toBe("{{#each x}}{{this}}{{else}}none{{/each}}");
+    });
+    it("still applies a field's inline default when its value is empty", () => {
+      const active = new Set(["tone"]);
+      expect(applyVariables("Tone: {{tone:friendly}}, code {{x}}", {}, active)).toBe("Tone: friendly, code {{x}}");
+    });
+  });
+});
+
+describe("humanizeVarName", () => {
+  it("turns snake_case / kebab-case into a sentence-case label", () => {
+    expect(humanizeVarName("user_name")).toBe("User name");
+    expect(humanizeVarName("target-audience")).toBe("Target audience");
+  });
+  it("splits camelCase", () => {
+    expect(humanizeVarName("recipientEmail")).toBe("Recipient Email");
+  });
+  it("capitalizes a single bare word and tolerates empties", () => {
+    expect(humanizeVarName("topic")).toBe("Topic");
+    expect(humanizeVarName("")).toBe("");
+  });
+});
+
+describe("isLongValueVar", () => {
+  it("flags names that imply prose/code", () => {
+    expect(isLongValueVar({ name: "description" })).toBe(true);
+    expect(isLongValueVar({ name: "code_snippet" })).toBe(true);
+    expect(isLongValueVar({ name: "user_message" })).toBe(true);
+  });
+  it("flags a default that is long or multi-line", () => {
+    expect(isLongValueVar({ name: "x", default: "a".repeat(80) })).toBe(true);
+    expect(isLongValueVar({ name: "x", default: "line1\nline2" })).toBe(true);
+  });
+  it("treats short token-like vars as single-line", () => {
+    expect(isLongValueVar({ name: "tone" })).toBe(false);
+    expect(isLongValueVar({ name: "topic", default: "AI" })).toBe(false);
   });
 });
 
