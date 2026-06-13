@@ -1,4 +1,4 @@
-import { resolveUseWith, useWithFilter, useWithLabel, useWithBadge, USE_WITH_VALUES } from "../lib/useWith";
+import { resolveUseWith, useWithFilter, useWithLabel, useWithBadge, useWithSurfaces, USE_WITH_VALUES } from "../lib/useWith";
 
 describe("resolveUseWith", () => {
   it("passes through valid values", () => {
@@ -48,5 +48,22 @@ describe("useWithBadge", () => {
     expect(useWithBadge(undefined)).toBeNull();
     expect(useWithBadge("garbage")).toBeNull();
     expect(useWithBadge(null)).toBeNull();
+  });
+});
+
+describe("useWithSurfaces", () => {
+  it("shows only web chat for 'chat'", () => {
+    expect(useWithSurfaces("chat")).toEqual({ chat: true, agent: false });
+  });
+  it("shows only agent targets for 'agent'", () => {
+    expect(useWithSurfaces("agent")).toEqual({ chat: false, agent: true });
+  });
+  it("shows both lists for 'both'", () => {
+    expect(useWithSurfaces("both")).toEqual({ chat: true, agent: true });
+  });
+  it("treats missing / invalid as 'both' (legacy prompts keep both)", () => {
+    expect(useWithSurfaces(undefined)).toEqual({ chat: true, agent: true });
+    expect(useWithSurfaces("garbage")).toEqual({ chat: true, agent: true });
+    expect(useWithSurfaces(null)).toEqual({ chat: true, agent: true });
   });
 });

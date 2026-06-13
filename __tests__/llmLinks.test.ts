@@ -1,4 +1,9 @@
-import { buildAssistantLinks, LLM_MAX_CHARS, type AssistantId } from "../lib/llmLinks";
+import { buildAssistantLinks, assistantOpenUrl, GEMINI_ANDROID_URL, LLM_MAX_CHARS, type AssistantId } from "../lib/llmLinks";
+
+const ANDROID_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
+const DESKTOP_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 function byId(text: string) {
   const list = buildAssistantLinks(text)!;
@@ -48,5 +53,27 @@ describe("buildAssistantLinks", () => {
     const a = byId("a & b = c? <tag>");
     expect(a.chatgpt.url).toContain("a%20%26%20b%20%3D%20c%3F%20%3Ctag%3E");
     expect(a.chatgpt.url).not.toContain("<tag>");
+  });
+});
+
+describe("assistantOpenUrl", () => {
+  it("drops the /app path for Gemini on Android (the app-link crashes the native app)", () => {
+    const a = byId("hello");
+    expect(assistantOpenUrl(a.gemini, ANDROID_UA)).toBe(GEMINI_ANDROID_URL);
+    expect(assistantOpenUrl(a.gemini, ANDROID_UA)).not.toContain("/app");
+  });
+  it("keeps the normal Gemini /app URL on desktop", () => {
+    const a = byId("hello");
+    expect(assistantOpenUrl(a.gemini, DESKTOP_UA)).toBe("https://gemini.google.com/app");
+  });
+  it("never rewrites the other assistants, even on Android", () => {
+    const a = byId("hello");
+    for (const id of ["chatgpt", "claude", "perplexity"] as const) {
+      expect(assistantOpenUrl(a[id], ANDROID_UA)).toBe(a[id].url);
+    }
+  });
+  it("falls back to the assistant's own url when the user agent is unknown", () => {
+    const a = byId("hello");
+    expect(assistantOpenUrl(a.gemini, undefined)).toBe(a.gemini.url);
   });
 });

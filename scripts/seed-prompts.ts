@@ -40,12 +40,25 @@ if (!uri) {
   process.exit(1);
 }
 
-const client = await new MongoClient(uri).connect();
-try {
-  const db = client.db(process.env.MONGODB_DB || "promptinghub");
-  console.log(`Seeding ${AWESOME_PROMPTS.length} prompts as ${ownerEmail}…`);
-  const res = await seedDatabase(db, AWESOME_PROMPTS, { ownerEmail, ownerName });
-  console.log("✓ Seed complete:", res);
-} finally {
-  await client.close();
+// Wrapped in an async main() rather than top-level await: tsx compiles this to
+// CommonJS, which doesn't support top-level await, so the script broke at parse
+// time. The IIFE keeps it runnable locally for seeding test data.
+// `mongoUri` is passed in (not closed over) so the `if (!uri)` narrowing above
+// reaches it as a plain string — control-flow narrowing doesn't flow into a
+// nested function's closure.
+async function main(mongoUri: string) {
+  const client = await new MongoClient(mongoUri).connect();
+  try {
+    const db = client.db(process.env.MONGODB_DB || "promptinghub");
+    console.log(`Seeding ${AWESOME_PROMPTS.length} prompts as ${ownerEmail}…`);
+    const res = await seedDatabase(db, AWESOME_PROMPTS, { ownerEmail, ownerName });
+    console.log("✓ Seed complete:", res);
+  } finally {
+    await client.close();
+  }
 }
+
+main(uri).catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
