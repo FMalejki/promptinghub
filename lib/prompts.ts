@@ -401,6 +401,29 @@ export async function listCategories(db: Db): Promise<string[]> {
   return ((await db.collection("prompts").distinct("category")) as string[]).sort();
 }
 
+// --- Semantic-search embedding storage (model-free; the vectors are computed in
+// the route/backfill via lib/embeddings, kept out of this module so tests and
+// other consumers never load the model). ---
+
+// Persist a prompt's embedding vector. Best-effort: callers ignore failures so a
+// missing/late embedding only means the prompt falls back to keyword matching.
+export async function setPromptEmbedding(db: Db, id: string, embedding: number[]): Promise<void> {
+  if (!ObjectId.isValid(id) || !Array.isArray(embedding) || !embedding.length) return;
+  await db.collection("prompts").updateOne({ _id: new ObjectId(id) }, { $set: { embedding } });
+}
+
+// Load stored embeddings for a set of prompt ids → Map<id, vector>. Prompts
+// without an embedding are simply absent from the map.
+export async function getPromptEmbeddings(db: Db, ids: string[]): Promise<Map<string, number[]>> {
+  const objIds = ids.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+  if (!objIds.length) return new Map();
+  const rows = await db
+    .collection("prompts")
+    .find({ _id: { $in: objIds }, embedding: { $type: "array" } }, { projection: { embedding: 1 } })
+    .toArray();
+  return new Map(rows.map((r: any) => [r._id.toString(), r.embedding as number[]]));
+}
+
 /** Public prompt counts per category, descending by count. */
 export async function topCategories(db: Db): Promise<{ category: string; count: number }[]> {
   const rows = await db
