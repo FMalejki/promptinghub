@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
 import { PromptCard } from "../components/PromptCard";
 import { PromptOfDay } from "../components/PromptOfDay";
-import { TrendingNow } from "../components/TrendingNow";
+import { TrendingNow, type TrendingPrompt } from "../components/TrendingNow";
 import { trendingRankMap, TRENDING_BADGE_TOP_N } from "@/lib/trendingBadge";
 import { PROMPT_CATEGORIES } from "@/lib/constants";
 import { hasActiveFilters } from "@/lib/browseFilters";
@@ -43,6 +43,10 @@ export default function BrowsePage() {
   const [error, setError] = useState(false);
   const [stats, setStats] = useState<{ prompts: number; creators: number; copies: number } | null>(null);
   const [catCounts, setCatCounts] = useState<Record<string, number>>({});
+  // The current top-window trending prompts, fetched once. Drives both the per-card
+  // "trending now" flame badge (via id→rank map) and the TrendingNow tile band, so
+  // the landing view issues a single trending request instead of two.
+  const [trendingTop, setTrendingTop] = useState<TrendingPrompt[]>([]);
   // id → 1-based trending rank for the current top window, so any card that's
   // trending right now shows a flame badge regardless of the active sort.
   const [trendingRanks, setTrendingRanks] = useState<Map<string, number>>(new Map());
@@ -70,10 +74,15 @@ export default function BrowsePage() {
       .then((r) => (r.ok ? r.json() : { counts: {} }))
       .then((d) => setCatCounts(d.counts || {}))
       .catch(() => {});
-    // Top trending ids → rank map, so cards can show a "trending now" badge.
+    // Top trending window, fetched once: feeds both the card badges (id→rank map)
+    // and the TrendingNow band (top 3), so we don't fire two trending requests.
     fetch(`/api/prompts?sort=trending&limit=${TRENDING_BADGE_TOP_N}`)
       .then((r) => (r.ok ? r.json() : { prompts: [] }))
-      .then((d) => setTrendingRanks(trendingRankMap((d.prompts || []).map((p: { id: string }) => p.id))))
+      .then((d) => {
+        const list: TrendingPrompt[] = Array.isArray(d.prompts) ? d.prompts : [];
+        setTrendingTop(list);
+        setTrendingRanks(trendingRankMap(list.map((p) => p.id)));
+      })
       .catch(() => {});
   }, []);
 
@@ -192,7 +201,7 @@ export default function BrowsePage() {
         {!q && !category && !tag && !imageOnly && !skillsOnly && (
           <>
             <PromptOfDay />
-            <TrendingNow />
+            <TrendingNow initial={trendingTop.slice(0, 3)} />
           </>
         )}
 

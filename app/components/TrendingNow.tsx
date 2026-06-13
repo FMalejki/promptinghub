@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { promptImageSrc, getPlaceholderImage } from "@/lib/constants";
 
-type TrendingPrompt = {
+export type TrendingPrompt = {
   id: string;
   name: string;
   description: string;
@@ -18,22 +18,29 @@ type TrendingPrompt = {
 // differently from the blue "Prompt of the day" banner above it. Renders nothing
 // until data arrives (and nothing if there aren't at least 2 trending prompts —
 // a one-tile "trending" row looks broken).
-export function TrendingNow() {
-  const [prompts, setPrompts] = useState<TrendingPrompt[] | null>(null);
+//
+// `initial` lets a parent that already has the trending list (e.g. /browse, which
+// fetches the top window for card badges) hand it down so we don't issue a second
+// identical request — no extra round-trip, no pop-in. Without it we self-fetch,
+// so the component still works standalone.
+export function TrendingNow({ initial }: { initial?: TrendingPrompt[] } = {}) {
+  const [fetched, setFetched] = useState<TrendingPrompt[] | null>(null);
 
   useEffect(() => {
+    if (initial) return; // parent supplied the data — skip the network call
     let active = true;
     fetch("/api/prompts?sort=trending&limit=3")
       .then((r) => (r.ok ? r.json() : { prompts: [] }))
       .then((d) => {
-        if (active) setPrompts(Array.isArray(d.prompts) ? d.prompts : []);
+        if (active) setFetched(Array.isArray(d.prompts) ? d.prompts : []);
       })
-      .catch(() => active && setPrompts([]));
+      .catch(() => active && setFetched([]));
     return () => {
       active = false;
     };
-  }, []);
+  }, [initial]);
 
+  const prompts = initial ?? fetched;
   if (!prompts || prompts.length < 2) return null;
 
   return (
