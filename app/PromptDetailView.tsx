@@ -30,6 +30,7 @@ import { track, getAnonId } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
 import { FileTree } from "./components/FileTree";
+import { useToast } from "./components/Toast";
 
 type TestedModel = { modelId: string; version?: string; notes?: string };
 type Author = { name: string; image: string | null; handle: string | null };
@@ -117,6 +118,7 @@ function PromptText({
 export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [stars, setStars] = useState(prompt.stars);
   const [copyCount, setCopyCount] = useState(prompt.copyCount ?? 0);
   const [counted, setCounted] = useState(false);
@@ -237,7 +239,7 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
       const body = await res.json().catch(() => null);
       setIsPinned(Array.isArray(body?.pinned) ? body.pinned.includes(prompt.id) : !isPinned);
     } else if (res.status === 400) {
-      alert("You can pin up to 3 prompts. Unpin one first.");
+      toast("You can pin up to 3 prompts. Unpin one first.", { variant: "error" });
     }
   }
 

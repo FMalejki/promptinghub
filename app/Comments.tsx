@@ -9,6 +9,7 @@ import { renderMentions } from "@/lib/mentions";
 import { parseInline } from "@/lib/inlineMarkdown";
 import { sortRoots, type SortMode } from "@/lib/commentSort";
 import { REACTION_EMOJIS } from "@/lib/reactionEmojis";
+import { useToast } from "./components/Toast";
 
 type Author = { name: string; image: string | null; handle: string | null };
 type Comment = {
@@ -66,6 +67,7 @@ function Body({ text }: { text: string }) {
 export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n: number) => void }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
@@ -134,7 +136,7 @@ export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n
       setEditing(null);
       setEditBody("");
     } else if (res.status === 409) {
-      alert("The edit window for this comment has closed.");
+      toast("The edit window for this comment has closed.", { variant: "error" });
     }
   }
 
@@ -149,7 +151,7 @@ export function Comments({ promptId, onCount }: { promptId: string; onCount?: (n
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
-    if (res.ok) alert("Thanks — this comment has been flagged for moderation.");
+    if (res.ok) toast("Thanks — this comment has been flagged for moderation.", { variant: "success" });
   }
 
   async function toggleLike(id: string) {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "../components/Navbar";
+import { useToast } from "../components/Toast";
 import { weekOverWeek } from "@/lib/analyticsSummary";
 
 type Row = { id: string; name: string; copyCount: number; stars: number; forkCount: number; isPrivate: boolean };
@@ -99,6 +100,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export default function DashboardPage() {
   const { status } = useSession();
+  const { toast } = useToast();
   const [data, setData] = useState<Analytics | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "anon" | "error">("loading");
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`/api/prompts/${row.id}`, { method: "DELETE" });
       if (!res.ok) {
-        alert("Couldn't delete that prompt. Please try again.");
+        toast("Couldn't delete that prompt. Please try again.", { variant: "error" });
         return;
       }
       setData((d) =>
@@ -125,7 +127,7 @@ export default function DashboardPage() {
           : d,
       );
     } catch {
-      alert("Couldn't delete that prompt. Check your connection.");
+      toast("Couldn't delete that prompt. Check your connection.", { variant: "error" });
     } finally {
       setDeleting(null);
     }
