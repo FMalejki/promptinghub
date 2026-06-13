@@ -26,6 +26,8 @@ import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
 import { AssistantLinks } from "./components/AssistantLinks";
+import { AgentLinks } from "./components/AgentLinks";
+import { useWithSurfaces } from "@/lib/useWith";
 import { track, getAnonId } from "./components/AnalyticsBeacon";
 import { PlaygroundPanel } from "./PlaygroundPanel";
 import { ModelAttestations } from "./ModelAttestations";
@@ -715,12 +717,18 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
         </div>
       )}
 
-      {/* Run this prompt in an assistant (text prompts only) — below the prompt body */}
-      {!imageGen && (
-        <div className="mt-6">
-          <AssistantLinks text={allText} onOpen={recordCopy} />
-        </div>
-      )}
+      {/* Run/use this prompt (text prompts only) — below the prompt body. Which
+          surfaces show depends on the prompt's useWith: web chat assistants for
+          "chat", coding-agent copy targets for "agent", both lists for "both". */}
+      {!imageGen && (() => {
+        const surfaces = useWithSurfaces(prompt.useWith);
+        return (
+          <div className="mt-6 space-y-4">
+            {surfaces.chat && <AssistantLinks text={allText} onOpen={recordCopy} />}
+            {surfaces.agent && <AgentLinks text={allText} onCopy={recordCopy} />}
+          </div>
+        );
+      })()}
 
       {/* Install box */}
       {installRef && (

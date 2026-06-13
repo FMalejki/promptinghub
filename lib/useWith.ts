@@ -27,6 +27,18 @@ export function useWithFilter(input: unknown): { $in: (UseWith | null)[] } | und
   return { $in: [v, "both", null] };
 }
 
+/**
+ * Which "use this prompt" surfaces a detail page should show, given a useWith.
+ * - "chat"  → web chat assistants only (ChatGPT/Claude/Gemini/…)
+ * - "agent" → coding-agent targets only (Claude Code/Cursor/…)
+ * - "both"  → both lists
+ * Legacy/invalid (missing field) resolves to "both" so old prompts keep both.
+ */
+export function useWithSurfaces(input: unknown): { chat: boolean; agent: boolean } {
+  const v = resolveUseWith(input);
+  return { chat: v === "chat" || v === "both", agent: v === "agent" || v === "both" };
+}
+
 /** Display label + emoji for the UI badge/selector. */
 export function useWithLabel(v: UseWith): string {
   switch (v) {
