@@ -21,6 +21,7 @@ import { VersionHistory } from "./VersionHistory";
 import { ApiSnippet } from "./ApiSnippet";
 import { ReportButton } from "./ReportButton";
 import { ShareButtons } from "./ShareButtons";
+import { PrivateShareButton } from "./PrivateShareButton";
 import { promptStats } from "@/lib/promptStats";
 import { fileAnchorId, fileAnchorLink, parseFileAnchor, activeFileIndex } from "@/lib/fileAnchor";
 import { relativeTime } from "@/lib/relativeTime";
@@ -428,6 +429,8 @@ export function PromptDetailView({ prompt }: { prompt: PromptDetail }) {
             </button>
 
             <SaveToCollection promptId={prompt.id} />
+
+            {prompt.isPrivate && <PrivateShareButton canManage={canEdit} />}
 
             {prompt.isOwner && !prompt.isPrivate && (
               <button
