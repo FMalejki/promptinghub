@@ -23,7 +23,18 @@ export function AssistantLinks({ text, onOpen }: { text: string; onOpen?: () => 
     setCopiedId(a.id);
     track("cta_click", typeof window !== "undefined" ? window.location.pathname : "/", { action: "open_in", assistant: a.id });
     onOpen?.();
-    window.open(a.url, "_blank", "noopener,noreferrer");
+
+    let targetUrl = a.url;
+    const isAndroidGemini = a.id === "gemini" && typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+    
+    if (isAndroidGemini) {
+      // By skipping the "/app" path, we often bypass the aggressive Android App Link
+      // that causes the installed Gemini app to crash, forcing it to open in the browser instead.
+      targetUrl = "https://gemini.google.com/";
+    }
+
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+
     setTimeout(() => setCopiedId((c) => (c === a.id ? null : c)), 2500);
   }
 

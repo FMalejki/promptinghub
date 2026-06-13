@@ -40,12 +40,19 @@ if (!uri) {
   process.exit(1);
 }
 
-const client = await new MongoClient(uri).connect();
-try {
-  const db = client.db(process.env.MONGODB_DB || "promptinghub");
-  console.log(`Seeding ${AWESOME_PROMPTS.length} prompts as ${ownerEmail}…`);
-  const res = await seedDatabase(db, AWESOME_PROMPTS, { ownerEmail, ownerName });
-  console.log("✓ Seed complete:", res);
-} finally {
-  await client.close();
+async function main() {
+  const client = await new MongoClient(uri).connect();
+  try {
+    const db = client.db(process.env.MONGODB_DB || "promptinghub");
+    console.log(`Seeding ${AWESOME_PROMPTS.length} prompts as ${ownerEmail}…`);
+    const res = await seedDatabase(db, AWESOME_PROMPTS, { ownerEmail, ownerName });
+    console.log("✓ Seed complete:", res);
+  } finally {
+    await client.close();
+  }
 }
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
