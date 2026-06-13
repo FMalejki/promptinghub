@@ -401,6 +401,21 @@ export async function listCategories(db: Db): Promise<string[]> {
   return ((await db.collection("prompts").distinct("category")) as string[]).sort();
 }
 
+// Existence checks for the /c and /t browse pages — true when ANY prompt (public
+// or private) uses this category/tag. Deliberately privacy-agnostic so we 404
+// only genuinely-empty URLs (typos), never a page a signed-in owner could fill
+// with their own private prompts. Match shapes mirror listPrompts' filters.
+export async function categoryExists(db: Db, category: string): Promise<boolean> {
+  if (!category) return false;
+  return (await db.collection("prompts").countDocuments({ category }, { limit: 1 })) > 0;
+}
+
+export async function tagExists(db: Db, tag: string): Promise<boolean> {
+  const t = normalizeTags(tag)[0];
+  if (!t) return false;
+  return (await db.collection("prompts").countDocuments({ tags: t }, { limit: 1 })) > 0;
+}
+
 // --- Semantic-search embedding storage (model-free; the vectors are computed in
 // the route/backfill via lib/embeddings, kept out of this module so tests and
 // other consumers never load the model). ---

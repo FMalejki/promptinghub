@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getCreatorProfile } from "@/lib/users";
 import { creatorJsonLd } from "@/lib/jsonLd";
@@ -36,6 +37,10 @@ async function creatorLdJson(handle: string): Promise<string | null> {
 }
 
 export default async function CreatorPage({ params }: { params: { handle: string } }) {
+  // Real 404 for an unknown handle instead of a 200 + client empty state.
+  const creator = await getCreatorProfile(await getDb(), params.handle).catch(() => null);
+  if (!creator) notFound();
+
   const ld = await creatorLdJson(params.handle);
   return (
     <>

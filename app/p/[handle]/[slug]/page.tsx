@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getPromptDetailByHandleAndSlug } from "@/lib/prompts";
 import { promptOgMetadata, canonicalPromptUrl } from "@/lib/meta";
@@ -26,6 +27,12 @@ export async function generateMetadata({ params }: { params: { handle: string; s
   }
 }
 
-export default function NamespacedPromptPage({ params }: { params: { handle: string; slug: string } }) {
+export default async function NamespacedPromptPage({ params }: { params: { handle: string; slug: string } }) {
+  // Existence-only 404 (unknown handle or slug). Privacy stays the client's job —
+  // a private prompt the viewer can access must still render — so we don't gate on
+  // isPrivate here, only on the row being missing entirely.
+  const exists = await getPromptDetailByHandleAndSlug(await getDb(), params.handle, params.slug).catch(() => null);
+  if (!exists) notFound();
+
   return <NamespacedPromptClient handle={params.handle} slug={params.slug} />;
 }
